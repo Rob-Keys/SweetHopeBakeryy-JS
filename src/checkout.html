@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Order Summary</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="Submit your order request for delicious baked goods from Sweet Hope Bakery. Enter pickup details and submit your order request. Payment is due at in-person pickup.">
+        <meta property="og:title" content="Order Request Form - Sweet Hope Bakery">
+        <meta property="og:description" content="Order request for custom cakes, cookies, donuts, and more in Arlington, Virginia. Payment at pickup only.">
+        <meta property="og:image" content="https://example.com/your-cake-photo.jpg">
+        <meta property="og:url" content="https://sweethopebakeryy.com/checkout">
+        <link rel="icon" type="image/x-icon" href="/images/sweethopebakeryy.ico">
+        <link rel="apple-touch-icon" href="/images/sweethopebakeryy.ico">
+        <link rel="canonical" href="https://www.sweethopebakeryy.com/checkout" />
+
+        <link rel="stylesheet" href="/styles/shared.css">
+        <link rel="stylesheet" href="/styles/checkout.css">
+
+        <script src="https://js.stripe.com/basil/stripe.js"></script>
+
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Tagesschrift&display=swap" rel="stylesheet">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <body>
+        <div id="header-placeholder"></div>
+
+        <div class="row mx-2 my-4">
+            <div class="col-md-5 left-side fade-in-right">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Order Summary</h2>
+                    </div>
+                    <ul class="list-group list-group-flush" id="order-summary-list">
+                        <!-- Populated by checkout.js -->
+                    </ul>
+                    <div class="card-body">
+                        <h5 class="card-title" id="order-total">Total: $0.00</h5>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-1"></div>
+            <div class="col-md-5 fade-in-left">
+                <form id="checkout-form">
+                    <h4 class="m-0 p-0"> Name: </h4>
+                    <input type="text" name="customer_name" id="name" class="m-0 p-0 mb-2" style="width: 100%" required>
+
+                    <h4 class="m-0 p-0"> Email: </h4>
+                    <input type="email" name="customer_email" id="email" class="m-0 p-0 mb-2" style="width: 100%" required>
+
+                    <h4 class="m-0 p-0"> Phone Number: </h4>
+                    <input type="tel" name="customer_phone" id="phone" class="m-0 p-0 mb-4" style="width: 100%" required>
+
+                    <h4 class="m-0 p-0"> Pickup Details: </h4>
+                    <div class="pickup-details-container">
+                        <div class="row">
+                            <p class="col-md-6">Pickup Location:</p>
+                            <h5 class="col-md-6"><strong>Arlington, VA, 22207</strong> </h5>
+                        </div>
+
+                        <div class="row">
+                            <p class="col-md-6">Pickup Date:</p>
+                            <input type="date" name="acquisition_date" id="pickup-date" class="col-md-6" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 m-0 p-0"></div>
+                            <p class="col-6 m-0 p-0 small-text mt-1" style="text-align: end"> * Final pickup time and address to be coordinated through direct communication post-order. </p>
+                        </div>
+                    </div>
+
+                    <input type="hidden" name="acquisition_method" value="pickup">
+
+                    <h4 class="m-0 p-0"> Payment Method: </h4>
+                    <div id="payment-element"></div>
+
+                    <div id="email-errors" class="text-danger"></div>
+                    <div id="phone-errors" class="text-danger"></div>
+
+                    <button type="button" id="pay-button" class="btn-cookie btn-lg mt-3">Pay Now</button>
+                    <div id="confirm-errors"></div>
+                </form>
+            </div>
+        </div>
+
+        <div id="footer-placeholder"></div>
+
+        <script type="module" src="/js/pages/checkout.js"></script>
+    </body>
+</html>

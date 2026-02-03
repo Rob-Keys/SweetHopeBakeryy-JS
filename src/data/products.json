@@ -1,0 +1,65 @@
+[
+    {
+        "itemName": "Maple Brown Sugar Cookies",
+        "description": "Soft cookies with maple syrup and brown sugar. Sweet with a hint of caramel flavor.",
+        "prices": {
+            "3": 20,
+            "6": 30,
+            "12": 40
+        },
+        "imageURLs": [
+            "/images/products/map1.avif",
+            "/images/products/map2.avif"
+        ],
+        "customizations": []
+    },
+    {
+        "itemName": "Snickerdoodles",
+        "description": "Classic cinnamon-sugar cookies with a soft center and crispy edges.",
+        "prices": {
+            "6": 25,
+            "12": 40
+        },
+        "imageURLs": [
+            "/images/products/snick1.avif",
+            "/images/products/snick2.avif"
+        ]
+    },
+    {
+        "itemName": "Protein Cookies",
+        "description": "Cookies made with protein powder for a healthier treat. Good for snacking or post-workout.",
+        "prices": {
+            "6": 20,
+            "12": 38
+        },
+        "imageURLs": [
+            "/images/products/prot1.avif",
+            "/images/products/prot2.avif"
+        ]
+    },
+    {
+        "itemName": "Double Chocolate Muffins",
+        "description": "Moist chocolate muffins with chocolate chips throughout. Rich and satisfying.",
+        "prices": {
+            "3": 10,
+            "6": 18,
+            "12": 30
+        },
+        "imageURLs": [
+            "/images/products/muff1.avif",
+            "/images/products/muff2.avif"
+        ]
+    },
+    {
+        "itemName": "Cinnamon Cookies",
+        "description": "Buttery cookies with cinnamon. Crispy outside, soft inside.",
+        "prices": {
+            "6": 20,
+            "12": 38
+        },
+        "imageURLs": [
+            "/images/products/cinn1.avif",
+            "/images/products/cinn2.avif"
+        ]
+    }
+]
