@@ -51,14 +51,18 @@ async function hashPasswordPbkdf2(password, saltB64, iterations) {
 
 export async function onRequestPost(context) {
   const { ADMIN_PASSWORD_HASH, JWT_SECRET } = context.env;
-  if (!ADMIN_PASSWORD_HASH || !JWT_SECRET) {
-    return Response.json({ error: 'Auth env vars not configured' }, { status: 500 });
+  if (!ADMIN_PASSWORD_HASH) {
+    return Response.json({ error: 'ADMIN_PASSWORD_HASH not set' }, { status: 500 });
+  }
+  if (!JWT_SECRET) {
+    return Response.json({ error: 'JWT_SECRET not set' }, { status: 500 });
   }
 
   try {
     const parsed = parsePbkdf2Hash(ADMIN_PASSWORD_HASH);
     if (!parsed) {
-      return Response.json({ error: 'Auth env vars not configured' }, { status: 500 });
+      const parts = String(ADMIN_PASSWORD_HASH).split('$');
+      return Response.json({ error: 'Hash parse failed', parts: parts.length, prefix: parts[0] }, { status: 500 });
     }
 
     const { password } = await context.request.json();

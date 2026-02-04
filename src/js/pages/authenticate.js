@@ -14,7 +14,7 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     } else {
         const errorEl = document.getElementById('auth-error');
         if (result.status === 500) {
-            errorEl.textContent = 'Server configuration error. Please contact the administrator.';
+            errorEl.textContent = 'Server error: ' + result.error;
         } else {
             errorEl.textContent = 'Incorrect password.';
         }
