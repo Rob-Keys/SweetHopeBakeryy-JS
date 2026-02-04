@@ -7,7 +7,7 @@ const DESIRED_PAGE_KEY = 'shb_desired_page';
 /**
  * Authenticate with a password via server endpoint. Stores JWT in sessionStorage on success.
  * @param {string} password
- * @returns {Promise<boolean>}
+ * @returns {Promise<{success: boolean, status: number, error: string}>}
  */
 async function authenticate(password) {
   try {
@@ -16,16 +16,19 @@ async function authenticate(password) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password })
     });
-    if (!response.ok) return false;
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      return { success: false, status: response.status, error: body.error || 'Unknown error' };
+    }
     const { token } = await response.json();
     if (token) {
       sessionStorage.setItem(AUTH_KEY, token);
-      return true;
+      return { success: true };
     }
-    return false;
+    return { success: false, status: 200, error: 'No token in response' };
   } catch (err) {
     console.error('authenticate failed:', err);
-    return false;
+    return { success: false, status: 0, error: err.message };
   }
 }
 

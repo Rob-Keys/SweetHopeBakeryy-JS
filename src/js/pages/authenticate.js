@@ -8,10 +8,16 @@ renderFooter();
 document.getElementById('auth-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const password = document.getElementById('password').value;
-    const success = await authenticate(password);
-    if (success) {
+    const result = await authenticate(password);
+    if (result.success) {
         window.location.href = getDesiredPage();
     } else {
-        document.getElementById('auth-error').style.display = 'block';
+        const errorEl = document.getElementById('auth-error');
+        if (result.status === 500) {
+            errorEl.textContent = 'Server configuration error. Please contact the administrator.';
+        } else {
+            errorEl.textContent = 'Incorrect password.';
+        }
+        errorEl.style.display = 'block';
     }
 });
