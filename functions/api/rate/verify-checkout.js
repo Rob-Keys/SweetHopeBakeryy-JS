@@ -57,7 +57,8 @@ async function stripeRequest(secretKey, method, path) {
   const res = await fetch(`https://api.stripe.com/v1${path}`, {
     method,
     headers: {
-      'Authorization': `Bearer ${secretKey}`
+      'Authorization': `Bearer ${secretKey}`,
+      'Stripe-Version': '2026-01-28.clover'
     }
   });
   const text = await res.text();

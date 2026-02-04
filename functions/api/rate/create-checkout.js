@@ -69,7 +69,8 @@ function appendForm(params, key, value) {
 async function stripeRequest(secretKey, method, path, body) {
   const headers = {
     'Authorization': `Bearer ${secretKey}`,
-    'Content-Type': 'application/x-www-form-urlencoded'
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Stripe-Version': '2026-01-28.clover'
   };
   const init = { method, headers };
   if (body) {
