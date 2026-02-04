@@ -156,7 +156,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         </div>
         <div class="col-md-1"></div>
         <div class="col-md-5 fade-in-left">
-          <h2>Order Submitted</h2>
+          <h2>Order Failed</h2>
           <div class="alert alert-warning mt-3" role="alert">
             <strong>Payment verification failed.</strong> We could not confirm your payment. If you were charged, please contact us at support@sweethopebakeryy.com and we will resolve this.
           </div>
