@@ -5,7 +5,16 @@
 import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
 import { initShared } from '../shared.js';
-import { getCompletedOrder, clearCart, clearCustomerDetails, clearCompletedOrder, getCustomerDetails } from '../modules/cart.js';
+import {
+  getCompletedOrder,
+  clearCart,
+  clearCustomerDetails,
+  clearCompletedOrder,
+  getCustomerDetails,
+  getCart,
+  getCartTotal,
+  getCartLines
+} from '../modules/cart.js';
 import { didCheckoutSucceed } from '../stripe/stripe.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -19,11 +28,41 @@ document.addEventListener('DOMContentLoaded', async () => {
   const sessionId = params.get('session_id');
 
   // Get completed order from localStorage (saved before payment in checkout.js)
-  const completedOrder = getCompletedOrder();
+  let completedOrder = getCompletedOrder();
   const customerDetails = getCustomerDetails();
 
+  // Fallback: reconstruct from cart storage if snapshot is missing
+  if (!completedOrder) {
+    const cart = getCart();
+    if (cart && Object.keys(cart).length > 0) {
+      completedOrder = {
+        cart,
+        cart_total: getCartTotal(),
+        cartLines: getCartLines()
+      };
+    }
+  }
+
+  // Fallback: fetch short-lived order snapshot from server (for cross-origin return URLs)
+  if (!completedOrder && sessionId) {
+    try {
+      const response = await fetch(`/api/rate/get-order?session_id=${encodeURIComponent(sessionId)}`);
+      if (response.ok) {
+        completedOrder = await response.json();
+      }
+    } catch (err) {
+      console.warn('Return page fallback order fetch failed:', err);
+    }
+  }
+
   // Verify payment and trigger server-side emails (POST with order data)
-  const result = await didCheckoutSucceed(sessionId, completedOrder?.cart, completedOrder?.cart_total, customerDetails);
+  const result = await didCheckoutSucceed(
+    sessionId,
+    completedOrder?.cart,
+    completedOrder?.cart_total,
+    customerDetails,
+    completedOrder?.cartLines
+  );
 
   const escapeHtml = (str) => {
     if (!str) return '';

@@ -56,11 +56,14 @@ async function fetchStripePublicKey() {
  * @param {Object} cart - Cart data { "Product Name": { quantity, price } }
  * @param {number} cartTotal - Total amount
  * @param {Object} customerDetails - Customer info { customer_name, customer_email, ... }
+ * @param {Array} [cartLinesOverride] - Optional cart lines to validate with server
  * @returns {Promise<{success: boolean, customerEmail: string|null}>}
  */
-async function didCheckoutSucceed(sessionId, cart, cartTotal, customerDetails) {
+async function didCheckoutSucceed(sessionId, cart, cartTotal, customerDetails, cartLinesOverride) {
   try {
-    const cartLines = getCartLines();
+    const cartLines = Array.isArray(cartLinesOverride) && cartLinesOverride.length
+      ? cartLinesOverride
+      : getCartLines();
     const response = await fetch('/api/rate/verify-checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

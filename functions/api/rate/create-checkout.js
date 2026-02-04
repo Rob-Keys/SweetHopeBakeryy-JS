@@ -49,6 +49,51 @@ function buildStripeLineItems(cartLines, products) {
   });
 }
 
+function buildCartSummary(cartLines, products) {
+  const productMap = new Map(products.map(p => [p.itemName, p]));
+  const cart = {};
+  let total = 0;
+
+  for (const line of cartLines) {
+    const name = String(line?.name || '');
+    const quantityKey = String(line?.quantityKey || '');
+    const product = productMap.get(name);
+    if (!product) throw new Error(`Unknown product: ${name}`);
+
+    const priceValue = product.prices?.[quantityKey];
+    const price = Number(priceValue);
+    const quantity = Number(quantityKey);
+    if (!Number.isFinite(price) || !Number.isFinite(quantity)) {
+      throw new Error(`Invalid quantity for ${name}`);
+    }
+
+    if (!cart[name]) {
+      cart[name] = { quantity: 0, price: 0 };
+    }
+    cart[name].quantity += quantity;
+    cart[name].price += price;
+    total += price;
+  }
+
+  return { cart, total };
+}
+
+async function persistOrderSnapshot(context, sessionId, cartLines, cartSummary) {
+  const kv = getKv(context);
+  if (!kv || !sessionId) return;
+  const key = `orders/${sessionId}`;
+  const payload = {
+    cart: cartSummary.cart,
+    cart_total: cartSummary.total,
+    cartLines
+  };
+  try {
+    await kv.put(key, JSON.stringify(payload), { expirationTtl: 60 * 60 * 24 });
+  } catch (err) {
+    console.warn('persistOrderSnapshot failed:', err);
+  }
+}
+
 function appendForm(params, key, value) {
   if (value === null || value === undefined) return;
   if (Array.isArray(value)) {
@@ -112,6 +157,7 @@ export async function onRequestPost(context) {
 
     const products = await loadProducts(context);
     const stripeLineItems = buildStripeLineItems(cartLines, products);
+    const cartSummary = buildCartSummary(cartLines, products);
 
     const session = await stripeRequest(STRIPE_SECRET_KEY, 'POST', '/checkout/sessions', {
       line_items: stripeLineItems,
@@ -119,6 +165,8 @@ export async function onRequestPost(context) {
       ui_mode: 'custom',
       return_url: getReturnUrl(context.request, context.env)
     });
+
+    await persistOrderSnapshot(context, session?.id, cartLines, cartSummary);
 
     return Response.json({ clientSecret: session.client_secret });
   } catch (err) {
