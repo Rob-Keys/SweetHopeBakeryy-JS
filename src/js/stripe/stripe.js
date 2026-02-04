@@ -75,11 +75,18 @@ async function didCheckoutSucceed(sessionId, cart, cartTotal, customerDetails, c
         cartLines
       })
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return await response.json();
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return {
+        success: false,
+        customerEmail: null,
+        error: data?.error || data?.message || `HTTP ${response.status}`
+      };
+    }
+    return data;
   } catch (err) {
     console.error('didCheckoutSucceed failed:', err);
-    return { success: false, customerEmail: null };
+    return { success: false, customerEmail: null, error: err?.message || 'Verification failed' };
   }
 }
 

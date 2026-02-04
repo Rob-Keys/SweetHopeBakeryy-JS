@@ -6,7 +6,19 @@ const KV_BINDING = 'kv-db';
 const PRODUCTS_KEY = 'data/products.json';
 
 function getReturnUrl(request, env) {
-  const base = env.PUBLIC_SITE_URL || new URL(request.url).origin;
+  const requestOrigin = new URL(request.url).origin;
+  let base = requestOrigin;
+  if (env.PUBLIC_SITE_URL) {
+    try {
+      const envOrigin = new URL(env.PUBLIC_SITE_URL).origin;
+      // Avoid cross-environment redirects (preview -> prod) that break verification
+      if (envOrigin === requestOrigin) {
+        base = env.PUBLIC_SITE_URL;
+      }
+    } catch {
+      // ignore malformed PUBLIC_SITE_URL
+    }
+  }
   return new URL('/return?session_id={CHECKOUT_SESSION_ID}', base).toString();
 }
 
