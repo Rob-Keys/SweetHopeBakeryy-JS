@@ -34,7 +34,7 @@ export function renderProduct(product) {
   ).join('');
 
   return `
-    <div class="product-card mb-4 p-3 rounded fade-in-up">
+    <div class="product-card cv-auto mb-4 p-3 rounded fade-in-up">
       <h3 class="product-name">${safeName}</h3>
       <div class="slider-container">
         <div class="slider-wrapper">${slidesHTML}</div>

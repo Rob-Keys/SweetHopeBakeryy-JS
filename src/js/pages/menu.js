@@ -31,14 +31,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (container) {
     let html = '';
     for (let i = 0; i < products.length - 1; i += 2) {
-      html += `<div class="row">
+      html += `<div class="row cv-auto">
         <div class="col-6">${renderProduct(products[i])}</div>
         <div class="col-6">${renderProduct(products[i + 1])}</div>
       </div>`;
     }
     // Odd last product centered
     if (products.length % 2 === 1) {
-      html += `<div class="row"><div class="col-3"></div><div class="col-6">${renderProduct(products[products.length - 1])}</div></div>`;
+      html += `<div class="row cv-auto"><div class="col-3"></div><div class="col-6">${renderProduct(products[products.length - 1])}</div></div>`;
     }
     container.innerHTML = html;
   }

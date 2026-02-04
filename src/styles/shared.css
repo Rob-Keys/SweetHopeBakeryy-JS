@@ -120,6 +120,12 @@ footer {
   flex-direction: row-reverse;
 }
 
+/* Defer rendering offscreen content to keep UI responsive on slow devices. */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 1000px 800px;
+}
+
 h1 {
 	font-size: 4rem !important;
 }

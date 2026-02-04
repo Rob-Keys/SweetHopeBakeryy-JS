@@ -9,6 +9,21 @@ export function renderHeader() {
   const el = document.getElementById('header-placeholder');
   if (!el) return;
 
+  // Prefetch likely next pages to reduce navigation latency.
+  const prefetchRoutes = ['/', '/about', '/menu', '/contact'];
+  const head = document.head;
+  if (head) {
+    prefetchRoutes.forEach((href) => {
+      if (window.location.pathname === href) return;
+      if (head.querySelector(`link[rel="prefetch"][href="${href}"]`)) return;
+      const link = document.createElement('link');
+      link.rel = 'prefetch';
+      link.as = 'document';
+      link.href = href;
+      head.appendChild(link);
+    });
+  }
+
   el.innerHTML = `
     <header>
       <div style="height: 2.4rem; position: absolute; width: 100vw; background-color: #3f2a14;"></div>

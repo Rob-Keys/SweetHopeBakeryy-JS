@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const txtFade = index % 2 === 0 ? 'fade-in-right' : 'fade-in-left';
 
       html += `
-        <div class="${rowClass}">
+        <div class="${rowClass} cv-auto">
           <div class="col-6 ${imgFade}">
             <img src="${safeImageUrl}" class="caroline-image" loading="lazy" decoding="async">
           </div>
