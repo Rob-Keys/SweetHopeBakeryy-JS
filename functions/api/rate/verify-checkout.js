@@ -226,77 +226,82 @@ export async function onRequestPost(context) {
       }
     }
 
+    const success = paid && validated.valid && !cartMismatch;
+
     // Send order confirmation emails if payment succeeded and cart validated
-    if (paid && validated.valid && !cartMismatch && customerDetails && AWS_KEY && AWS_SECRET_KEY) {
-      const credentials = { accessKeyId: AWS_KEY, secretAccessKey: AWS_SECRET_KEY };
-      const s3 = new S3Client({ region: AWS_REGION, credentials });
-      const ses = new SESClient({ region: AWS_REGION, credentials });
-      const from = 'support@sweethopebakeryy.com';
-
-      // Replay protection: only send once per session_id
-      const receiptKey = `orders/${session_id}.json`;
-      let alreadySent = false;
+    if (success && customerDetails && AWS_KEY && AWS_SECRET_KEY) {
       try {
-        await s3.send(new HeadObjectCommand({ Bucket: 'sweethopebakeryy', Key: receiptKey }));
-        alreadySent = true;
-      } catch (err) {
-        if (err?.$metadata?.httpStatusCode !== 404 && err?.name !== 'NotFound') {
-          throw err;
+        const credentials = { accessKeyId: AWS_KEY, secretAccessKey: AWS_SECRET_KEY };
+        const s3 = new S3Client({ region: AWS_REGION, credentials });
+        const ses = new SESClient({ region: AWS_REGION, credentials });
+        const from = 'support@sweethopebakeryy.com';
+
+        // Replay protection: only send once per session_id
+        const receiptKey = `orders/${session_id}.json`;
+        let alreadySent = false;
+        try {
+          await s3.send(new HeadObjectCommand({ Bucket: 'sweethopebakeryy', Key: receiptKey }));
+          alreadySent = true;
+        } catch (err) {
+          if (err?.$metadata?.httpStatusCode !== 404 && err?.name !== 'NotFound') {
+            throw err;
+          }
         }
+
+        if (!alreadySent) {
+          // Update customer email from Stripe if available
+          if (customerEmail) {
+            customerDetails.customer_email = customerEmail;
+          }
+
+          const receipt = buildCustomerReceipt(validated.cart, validated.total, customerDetails);
+          const ownerNotif = buildOwnerNotification(validated.cart, validated.total, customerDetails);
+
+          // Send all 3 emails in parallel
+          const emailPromises = [];
+
+          // 1. Customer receipt
+          if (customerEmail) {
+            emailPromises.push(
+              sendEmailViaSES(ses, from, customerEmail, receipt.subject, receipt.body)
+                .catch(err => console.error('Customer email failed:', err))
+            );
+          }
+
+          // 2. Owner notification
+          if (CAROLINE_EMAIL_ADDRESS) {
+            emailPromises.push(
+              sendEmailViaSES(ses, from, CAROLINE_EMAIL_ADDRESS, ownerNotif.subject, ownerNotif.body)
+                .catch(err => console.error('Owner email failed:', err))
+            );
+          }
+
+          // 3. Developer notification
+          if (DEVELOPER_EMAIL_ADDRESS) {
+            emailPromises.push(
+              sendEmailViaSES(ses, from, DEVELOPER_EMAIL_ADDRESS, ownerNotif.subject, ownerNotif.body)
+                .catch(err => console.error('Developer email failed:', err))
+            );
+          }
+
+          await Promise.all(emailPromises);
+
+          // Mark session as processed
+          await s3.send(new PutObjectCommand({
+            Bucket: 'sweethopebakeryy',
+            Key: receiptKey,
+            Body: JSON.stringify({ session_id, sent_at: Date.now() }),
+            ContentType: 'application/json'
+          }));
+        }
+      } catch (err) {
+        console.error('Email pipeline failed:', err);
+        // Do not fail checkout verification if email pipeline errors
       }
-
-      if (alreadySent) {
-        return Response.json({ success: true, customerEmail });
-      }
-
-      // Update customer email from Stripe if available
-      if (customerEmail) {
-        customerDetails.customer_email = customerEmail;
-      }
-
-      const receipt = buildCustomerReceipt(validated.cart, validated.total, customerDetails);
-      const ownerNotif = buildOwnerNotification(validated.cart, validated.total, customerDetails);
-
-      // Send all 3 emails in parallel
-      const emailPromises = [];
-
-      // 1. Customer receipt
-      if (customerEmail) {
-        emailPromises.push(
-          sendEmailViaSES(ses, from, customerEmail, receipt.subject, receipt.body)
-            .catch(err => console.error('Customer email failed:', err))
-        );
-      }
-
-      // 2. Owner notification
-      if (CAROLINE_EMAIL_ADDRESS) {
-        emailPromises.push(
-          sendEmailViaSES(ses, from, CAROLINE_EMAIL_ADDRESS, ownerNotif.subject, ownerNotif.body)
-            .catch(err => console.error('Owner email failed:', err))
-        );
-      }
-
-      // 3. Developer notification
-      if (DEVELOPER_EMAIL_ADDRESS) {
-        emailPromises.push(
-          sendEmailViaSES(ses, from, DEVELOPER_EMAIL_ADDRESS, ownerNotif.subject, ownerNotif.body)
-            .catch(err => console.error('Developer email failed:', err))
-        );
-      }
-
-      await Promise.all(emailPromises);
-
-      // Mark session as processed
-      await s3.send(new PutObjectCommand({
-        Bucket: 'sweethopebakeryy',
-        Key: receiptKey,
-        Body: JSON.stringify({ session_id, sent_at: Date.now() }),
-        ContentType: 'application/json'
-      }));
     }
 
     return Response.json({
-      success: paid && validated.valid && !cartMismatch,
+      success,
       customerEmail
     });
   } catch (err) {

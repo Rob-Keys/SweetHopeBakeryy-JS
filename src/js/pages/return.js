@@ -63,6 +63,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     customerDetails,
     completedOrder?.cartLines
   );
+  if (result?.error && typeof globalThis.__debugLog === 'function') {
+    globalThis.__debugLog('verify-checkout error:', result.error);
+  }
 
   const escapeHtml = (str) => {
     if (!str) return '';

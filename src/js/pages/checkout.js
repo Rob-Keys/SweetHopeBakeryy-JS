@@ -81,13 +81,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (el) el.textContent = message || '';
   };
 
-  const isDebug = () => globalThis?.__debugErrors === true;
   const debugLog = (message, error) => {
-    if (!isDebug()) return;
+    if (typeof globalThis.__debugLog !== 'function') return;
     if (error) {
-      console.error(message, error);
+      globalThis.__debugLog(message, error);
     } else {
-      console.error(message);
+      globalThis.__debugLog(message);
     }
   };
 

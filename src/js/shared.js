@@ -8,6 +8,15 @@ const originalConsole = {
   error: console.error?.bind(console)
 };
 
+function debugLog(...args) {
+  if (globalThis.__debugErrors !== true) return;
+  if (originalConsole.error) {
+    originalConsole.error(...args);
+  }
+}
+
+globalThis.__debugLog = debugLog;
+
 function setConsoleEnabled(enabled) {
   if (typeof console === 'undefined') return;
   const noop = () => {};
