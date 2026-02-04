@@ -4,7 +4,7 @@ import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
 import { initShared } from '../shared.js';
 import { isCartEmpty, buildLineItems, getCartLines, saveCustomerDetails, saveCompletedOrder } from '../modules/cart.js';
-import { createStripeCheckout } from '../stripe/stripe.js';
+import { createStripeCheckout, fetchStripePublicKey } from '../stripe/stripe.js';
 import config from '../modules/config.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -70,8 +70,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ── Stripe integration (from public/js/stripe/checkout.js) ──
-  // Get public key from config (replaces fetch('/get_stripe_public_key'))
-  const stripe = Stripe(config.stripePublicKey);
+  // Prefer server-provided publishable key to avoid mode/account mismatches
+  const serverPublicKey = await fetchStripePublicKey();
+  const stripePublicKey = serverPublicKey || config.stripePublicKey;
+  const stripe = Stripe(stripePublicKey);
 
   const clientSecretPromise = createStripeCheckout();
 

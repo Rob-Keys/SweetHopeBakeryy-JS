@@ -24,10 +24,28 @@ async function createStripeCheckout() {
       body: JSON.stringify({ cartLines })
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const { clientSecret } = await response.json();
+    const data = await response.json();
+    const clientSecret = data.clientSecret || data.client_secret || data.checkoutSessionClientSecret || null;
+    if (!clientSecret) throw new Error('Missing checkout client secret');
     return clientSecret;
   } catch (err) {
     console.error('createStripeCheckout failed:', err);
+    return null;
+  }
+}
+
+/**
+ * Fetch Stripe publishable key from server (keeps mode/account in sync with secret key).
+ * @returns {Promise<string|null>} publishable key or null on failure
+ */
+async function fetchStripePublicKey() {
+  try {
+    const response = await fetch('/api/rate/get-stripe-public-key');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    return data.publicKey || data.stripePublicKey || null;
+  } catch (err) {
+    console.warn('fetchStripePublicKey failed:', err);
     return null;
   }
 }
@@ -62,4 +80,4 @@ async function didCheckoutSucceed(sessionId, cart, cartTotal, customerDetails) {
   }
 }
 
-export { prepareCheckoutSession, createStripeCheckout, didCheckoutSucceed };
+export { prepareCheckoutSession, createStripeCheckout, didCheckoutSucceed, fetchStripePublicKey };
