@@ -73,14 +73,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Get public key from config (replaces fetch('/get_stripe_public_key'))
   const stripe = Stripe(config.stripePublicKey);
 
-  const fetchClientSecret = async () => {
-    const clientSecret = await createStripeCheckout();
-    return clientSecret;
-  };
+  const clientSecretPromise = createStripeCheckout();
 
   let checkout = null;
   try {
-    checkout = await stripe.initCheckout({ fetchClientSecret });
+    checkout = await stripe.initCheckout({ clientSecret: clientSecretPromise });
   } catch (err) {
     console.error('Stripe checkout initialization failed:', err.message);
     const paymentEl = document.getElementById('payment-element');
