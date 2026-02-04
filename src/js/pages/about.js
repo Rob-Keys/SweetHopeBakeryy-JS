@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       html += `
         <div class="${rowClass}">
           <div class="col-6 ${imgFade}">
-            <img src="${safeImageUrl}" class="caroline-image">
+            <img src="${safeImageUrl}" class="caroline-image" loading="lazy" decoding="async">
           </div>
           <div class="col-6 d-flex flex-column justify-content-center ${txtFade}">
             <h2 class="mb-3">${safeHeaderText}</h2>

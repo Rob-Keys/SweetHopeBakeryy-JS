@@ -1,6 +1,22 @@
 /*
   Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data: https://sweethopebakeryy.s3.us-east-1.amazonaws.com https://*.stripe.com https://m.stripe.com; script-src 'self' https://js.stripe.com https://cdn.jsdelivr.net https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; connect-src 'self' https://api.stripe.com https://m.stripe.com https://r.stripe.com https://cloudflareinsights.com; frame-src https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com; form-action 'self'; upgrade-insecure-requests; block-all-mixed-content
+  Cache-Control: public, max-age=60, s-maxage=604800, stale-while-revalidate=86400
   Referrer-Policy: strict-origin-when-cross-origin
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Permissions-Policy: geolocation=(), microphone=(), camera=()
+
+/api/*
+  Cache-Control: no-store
+
+/data/*
+  Cache-Control: public, max-age=300, s-maxage=86400, stale-while-revalidate=3600
+
+/styles/*
+  Cache-Control: public, max-age=604800, s-maxage=2592000, stale-while-revalidate=86400
+
+/js/*
+  Cache-Control: public, max-age=604800, s-maxage=2592000, stale-while-revalidate=86400
+
+/images/*
+  Cache-Control: public, max-age=604800, s-maxage=2592000, stale-while-revalidate=86400

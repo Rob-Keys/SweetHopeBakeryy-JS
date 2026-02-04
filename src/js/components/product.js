@@ -16,7 +16,7 @@ export function renderProduct(product) {
 
   // Build image slides
   const slidesHTML = imageURLs.map(url =>
-    `<div class="slide"><img src="${escapeHtml(url)}" alt="${safeName} picture" class="product-image"></div>`
+    `<div class="slide"><img src="${escapeHtml(url)}" alt="${safeName} picture" class="product-image" loading="lazy" decoding="async"></div>`
   ).join('');
 
   // Arrows only if more than 1 image

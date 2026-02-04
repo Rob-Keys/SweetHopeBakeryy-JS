@@ -74,12 +74,12 @@ export function renderPageSectionEditor(sections, pageName) {
       html += `
         <div class="col-2">
           <div class="view-mode">
-            <img class="demo-photo" src="${safeImageUrl}" alt="Section's associated image">
+            <img class="demo-photo" src="${safeImageUrl}" alt="Section's associated image" loading="lazy" decoding="async">
           </div>
           <div class="edit-mode" style="display: none;">
             <div class="edit-images-container">
               <div class="edit-image-item" data-image-url="${safeImageUrl}">
-                <img src="${safeImageUrl}" alt="Section image" class="edit-product-image" style="width: 80px; height: 80px; object-fit: cover;">
+                <img src="${safeImageUrl}" alt="Section image" class="edit-product-image" style="width: 80px; height: 80px; object-fit: cover;" loading="lazy" decoding="async">
                 <button type="button" class="btn btn-sm btn-danger remove-image-btn">&times;</button>
               </div>
             </div>

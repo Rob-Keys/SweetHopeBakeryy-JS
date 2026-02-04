@@ -104,6 +104,7 @@ async function stripeRequest(secretKey, method, path, body) {
 }
 
 export async function onRequestPost(context) {
+  console.log('create-checkout: using fetch-based Stripe client');
   const { STRIPE_SECRET_KEY } = context.env;
   if (!STRIPE_SECRET_KEY) {
     return Response.json({ error: 'STRIPE_SECRET_KEY not configured' }, { status: 500 });

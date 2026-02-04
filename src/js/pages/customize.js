@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Slides for view mode
     const slidesHTML = imageURLs.map(url =>
-      `<div class="slide"><img src="${escapeHtml(url)}" alt="${safeItemName} picture" class="product-image"></div>`
+      `<div class="slide"><img src="${escapeHtml(url)}" alt="${safeItemName} picture" class="product-image" loading="lazy" decoding="async"></div>`
     ).join('');
     const arrowsHTML = imageURLs.length > 1
       ? `<button class="arrow left">&#8249;</button><button class="arrow right">&#8250;</button>`
@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Edit mode images
     const editImagesHTML = imageURLs.map(url => `
       <div class="edit-image-item" data-image-url="${escapeHtml(url)}">
-        <img src="${escapeHtml(url)}" alt="Product image" class="edit-product-image" style="width: 80px; height: 80px; object-fit: cover;">
+        <img src="${escapeHtml(url)}" alt="Product image" class="edit-product-image" style="width: 80px; height: 80px; object-fit: cover;" loading="lazy" decoding="async">
         <button type="button" class="btn btn-sm btn-danger remove-image-btn">&times;</button>
       </div>`).join('');
 
