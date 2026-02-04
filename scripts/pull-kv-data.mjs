@@ -34,7 +34,7 @@ async function main() {
   await mkdir(outDir, { recursive: true });
 
   for (const table of TABLES) {
-    const key = `data/${table}.json`;
+    const key = `${table}.json`;
     try {
       const data = await fetchJson(key);
       const outPath = path.join(outDir, `${table}.json`);
