@@ -2,8 +2,7 @@
 // Creates a Stripe checkout session
 // Env vars: STRIPE_SECRET_KEY
 
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
-
+const KV_BINDING = 'kv-db';
 const PRODUCTS_KEY = 'data/products.json';
 
 function getReturnUrl(request, env) {
@@ -11,22 +10,16 @@ function getReturnUrl(request, env) {
   return new URL('/return?session_id={CHECKOUT_SESSION_ID}', base).toString();
 }
 
-async function loadProducts(context) {
-  const { AWS_KEY, AWS_SECRET_KEY, AWS_REGION = 'us-east-1' } = context.env;
-  if (AWS_KEY && AWS_SECRET_KEY) {
-    const credentials = { accessKeyId: AWS_KEY, secretAccessKey: AWS_SECRET_KEY };
-    const s3 = new S3Client({ region: AWS_REGION, credentials });
-    const obj = await s3.send(new GetObjectCommand({
-      Bucket: 'sweethopebakeryy',
-      Key: PRODUCTS_KEY
-    }));
-    return JSON.parse(await obj.Body.transformToString());
-  }
+function getKv(context) {
+  return context.env[KV_BINDING];
+}
 
-  const fallbackUrl = new URL('/data/products.json', new URL(context.request.url).origin);
-  const res = await fetch(fallbackUrl.toString());
-  if (!res.ok) throw new Error('Unable to load products data');
-  return await res.json();
+async function loadProducts(context) {
+  const kv = getKv(context);
+  if (!kv) throw new Error('KV binding not available');
+  const data = await kv.get(PRODUCTS_KEY, 'json');
+  if (!Array.isArray(data)) throw new Error('Unable to load products data');
+  return data;
 }
 
 function buildStripeLineItems(cartLines, products) {
