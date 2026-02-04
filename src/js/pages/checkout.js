@@ -7,6 +7,32 @@ import { isCartEmpty, buildLineItems, getCartLines, saveCustomerDetails, saveCom
 import { createStripeCheckout, fetchStripePublicKey } from '../stripe/stripe.js';
 import config from '../modules/config.js';
 
+const STRIPE_SCRIPT_SRC = 'https://js.stripe.com/clover/stripe.js';
+let stripeScriptPromise = null;
+
+function loadStripeScript() {
+  if (window.Stripe) return Promise.resolve(window.Stripe);
+  if (stripeScriptPromise) return stripeScriptPromise;
+
+  stripeScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = STRIPE_SCRIPT_SRC;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      if (window.Stripe) {
+        resolve(window.Stripe);
+      } else {
+        reject(new Error('Stripe failed to initialize.'));
+      }
+    };
+    script.onerror = () => reject(new Error('Stripe failed to load.'));
+    document.head.appendChild(script);
+  });
+
+  return stripeScriptPromise;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   renderHeader();
 
@@ -69,14 +95,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  // ── Stripe integration (from public/js/stripe/checkout.js) ──
-  // Prefer server-provided publishable key to avoid mode/account mismatches
-  const serverPublicKey = await fetchStripePublicKey();
-  const stripePublicKey = serverPublicKey || config.stripePublicKey;
-  const stripe = Stripe(stripePublicKey);
-
-  const clientSecretPromise = createStripeCheckout();
-
   const setUserError = (el, message) => {
     if (el) el.textContent = message || '';
   };
@@ -92,46 +110,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const emailErrors = document.getElementById('email-errors');
   const phoneErrors = document.getElementById('phone-errors');
+  const errors = document.getElementById('confirm-errors');
+  const payButton = document.getElementById('pay-button');
+  const paymentEl = document.getElementById('payment-element');
 
   let checkout = null;
   let checkoutActions = null;
-  try {
-    // clover build: initCheckout is synchronous, returns checkout object immediately
-    checkout = stripe.initCheckout({ clientSecret: clientSecretPromise });
 
-    // Mount payment element (works before loadActions)
-    const paymentElement = checkout.createPaymentElement();
-    paymentElement.mount('#payment-element');
-
-    // Load actions (needed for updateEmail, confirm, etc.)
-    const loadResult = await checkout.loadActions();
-    if (loadResult.type === 'error') {
-      throw new Error(loadResult.error?.message || 'Failed to load checkout');
-    }
-    checkoutActions = loadResult.actions;
-
-    // Email validation on blur
-    emailInput?.addEventListener('blur', async () => {
-      if (checkoutActions?.updateEmail) {
-        const result = await checkoutActions.updateEmail(emailInput.value);
-        if (result?.error) {
-          setUserError(emailErrors, 'Please enter a valid email address.');
-        }
-      }
-    });
-  } catch (err) {
-    debugLog('Stripe checkout initialization failed:', err);
-    checkout = null;
-    checkoutActions = null;
-    const paymentEl = document.getElementById('payment-element');
-    if (paymentEl) {
-      paymentEl.innerHTML = `<div class="alert alert-danger mt-2">Payment processing is temporarily unavailable. Please try again later or contact us at support@sweethopebakeryy.com.</div>`;
-    }
+  if (paymentEl) {
+    paymentEl.innerHTML = `<div class="alert alert-info mt-2">Loading secure payment form...</div>`;
   }
-
-  // ── Pay button handler (from stripe/checkout.js:38-115) ──
-  const payButton = document.getElementById('pay-button');
-  const errors = document.getElementById('confirm-errors');
+  if (payButton) {
+    payButton.disabled = true;
+    payButton.setAttribute('aria-busy', 'true');
+  }
 
   payButton?.addEventListener('click', async (e) => {
     if (e && e.defaultPrevented) return;
@@ -217,6 +209,68 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  const initStripeCheckout = async () => {
+    try {
+      await loadStripeScript();
+
+      // Prefer server-provided publishable key to avoid mode/account mismatches
+      const serverPublicKey = await fetchStripePublicKey();
+      const stripePublicKey = serverPublicKey || config.stripePublicKey;
+      if (!stripePublicKey) {
+        throw new Error('Missing Stripe publishable key.');
+      }
+
+      const stripe = Stripe(stripePublicKey);
+      const clientSecretPromise = createStripeCheckout();
+
+      // clover build: initCheckout is synchronous, returns checkout object immediately
+      checkout = stripe.initCheckout({ clientSecret: clientSecretPromise });
+
+      // Mount payment element (works before loadActions)
+      const paymentElement = checkout.createPaymentElement();
+      paymentElement.mount('#payment-element');
+
+      // Load actions (needed for updateEmail, confirm, etc.)
+      const loadResult = await checkout.loadActions();
+      if (loadResult.type === 'error') {
+        throw new Error(loadResult.error?.message || 'Failed to load checkout');
+      }
+      checkoutActions = loadResult.actions;
+
+      if (payButton) {
+        payButton.disabled = false;
+        payButton.removeAttribute('aria-busy');
+      }
+
+      // Email validation on blur
+      emailInput?.addEventListener('blur', async () => {
+        if (checkoutActions?.updateEmail) {
+          const result = await checkoutActions.updateEmail(emailInput.value);
+          if (result?.error) {
+            setUserError(emailErrors, 'Please enter a valid email address.');
+          }
+        }
+      });
+    } catch (err) {
+      debugLog('Stripe checkout initialization failed:', err);
+      checkout = null;
+      checkoutActions = null;
+      if (paymentEl) {
+        paymentEl.innerHTML = `<div class="alert alert-danger mt-2">Payment processing is temporarily unavailable. Please try again later or contact us at support@sweethopebakeryy.com.</div>`;
+      }
+      if (payButton) {
+        payButton.disabled = true;
+        payButton.removeAttribute('aria-busy');
+      }
+    }
+  };
+
   renderFooter();
   initShared();
+
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(() => initStripeCheckout(), { timeout: 2000 });
+  } else {
+    setTimeout(() => initStripeCheckout(), 0);
+  }
 });
