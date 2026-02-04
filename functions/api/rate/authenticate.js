@@ -75,6 +75,6 @@ export async function onRequestPost(context) {
     return Response.json({ token });
   } catch (err) {
     console.error('authenticate error:', err);
-    return Response.json({ error: 'Internal error' }, { status: 500 });
+    return Response.json({ error: 'Internal error: ' + err.message }, { status: 500 });
   }
 }
