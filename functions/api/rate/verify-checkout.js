@@ -3,7 +3,6 @@
 // No auth required — triggered by customer after checkout
 // Env vars: STRIPE_SECRET_KEY, AWS_KEY, AWS_SECRET_KEY, CAROLINE_EMAIL_ADDRESS, DEVELOPER_EMAIL_ADDRESS
 
-import Stripe from 'stripe';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { S3Client, HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 
@@ -52,6 +51,28 @@ function buildValidatedCart(cartLines, products) {
   }
 
   return { valid: true, cart, total };
+}
+
+async function stripeRequest(secretKey, method, path) {
+  const res = await fetch(`https://api.stripe.com/v1${path}`, {
+    method,
+    headers: {
+      'Authorization': `Bearer ${secretKey}`
+    }
+  });
+  const text = await res.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { error: { message: text || 'Stripe API error' } };
+  }
+
+  if (!res.ok) {
+    const message = data?.error?.message || `Stripe API error (${res.status})`;
+    throw new Error(message);
+  }
+  return data;
 }
 
 // Server-safe HTML escaping (no DOM APIs)
@@ -159,8 +180,7 @@ export async function onRequestPost(context) {
     }
 
     // Verify payment with Stripe
-    const stripe = new Stripe(STRIPE_SECRET_KEY);
-    const session = await stripe.checkout.sessions.retrieve(session_id);
+    const session = await stripeRequest(STRIPE_SECRET_KEY, 'GET', `/checkout/sessions/${session_id}`);
     const paid = session.payment_status === 'paid';
     const customerEmail = session.customer_details?.email || customerDetails?.customer_email || null;
 
