@@ -76,30 +76,40 @@ document.addEventListener('DOMContentLoaded', async () => {
   const clientSecretPromise = createStripeCheckout();
 
   let checkout = null;
+  let checkoutActions = null;
   try {
-    checkout = await stripe.initCheckout({ clientSecret: clientSecretPromise });
+    // clover build: initCheckout is synchronous, returns checkout object immediately
+    checkout = stripe.initCheckout({ clientSecret: clientSecretPromise });
+
+    // Mount payment element (works before loadActions)
+    const paymentElement = checkout.createPaymentElement();
+    paymentElement.mount('#payment-element');
+
+    // Load actions (needed for updateEmail, confirm, etc.)
+    const loadResult = await checkout.loadActions();
+    if (loadResult.type === 'error') {
+      throw new Error(loadResult.error?.message || 'Failed to load checkout');
+    }
+    checkoutActions = loadResult.actions;
+
+    // Email validation on blur
+    const emailErrors = document.getElementById('email-errors');
+    emailInput?.addEventListener('blur', async () => {
+      if (checkoutActions?.updateEmail) {
+        const result = await checkoutActions.updateEmail(emailInput.value);
+        if (result?.error) {
+          emailErrors.textContent = result.error.message;
+        }
+      }
+    });
   } catch (err) {
     console.error('Stripe checkout initialization failed:', err.message);
+    checkout = null;
+    checkoutActions = null;
     const paymentEl = document.getElementById('payment-element');
     if (paymentEl) {
       paymentEl.innerHTML = `<div class="alert alert-danger mt-2">Payment processing is temporarily unavailable. Please try again later or contact us at support@sweethopebakeryy.com.</div>`;
     }
-  }
-
-  if (checkout) {
-    // Mount payment element
-    const paymentElement = checkout.createPaymentElement();
-    paymentElement.mount('#payment-element');
-
-    // Email validation on blur (from stripe/checkout.js:28-35)
-    const emailErrors = document.getElementById('email-errors');
-    emailInput?.addEventListener('blur', () => {
-      checkout.updateEmail(emailInput.value).then((result) => {
-        if (result.error) {
-          emailErrors.textContent = result.error.message;
-        }
-      });
-    });
   }
 
   // ── Pay button handler (from stripe/checkout.js:38-115) ──
@@ -176,12 +186,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     saveCompletedOrder();
 
     // Confirm payment with Stripe
-    if (checkout) {
-      checkout.confirm().then((result) => {
+    if (checkoutActions) {
+      try {
+        const result = await checkoutActions.confirm();
         if (result.type === 'error') {
           if (errors) errors.textContent = result.error.message;
         }
-      });
+      } catch (confirmErr) {
+        if (errors) errors.textContent = confirmErr.message || 'Payment failed. Please try again.';
+      }
     } else {
       if (errors) errors.textContent = 'Payment processing is temporarily unavailable. Please try again later.';
     }
