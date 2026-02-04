@@ -136,18 +136,30 @@ export function initImageSliders() {
 
 export function initFadeEffects() {
   const elements = document.querySelectorAll('.fade-in-up, .fade-in-right, .fade-in-left');
+  if (!elements.length) return;
+
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    elements.forEach((el) => el.classList.add('fade-visible'));
+    return;
+  }
 
   const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('fade-visible');
-      }
+    entries.forEach((entry) => {
+      entry.target.classList.toggle('fade-visible', entry.isIntersecting);
     });
   }, {
     threshold: 0.2
   });
 
-  elements.forEach(el => observer.observe(el));
+  const startObserving = () => {
+    elements.forEach((el) => observer.observe(el));
+  };
+
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => requestAnimationFrame(startObserving));
+  } else {
+    startObserving();
+  }
 }
 
 export function initShared() {
