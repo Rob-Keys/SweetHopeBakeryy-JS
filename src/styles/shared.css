@@ -22,8 +22,9 @@ header {
 header, footer {
   flex: 0 0 auto; /* fixed height based on content */
 }
-main {
-	flex: 1 0 auto;   /* take remaining space */
+main,
+#header-placeholder ~ :not(#footer-placeholder):not(script) {
+	flex: 1 0 auto;   /* take remaining space, push footer to bottom */
 }
 footer {
 	margin: 0 !important;
