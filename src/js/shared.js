@@ -30,11 +30,21 @@ async function applyConsoleGate() {
   // Default to hiding logs unless server says otherwise
   setConsoleEnabled(false);
   try {
+    globalThis.__debugErrors = false;
+  } catch {
+    // ignore if globalThis is not writable
+  }
+  try {
     const response = await fetch('/api/rate/get-debug-flags');
     if (!response.ok) return;
     const data = await response.json();
     if (data?.debugErrors === true) {
       setConsoleEnabled(true);
+      try {
+        globalThis.__debugErrors = true;
+      } catch {
+        // ignore if globalThis is not writable
+      }
     }
   } catch {
     // swallow any errors to avoid leaking internals

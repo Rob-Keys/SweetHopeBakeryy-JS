@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-const TABLES = ['products', 'home_page', 'about_page', 'contact_page'];
+const TABLES = ['data/products', 'data/home_page', 'data/about_page', 'data/contact_page'];
 
 const {
   CLOUDFLARE_API_TOKEN,

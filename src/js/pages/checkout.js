@@ -81,6 +81,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (el) el.textContent = message || '';
   };
 
+  const isDebug = () => globalThis?.__debugErrors === true;
+  const debugLog = (message, error) => {
+    if (!isDebug()) return;
+    if (error) {
+      console.error(message, error);
+    } else {
+      console.error(message);
+    }
+  };
+
   const emailErrors = document.getElementById('email-errors');
   const phoneErrors = document.getElementById('phone-errors');
 
@@ -111,7 +121,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   } catch (err) {
-    console.error('Stripe checkout initialization failed:', err.message);
+    debugLog('Stripe checkout initialization failed:', err);
     checkout = null;
     checkoutActions = null;
     const paymentEl = document.getElementById('payment-element');
@@ -196,10 +206,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         const result = await checkoutActions.confirm();
         if (result.type === 'error') {
-          setUserError(errors, 'Payment could not be completed. Please try again.');
+          debugLog('Stripe confirm error:', result.error || result);
+          setUserError(errors, 'We couldn’t process your payment. Please check your payment details and try again.');
         }
       } catch (confirmErr) {
-        setUserError(errors, 'Payment failed. Please try again.');
+        debugLog('Stripe confirm exception:', confirmErr);
+        setUserError(errors, 'We couldn’t complete your payment. Please try again or contact support@sweethopebakeryy.com.');
       }
     } else {
       setUserError(errors, 'Payment processing is temporarily unavailable. Please try again later.');
