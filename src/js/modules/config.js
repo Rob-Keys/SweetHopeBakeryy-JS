@@ -4,7 +4,7 @@
 const config = {
   appEnv: 'development',
 
-  stripePublicKey: 'pk_live_51SFzIfAEKe5eKbDNqRlQeB7ireuGTYpSiCROz7WO0IDW2nqWMzUpKA6n5HKyqClX02ZBJEggEN7YegYXvAzGaqKn00pkageJQl',
+  stripePublicKey: 'pk_test_51RxF93AMz1mwKy1EHAUmTWM8kHE8sJWBKLScUMkNTOaxFtPMiFBwYi6QqjVkzmr6O13ZNOzTbdaZpSitasRffru700tU1iwNwH',
 
   pickupAddress: 'Arlington, VA, 22207',
 
