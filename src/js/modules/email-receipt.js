@@ -1,6 +1,4 @@
-// email-receipt.js - Build email receipt HTML
-// Extracted from Controller.php:669-742 send_email_receipt()
-// Preserved for when Lambda sends confirmation emails.
+// email-receipt.js - Build email receipt HTML for order confirmations
 
 import config from './config.js';
 
@@ -62,7 +60,7 @@ function buildCustomerReceipt(cart, cartTotal, details) {
 
   body += `<h4>Summary:</h4>`;
   for (const [name, item] of Object.entries(cart)) {
-    body += `<p>${item.quantity} x ${name}: $${formatPrice(item.price)}</p>`;
+    body += `<p>${item.quantity} x ${escapeHtml(name)}: $${formatPrice(item.price)}</p>`;
   }
   body += `<p><strong>Total: $${formatPrice(cartTotal)}</strong></p>`;
   body += `<hr><p>Thank you for your business!</p>`;

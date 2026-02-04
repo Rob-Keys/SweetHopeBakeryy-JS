@@ -1,14 +1,12 @@
 // return.js - Return page initialization
-// Replaces private/frontend/pages/return.php + Controller.php:142-162 showReturn()
-// Payment verification is STUBBED until Lambda is implemented.
+// Verifies payment and displays order confirmation
+// Order emails are sent server-side by verify-checkout — no client email logic needed
 
 import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
 import { initShared } from '../shared.js';
 import { getCompletedOrder, clearCart, clearCustomerDetails, clearCompletedOrder, getCustomerDetails } from '../modules/cart.js';
 import { didCheckoutSucceed } from '../stripe/stripe.js';
-import { buildCustomerReceipt, buildOwnerNotification } from '../modules/email-receipt.js';
-import { sendEmail } from '../aws/ses.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   renderHeader();
@@ -16,24 +14,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   const container = document.getElementById('return-content');
   if (!container) { renderFooter(); return; }
 
-  // Parse session_id from URL (mirrors Controller.php:72 + stripe.php:57-58)
+  // Parse session_id from URL
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get('session_id');
-
-  // Verify payment (STUBBED - returns { success: false } until Lambda)
-  const result = await didCheckoutSucceed(sessionId);
 
   // Get completed order from localStorage (saved before payment in checkout.js)
   const completedOrder = getCompletedOrder();
   const customerDetails = getCustomerDetails();
 
-  if (result.success && completedOrder) {
-    // Store customer email from Stripe verification
-    if (result.customerEmail) {
-      customerDetails.customer_email = result.customerEmail;
-    }
+  // Verify payment and trigger server-side emails (POST with order data)
+  const result = await didCheckoutSucceed(sessionId, completedOrder?.cart, completedOrder?.cart_total, customerDetails);
 
-    // Render order summary (mirrors return.php:22-49)
+  const escapeHtml = (str) => {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
+  if (result.success && completedOrder) {
+    const customerEmail = escapeHtml(result.customerEmail || customerDetails.customer_email || 'your email');
+
+    // Render order summary
     const cart = completedOrder.cart;
     const cartTotal = completedOrder.cart_total;
 
@@ -41,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     for (const [name, item] of Object.entries(cart)) {
       orderItemsHTML += `
         <li class="list-group-item d-flex justify-content-between align-items-center">
-          <p><strong>${item.quantity} ${name}</strong></p>
+          <p><strong>${item.quantity} ${escapeHtml(name)}</strong></p>
           <p>$${Number(item.price).toFixed(2)}</p>
         </li>`;
     }
@@ -63,25 +68,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="col-md-1"></div>
       <div class="col-md-5 fade-in-left">
         <h2>Thanks for your order!</h2>
-        <h4>A confirmation has been sent to ${customerDetails.customer_email || 'your email'}.</h4>
+        <h4>A confirmation has been sent to ${customerEmail}.</h4>
         <div class="alert alert-success mt-3" role="alert">
           <strong>Payment successful!</strong> We will contact you to coordinate pickup details.
         </div>
       </div>`;
-
-    // Build and send email receipts (STUBBED via ses.sendEmail)
-    // Mirrors Controller.php:669-742 send_email_receipt()
-    const customerReceipt = buildCustomerReceipt(cart, cartTotal, customerDetails);
-    const ownerNotification = buildOwnerNotification(cart, cartTotal, customerDetails);
-
-    // These are all stubbed - will log warnings to console
-    await sendEmail({
-      from: 'support@sweethopebakeryy.com',
-      to: [customerDetails.customer_email],
-      subject: customerReceipt.subject,
-      body: customerReceipt.body,
-      date: Date.now()
-    });
 
     // Clear cart and order data after successful display
     clearCart();
@@ -94,7 +85,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   } else {
     // Payment verification not available or failed
-    // Show order from localStorage if available, with a note about verification
     if (completedOrder) {
       const cart = completedOrder.cart;
       const cartTotal = completedOrder.cart_total;
@@ -103,7 +93,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       for (const [name, item] of Object.entries(cart)) {
         orderItemsHTML += `
           <li class="list-group-item d-flex justify-content-between align-items-center">
-            <p><strong>${item.quantity} ${name}</strong></p>
+            <p><strong>${item.quantity} ${escapeHtml(name)}</strong></p>
             <p>$${Number(item.price).toFixed(2)}</p>
           </li>`;
       }
@@ -126,7 +116,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div class="col-md-5 fade-in-left">
           <h2>Order Submitted</h2>
           <div class="alert alert-warning mt-3" role="alert">
-            <strong>Payment verification requires Lambda setup.</strong> The Stripe payment verification and email confirmation are currently stubbed. Once Lambda is implemented, this page will verify payment and send confirmation emails automatically.
+            <strong>Payment verification failed.</strong> We could not confirm your payment. If you were charged, please contact us at support@sweethopebakeryy.com and we will resolve this.
           </div>
         </div>`;
     } else {

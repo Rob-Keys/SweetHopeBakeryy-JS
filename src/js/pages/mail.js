@@ -1,6 +1,4 @@
 // mail.js - Admin mail page initialization
-// Replaces private/frontend/pages/mail.php + public/js/mail.js
-// Inbox/outbox and email sending are STUBBED until Lambda is implemented.
 
 import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
@@ -21,7 +19,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const container = document.getElementById('mail-content');
   if (!container) { renderFooter(); return; }
 
-  // Fetch inbox/outbox (STUBBED - returns empty arrays)
+  // Fetch inbox/outbox from S3
   const inbox = await getInbox();
   const outbox = await getOutbox();
 
@@ -29,35 +27,47 @@ document.addEventListener('DOMContentLoaded', async () => {
   inbox.sort((a, b) => (b.date || 0) - (a.date || 0));
   outbox.sort((a, b) => (b.date || 0) - (a.date || 0));
 
+  const escapeHtml = (str) => {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
+  const formatBody = (value) => escapeHtml(value).replace(/\n/g, '<br>');
+
   // Render inbox (mirrors mail.php:29-37)
   let html = '<h2> Inbox: </h2>';
   if (inbox.length === 0) {
-    html += '<p class="text-muted m-3">Inbox is empty. (Requires Lambda to fetch from S3)</p>';
+    html += '<p class="text-muted m-3">Inbox is empty.</p>';
   }
   inbox.forEach(mail => {
     html += `
       <div class="bg-light m-3">
-        <div>from: ${mail.from || ''}</div>
-        <div>to: ${mail.to || ''}</div>
-        <div>date: ${mail.date || ''}</div>
-        <div>subject: ${mail.subject || ''}</div>
-        <div>body: ${mail.body || ''}</div>
+        <div>from: ${escapeHtml(mail.from || '')}</div>
+        <div>to: ${escapeHtml(mail.to || '')}</div>
+        <div>date: ${escapeHtml(mail.date || '')}</div>
+        <div>subject: ${escapeHtml(mail.subject || '')}</div>
+        <div>body: ${formatBody(mail.body || '')}</div>
       </div>`;
   });
 
   // Render outbox (mirrors mail.php:45-55)
   html += '<h2> Sent: </h2>';
   if (outbox.length === 0) {
-    html += '<p class="text-muted m-3">Outbox is empty. (Requires Lambda to fetch from S3)</p>';
+    html += '<p class="text-muted m-3">Outbox is empty.</p>';
   }
   outbox.forEach(mail => {
     html += `
       <div class="bg-light m-3">
-        <div>from: ${mail.from || ''}</div>
-        <div>to: ${mail.to || ''}</div>
-        <div>date: ${mail.date || ''}</div>
-        <div>subject: ${mail.subject || ''}</div>
-        <div>body: ${mail.body || ''}</div>
+        <div>from: ${escapeHtml(mail.from || '')}</div>
+        <div>to: ${escapeHtml(mail.to || '')}</div>
+        <div>date: ${escapeHtml(mail.date || '')}</div>
+        <div>subject: ${escapeHtml(mail.subject || '')}</div>
+        <div>body: ${formatBody(mail.body || '')}</div>
       </div>`;
   });
 
@@ -88,7 +98,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // ── Send email handler (STUBBED) ──
+  // ── Send email handler ──
   document.getElementById('compose-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = e.target;

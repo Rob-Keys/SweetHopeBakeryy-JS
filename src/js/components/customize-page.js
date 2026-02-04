@@ -8,6 +8,8 @@
  * @param {string} pageName - 'home_page', 'about_page', or 'contact_page'
  * @returns {string} HTML string
  */
+import { escapeHtml } from '../modules/escape.js';
+
 export function renderPageSectionEditor(sections, pageName) {
   const displayName = pageName.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
   const showHeader = pageName !== 'home_page';
@@ -34,45 +36,50 @@ export function renderPageSectionEditor(sections, pageName) {
 
   // Section rows
   sections.forEach((section, i) => {
+    const safeSectionIndex = escapeHtml(section.sectionIndex);
+    const safeHeaderText = escapeHtml(section.headerText || '');
+    const safeBodyText = escapeHtml(section.bodyText || '');
+    const imageURL = section.imageURL || (section.imageURLs ? section.imageURLs[0] : '');
+    const safeImageUrl = escapeHtml(imageURL);
+    const safeImageUrlsJson = escapeHtml(JSON.stringify(section.imageURLs || []));
     html += `
-      <div class="row menu-row" data-section-index="${i}" data-page-name="${pageName}">
+      <div class="row menu-row" data-section-index="${i}" data-page-name="${pageName}" data-image-urls='${safeImageUrlsJson}'>
         <!-- View Mode -->
-        <div class="col-2 view-mode"><p>${section.sectionIndex}</p></div>`;
+        <div class="col-2 view-mode"><p>${safeSectionIndex}</p></div>`;
 
     if (showHeader) {
-      html += `<div class="col-2 view-mode"><p>${section.headerText || ''}</p></div>`;
+      html += `<div class="col-2 view-mode"><p>${safeHeaderText}</p></div>`;
     }
-    html += `<div class="${bodyColClass} view-mode"><p>${section.bodyText || ''}</p></div>`;
+    html += `<div class="${bodyColClass} view-mode"><p>${safeBodyText}</p></div>`;
 
     // Edit Mode
     html += `
         <div class="col-2 edit-mode" style="display: none;">
-          <textarea class="form-control edit-sectionIndex" rows="2" disabled>${section.sectionIndex}</textarea>
-          <input type="hidden" class="original-sectionIndex" value="${section.sectionIndex}">
+          <textarea class="form-control edit-sectionIndex" rows="2" disabled>${safeSectionIndex}</textarea>
+          <input type="hidden" class="original-sectionIndex" value="${safeSectionIndex}">
         </div>`;
 
     if (showHeader) {
       html += `
         <div class="col-2 edit-mode" style="display: none;">
-          <textarea class="form-control edit-headerText" rows="2">${section.headerText || ''}</textarea>
+          <textarea class="form-control edit-headerText" rows="2">${safeHeaderText}</textarea>
         </div>`;
     }
     html += `
         <div class="${editBodyColClass} edit-mode" style="display: none;">
-          <textarea class="form-control edit-bodyText" rows="4">${section.bodyText || ''}</textarea>
+          <textarea class="form-control edit-bodyText" rows="4">${safeBodyText}</textarea>
         </div>`;
 
     if (showImage) {
-      const imageURL = section.imageURL || (section.imageURLs ? section.imageURLs[0] : '');
       html += `
         <div class="col-2">
           <div class="view-mode">
-            <img class="demo-photo" src="${imageURL}" alt="Section's associated image">
+            <img class="demo-photo" src="${safeImageUrl}" alt="Section's associated image">
           </div>
           <div class="edit-mode" style="display: none;">
             <div class="edit-images-container">
-              <div class="edit-image-item" data-image-url="${imageURL}">
-                <img src="${imageURL}" alt="Section image" class="edit-product-image" style="width: 80px; height: 80px; object-fit: cover;">
+              <div class="edit-image-item" data-image-url="${safeImageUrl}">
+                <img src="${safeImageUrl}" alt="Section image" class="edit-product-image" style="width: 80px; height: 80px; object-fit: cover;">
                 <button type="button" class="btn btn-sm btn-danger remove-image-btn">&times;</button>
               </div>
             </div>
@@ -89,7 +96,7 @@ export function renderPageSectionEditor(sections, pageName) {
           <form class="remove-section-form">
             <input type="hidden" name="tableName" value="${pageName}">
             <input type="hidden" name="partitionKey" value="sectionIndex">
-            <input type="hidden" name="partitionKeyValue" value="${section.sectionIndex}">
+            <input type="hidden" name="partitionKeyValue" value="${safeSectionIndex}">
             <button type="submit" class="btn btn-danger button-2 mt-2">Remove Section</button>
           </form>
         </div>

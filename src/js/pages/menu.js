@@ -8,6 +8,7 @@ import { initShared } from '../shared.js';
 import { getTable } from '../modules/database.js';
 import { renderProduct } from '../components/product.js';
 import { getCart, addToCart, removeFromCart, clearCart, getCartTotal, isCartEmpty } from '../modules/cart.js';
+import { escapeHtml } from '../modules/escape.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   renderHeader();
@@ -132,11 +133,11 @@ function renderCartUI() {
   } else {
     cartList.innerHTML = entries.map(([name, item]) => `
       <li class="list-group-item d-flex justify-content-between align-items-center">
-        <p>${name} : (${item.quantity})</p>
+        <p>${escapeHtml(name)} : (${item.quantity})</p>
         <div class="d-flex justify-content-end align-items-center price-container">
           <p class="me-3 price">$${Number(item.price).toFixed(2)}</p>
           <p>
-            <button type="button" class="remove-item-btn" data-name="${name}" style="color: red; background: none; border: none;"><p>X</p></button>
+            <button type="button" class="remove-item-btn" data-name="${escapeHtml(name)}" style="color: red; background: none; border: none;"><p>X</p></button>
           </p>
         </div>
       </li>`).join('');
@@ -189,11 +190,11 @@ function updateCartAfterAdd(data) {
   if (!existing) {
     const newItemHTML = `
       <li class="list-group-item d-flex justify-content-between align-items-center">
-        <p>${data.name} : (${data.quantity})</p>
+        <p>${escapeHtml(data.name)} : (${data.quantity})</p>
         <div class="d-flex justify-content-end align-items-center price-container">
           <p class="me-3 price">$${parseFloat(data.price).toFixed(2)}</p>
           <p>
-            <button type="button" class="remove-item-btn" data-name="${data.name}" style="color: red; background: none; border: none;"><p>X</p></button>
+            <button type="button" class="remove-item-btn" data-name="${escapeHtml(data.name)}" style="color: red; background: none; border: none;"><p>X</p></button>
           </p>
         </div>
       </li>`;

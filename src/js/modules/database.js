@@ -1,6 +1,7 @@
 // database.js - Client-side database module
-// Replaces private/backend/db/Database.php
-// Reads static JSON data files via fetch(). Write operations stubbed for future Lambda.
+// Reads static JSON data files via fetch(). Writes go to Cloudflare Pages Functions at /api/*
+
+import { getAuthToken, handle401, isAuthenticated } from './auth.js';
 
 const dataCache = {};
 
@@ -13,7 +14,13 @@ const dataCache = {};
  */
 async function getTable(tableName, partitionKeyValue = null) {
   if (!dataCache[tableName]) {
-    const response = await fetch(`/data/${tableName}.json`);
+    const useAdminApi = isAuthenticated();
+    const url = useAdminApi
+      ? `/api/get-data?tableName=${encodeURIComponent(tableName)}`
+      : `/data/${tableName}.json`;
+
+    const response = await fetch(url, useAdminApi ? { headers: authHeaders() } : undefined);
+    if (response.status === 401 && useAdminApi) { handle401(); return null; }
     if (!response.ok) throw new Error(`Failed to load ${tableName}: ${response.status}`);
     dataCache[tableName] = await response.json();
   }
@@ -22,6 +29,7 @@ async function getTable(tableName, partitionKeyValue = null) {
 
   if (partitionKeyValue !== null) {
     const partitionKey = tableName === 'products' ? 'itemName' : 'sectionIndex';
+    if (!Array.isArray(data)) return data || null;
     return data.find(item => String(item[partitionKey]) === String(partitionKeyValue)) || null;
   }
 
@@ -41,25 +49,60 @@ function clearCache(tableName = null) {
 }
 
 /**
- * STUBBED: Write an item to a table.
- * TODO: Implement as Lambda API endpoint.
- * Lambda should: accept { tableName, item }, write to JSON file, return { success: true }
+ * Build headers with auth token for admin API calls.
+ * @returns {Object} headers object
  */
-async function putItem(tableName, item) {
-  console.warn('database.putItem STUBBED - requires Lambda:', { tableName, item });
-  alert('Save functionality requires Lambda (not yet implemented).');
-  return { success: false, message: 'Write operations require server-side Lambda (not yet implemented)' };
+function authHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  const token = getAuthToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
 }
 
 /**
- * STUBBED: Remove an item from a table by its partition key value.
- * TODO: Implement as Lambda API endpoint.
- * Lambda should: accept { tableName, key }, remove from JSON file, return { success: true }
+ * Write an item to a table via Pages Function. Requires admin auth.
+ * @param {string} tableName
+ * @param {Object} item
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+async function putItem(tableName, item) {
+  try {
+    const response = await fetch('/api/save-data', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ tableName, item })
+    });
+    if (response.status === 401) { handle401(); return { success: false, error: 'Unauthorized' }; }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    clearCache(tableName);
+    return await response.json();
+  } catch (err) {
+    console.error('putItem failed:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Remove an item from a table by its partition key value via Pages Function. Requires admin auth.
+ * @param {string} tableName
+ * @param {string} key - partition key value
+ * @returns {Promise<{success: boolean, error?: string}>}
  */
 async function removeItem(tableName, key) {
-  console.warn('database.removeItem STUBBED - requires Lambda:', { tableName, key });
-  alert('Delete functionality requires Lambda (not yet implemented).');
-  return { success: false, message: 'Write operations require server-side Lambda (not yet implemented)' };
+  try {
+    const response = await fetch('/api/delete-data', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ tableName, key })
+    });
+    if (response.status === 401) { handle401(); return { success: false, error: 'Unauthorized' }; }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    clearCache(tableName);
+    return await response.json();
+  } catch (err) {
+    console.error('removeItem failed:', err);
+    return { success: false, error: err.message };
+  }
 }
 
 export { getTable, putItem, removeItem, clearCache };

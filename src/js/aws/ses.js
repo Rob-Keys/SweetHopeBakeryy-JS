@@ -1,21 +1,31 @@
-// ses.js - STUBBED AWS SES email sending
-// Replaces private/backend/aws/SES.php
-// TODO: Implement as a Lambda function called via API Gateway
+// ses.js - Email sending via Cloudflare Pages Function at /api/send-email
+// Auth-protected — admin compose only
+
+import { getAuthToken, handle401 } from '../modules/auth.js';
 
 /**
- * STUBBED: Send an email via SES.
- * Lambda should: accept { from, to: string[], subject, body, date },
- * send via SES, archive to S3 outbox, return { success: true }.
+ * Send an email via SES (server-side). Requires admin auth. Also archives to S3 outbox.
  * @param {Object} mail - { from, to: string[], subject, body, date }
+ * @returns {Promise<{success: boolean, error?: string}>}
  */
 async function sendEmail(mail) {
-  console.warn('SES.sendEmail STUBBED - requires Lambda:', {
-    from: mail.from,
-    to: mail.to,
-    subject: mail.subject
-  });
-  alert('Email sending requires Lambda (not yet implemented).');
-  return { success: false, message: 'Email sending requires Lambda (not yet implemented)' };
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    const token = getAuthToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch('/api/send-email', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(mail)
+    });
+    if (response.status === 401) { handle401(); return { success: false, error: 'Unauthorized' }; }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } catch (err) {
+    console.error('sendEmail failed:', err);
+    return { success: false, error: err.message };
+  }
 }
 
 export { sendEmail };

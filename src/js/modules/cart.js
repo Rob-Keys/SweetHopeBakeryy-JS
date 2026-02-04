@@ -9,13 +9,30 @@ const COMPLETED_ORDER_KEY = 'shb_completed_order';
 
 // ── Cart Operations ──
 
-function getCart() {
+function getCartStore() {
   const stored = localStorage.getItem(CART_KEY);
-  return stored ? JSON.parse(stored) : {};
+  if (!stored) return { lines: [], summary: {} };
+  try {
+    const parsed = JSON.parse(stored);
+    if (parsed && Array.isArray(parsed.lines) && parsed.summary && typeof parsed.summary === 'object') {
+      return parsed;
+    }
+    if (parsed && typeof parsed === 'object') {
+      // Legacy format: summary-only map (force refresh to avoid mismatched pricing)
+      return { lines: [], summary: {} };
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return { lines: [], summary: {} };
 }
 
-function saveCart(cart) {
-  localStorage.setItem(CART_KEY, JSON.stringify(cart));
+function saveCartStore(store) {
+  localStorage.setItem(CART_KEY, JSON.stringify(store));
+}
+
+function getCart() {
+  return getCartStore().summary;
 }
 
 /**
@@ -31,24 +48,28 @@ async function addToCart(name, quantityKey) {
   const price = menuItem.prices[quantityKey];
   if (price === undefined) throw new Error(`Price not found for ${name} qty ${quantityKey}`);
 
-  const cart = getCart();
+  const store = getCartStore();
+  const cart = store.summary;
+  const qty = parseInt(quantityKey);
+
   if (cart[name]) {
-    cart[name].quantity += parseInt(quantityKey);
+    cart[name].quantity += qty;
     cart[name].price += price;
   } else {
-    cart[name] = {
-      quantity: parseInt(quantityKey),
-      price: price
-    };
+    cart[name] = { quantity: qty, price };
   }
-  saveCart(cart);
+
+  store.lines.push({ name, quantityKey: String(quantityKey) });
+  saveCartStore(store);
   return { name, quantity: quantityKey, price };
 }
 
 function removeFromCart(name) {
-  const cart = getCart();
+  const store = getCartStore();
+  const cart = store.summary;
   delete cart[name];
-  saveCart(cart);
+  store.lines = store.lines.filter(line => line.name !== name);
+  saveCartStore(store);
 }
 
 function clearCart() {
@@ -78,6 +99,10 @@ function buildLineItems() {
     quantity: 1,
     actual_quantity: item.quantity,
   }));
+}
+
+function getCartLines() {
+  return getCartStore().lines;
 }
 
 // ── Customer Details ──
@@ -116,7 +141,7 @@ function clearCompletedOrder() {
 
 export {
   getCart, addToCart, removeFromCart, clearCart,
-  getCartTotal, isCartEmpty, buildLineItems,
+  getCartTotal, isCartEmpty, buildLineItems, getCartLines,
   saveCustomerDetails, getCustomerDetails, clearCustomerDetails,
   saveCompletedOrder, getCompletedOrder, clearCompletedOrder
 };

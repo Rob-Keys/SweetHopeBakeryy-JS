@@ -1,6 +1,5 @@
 // customize.js - Admin customize page initialization
 // Replaces private/frontend/pages/customize.php + public/js/customize.js
-// All write operations (edit, add, remove) are STUBBED until Lambda is implemented.
 
 import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
@@ -9,6 +8,7 @@ import { isAuthenticated, setDesiredPage } from '../modules/auth.js';
 import { getTable, putItem, removeItem } from '../modules/database.js';
 import { uploadImages, deleteImages } from '../aws/s3.js';
 import { renderPageSectionEditor } from '../components/customize-page.js';
+import { escapeHtml } from '../modules/escape.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   renderHeader();
@@ -65,10 +65,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const pricesStr = Object.entries(product.prices || {}).map(([q, p]) => `${q}:${p}`).join(', ');
     const customStr = Object.entries(product.customizations || {}).map(([c, p]) => `${c}:${p}`).join(', ');
     const imageURLs = product.imageURLs || [];
+    const safeItemName = escapeHtml(product.itemName);
+    const safeDescription = escapeHtml(product.description || '');
+    const safePricesStr = escapeHtml(pricesStr);
+    const safeCustomStr = escapeHtml(customStr);
 
     // Slides for view mode
     const slidesHTML = imageURLs.map(url =>
-      `<div class="slide"><img src="${url}" alt="${product.itemName} picture" class="product-image"></div>`
+      `<div class="slide"><img src="${escapeHtml(url)}" alt="${safeItemName} picture" class="product-image"></div>`
     ).join('');
     const arrowsHTML = imageURLs.length > 1
       ? `<button class="arrow left">&#8249;</button><button class="arrow right">&#8250;</button>`
@@ -76,31 +80,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Edit mode images
     const editImagesHTML = imageURLs.map(url => `
-      <div class="edit-image-item" data-image-url="${url}">
-        <img src="${url}" alt="Product image" class="edit-product-image" style="width: 80px; height: 80px; object-fit: cover;">
+      <div class="edit-image-item" data-image-url="${escapeHtml(url)}">
+        <img src="${escapeHtml(url)}" alt="Product image" class="edit-product-image" style="width: 80px; height: 80px; object-fit: cover;">
         <button type="button" class="btn btn-sm btn-danger remove-image-btn">&times;</button>
       </div>`).join('');
 
     html += `
     <div class="row menu-row" data-item-index="${i}">
       <!-- View Mode -->
-      <div class="col-2 view-mode"><p>${product.itemName}</p></div>
-      <div class="col-2 view-mode"><p>${product.description || ''}</p></div>
-      <div class="col-2 view-mode"><p>${pricesStr}</p></div>
-      <div class="col-2 view-mode"><p>${customStr}</p></div>
+      <div class="col-2 view-mode"><p>${safeItemName}</p></div>
+      <div class="col-2 view-mode"><p>${safeDescription}</p></div>
+      <div class="col-2 view-mode"><p>${safePricesStr}</p></div>
+      <div class="col-2 view-mode"><p>${safeCustomStr}</p></div>
       <!-- Edit Mode -->
       <div class="col-2 edit-mode" style="display: none;">
-        <textarea class="form-control edit-itemName" rows="4">${product.itemName}</textarea>
-        <input type="hidden" class="original-itemName" value="${product.itemName}">
+        <textarea class="form-control edit-itemName" rows="4">${safeItemName}</textarea>
+        <input type="hidden" class="original-itemName" value="${safeItemName}">
       </div>
       <div class="col-2 edit-mode" style="display: none;">
-        <textarea class="form-control edit-description" rows="4">${product.description || ''}</textarea>
+        <textarea class="form-control edit-description" rows="4">${safeDescription}</textarea>
       </div>
       <div class="col-2 edit-mode" style="display: none;">
-        <textarea class="form-control edit-prices" rows="4">${pricesStr}</textarea>
+        <textarea class="form-control edit-prices" rows="4">${safePricesStr}</textarea>
       </div>
       <div class="col-2 edit-mode" style="display: none;">
-        <textarea class="form-control edit-customizations" rows="4">${customStr}</textarea>
+        <textarea class="form-control edit-customizations" rows="4">${safeCustomStr}</textarea>
       </div>
       <div class="col-2">
         <div class="slider-container view-mode">
@@ -119,7 +123,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <form class="remove-item-form">
           <input type="hidden" name="tableName" value="products">
           <input type="hidden" name="partitionKey" value="itemName">
-          <input type="hidden" name="partitionKeyValue" value="${product.itemName}">
+          <input type="hidden" name="partitionKeyValue" value="${safeItemName}">
           <button type="submit" class="btn btn-danger button-2 mt-2">Remove Item</button>
         </form>
       </div>
@@ -212,7 +216,10 @@ function initProductEditHandlers() {
         });
       }
 
-      // Delete removed images (STUBBED)
+      // Build current image URLs (start with existing, minus removed)
+      const currentImageURLs = (product.imageURLs || []).filter(url => !imagesToRemove.includes(url));
+
+      // Delete removed images from S3
       if (imagesToRemove.length > 0) {
         const s3Keys = imagesToRemove.map(url => {
           try { return new URL(url).pathname.replace(/^\//, ''); } catch { return url; }
@@ -220,19 +227,25 @@ function initProductEditHandlers() {
         await deleteImages(s3Keys);
       }
 
-      // Upload new images (STUBBED)
+      // Upload new images and collect their public URLs
+      let newImageURLs = [];
       const newImagesInput = row.querySelector('.add-images-input');
       if (newImagesInput?.files?.length > 0) {
-        await uploadImages([], Array.from(newImagesInput.files));
+        const files = Array.from(newImagesInput.files);
+        const filenames = files.map(f => `products/${Date.now()}-${f.name}`);
+        const result = await uploadImages(filenames, files);
+        if (result.success && result.urls) {
+          newImageURLs = result.urls;
+        }
       }
 
-      // Save item (STUBBED)
+      // Save item with combined image URLs
       await putItem('products', {
         itemName,
         description,
         prices: parsedPrices,
         customizations: parsedCustom,
-        imageURLs: [] // Would be updated with actual URLs from S3
+        imageURLs: [...currentImageURLs, ...newImageURLs]
       });
     });
   });
@@ -273,6 +286,13 @@ function initSectionEditHandlers() {
       const headerText = headerTextEl ? headerTextEl.value : '';
       const bodyText = row.querySelector('.edit-bodyText')?.value;
 
+      // Start with existing images, minus any removed
+      const existingImages = row.dataset.imageUrls ? JSON.parse(row.dataset.imageUrls) : [];
+      let currentImageURLs = imageToRemove
+        ? existingImages.filter(url => url !== imageToRemove)
+        : [...existingImages];
+
+      // Delete removed image from S3
       if (imageToRemove) {
         try {
           const s3Key = new URL(imageToRemove).pathname.replace(/^\//, '');
@@ -280,16 +300,23 @@ function initSectionEditHandlers() {
         } catch { /* local image path */ }
       }
 
+      // Upload new images
+      let newImageURLs = [];
       const newImageInput = row.querySelector('.add-images-input');
       if (newImageInput?.files?.length > 0) {
-        await uploadImages([], Array.from(newImageInput.files));
+        const files = Array.from(newImageInput.files);
+        const filenames = files.map(f => `${pageName}/${Date.now()}-${f.name}`);
+        const result = await uploadImages(filenames, files);
+        if (result.success && result.urls) {
+          newImageURLs = result.urls;
+        }
       }
 
       await putItem(pageName, {
         sectionIndex,
         headerText,
         bodyText,
-        imageURLs: []
+        imageURLs: [...currentImageURLs, ...newImageURLs]
       });
     });
   });
@@ -325,9 +352,38 @@ function initAddHandlers() {
     e.preventDefault();
     const form = e.target;
     const name = form.querySelector('[name="partitionKeyValue"]').value;
+    const description = form.querySelector('[name="description"]')?.value || '';
+    const csvPrices = form.querySelector('[name="csvPrices"]')?.value || '';
+    const csvCustomizations = form.querySelector('[name="csvCustomizations"]')?.value || '';
     if (!name) return;
-    await uploadImages([], []); // STUBBED
-    await putItem('products', { itemName: name });
+
+    // Parse prices
+    const prices = {};
+    csvPrices.split(',').forEach(pair => {
+      const [q, p] = pair.split(':').map(s => s.trim());
+      if (q && p) prices[q] = parseInt(p);
+    });
+
+    // Parse customizations
+    const customizations = {};
+    csvCustomizations.split(',').forEach(pair => {
+      const [c, p] = pair.split(':').map(s => s.trim());
+      if (c && p) customizations[c] = p;
+    });
+
+    // Upload images
+    let imageURLs = [];
+    const imageInput = form.querySelector('[name="images[]"]');
+    if (imageInput?.files?.length > 0) {
+      const files = Array.from(imageInput.files);
+      const filenames = files.map(f => `products/${Date.now()}-${f.name}`);
+      const result = await uploadImages(filenames, files);
+      if (result.success && result.urls) {
+        imageURLs = result.urls;
+      }
+    }
+
+    await putItem('products', { itemName: name, description, prices, customizations, imageURLs });
   });
 
   // Add section
@@ -336,8 +392,23 @@ function initAddHandlers() {
       e.preventDefault();
       const pageName = form.dataset.pageName;
       const sectionIndex = form.querySelector('[name="partitionKeyValue"]')?.value;
+      const headerText = form.querySelector('[name="headerText"]')?.value || '';
+      const bodyText = form.querySelector('[name="bodyText"]')?.value || '';
       if (!sectionIndex) return;
-      await putItem(pageName, { sectionIndex });
+
+      // Upload image if provided
+      let imageURLs = [];
+      const imageInput = form.querySelector('[name="images[]"]');
+      if (imageInput?.files?.length > 0) {
+        const files = Array.from(imageInput.files);
+        const filenames = files.map(f => `${pageName}/${Date.now()}-${f.name}`);
+        const result = await uploadImages(filenames, files);
+        if (result.success && result.urls) {
+          imageURLs = result.urls;
+        }
+      }
+
+      await putItem(pageName, { sectionIndex, headerText, bodyText, imageURLs });
     });
   });
 }

@@ -1,14 +1,9 @@
 // checkout.js - Checkout page initialization
-// Replaces:
-//   - private/frontend/pages/checkout.php (order summary rendering)
-//   - public/js/checkout.js (form validation + sessionStorage persistence)
-//   - public/js/stripe/checkout.js (Stripe Elements integration)
-// Stripe checkout session creation is STUBBED until Lambda is implemented.
 
 import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
 import { initShared } from '../shared.js';
-import { isCartEmpty, buildLineItems, getCartTotal, saveCustomerDetails, saveCompletedOrder } from '../modules/cart.js';
+import { isCartEmpty, buildLineItems, getCartLines, saveCustomerDetails, saveCompletedOrder } from '../modules/cart.js';
 import { createStripeCheckout } from '../stripe/stripe.js';
 import config from '../modules/config.js';
 
@@ -63,12 +58,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     pickupDateInput.min = minDate.toISOString().split('T')[0];
   }
 
+  const cartLines = getCartLines();
+  if (!cartLines.length) {
+    const paymentEl = document.getElementById('payment-element');
+    if (paymentEl) {
+      paymentEl.innerHTML = `<div class="alert alert-warning mt-2">Your cart needs to be refreshed. Please return to the menu and add your items again.</div>`;
+    }
+    renderFooter();
+    initShared();
+    return;
+  }
+
   // ── Stripe integration (from public/js/stripe/checkout.js) ──
   // Get public key from config (replaces fetch('/get_stripe_public_key'))
   const stripe = Stripe(config.stripePublicKey);
 
   const fetchClientSecret = async () => {
-    // STUBBED: This calls createStripeCheckout() which returns null until Lambda
     const clientSecret = await createStripeCheckout();
     return clientSecret;
   };
@@ -77,11 +82,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     checkout = await stripe.initCheckout({ fetchClientSecret });
   } catch (err) {
-    // Stripe init will fail if clientSecret is null (stubbed)
-    console.warn('Stripe checkout initialization failed (expected if Lambda not yet set up):', err.message);
+    console.error('Stripe checkout initialization failed:', err.message);
     const paymentEl = document.getElementById('payment-element');
     if (paymentEl) {
-      paymentEl.innerHTML = `<div class="alert alert-warning mt-2">Payment processing requires Lambda setup. Stripe checkout session creation is currently stubbed.</div>`;
+      paymentEl.innerHTML = `<div class="alert alert-danger mt-2">Payment processing is temporarily unavailable. Please try again later or contact us at support@sweethopebakeryy.com.</div>`;
     }
   }
 
@@ -95,7 +99,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     emailInput?.addEventListener('blur', () => {
       checkout.updateEmail(emailInput.value).then((result) => {
         if (result.error) {
-          emailErrors.innerHTML = `<p class='small-text'>${result.error.message}</p>`;
+          emailErrors.textContent = result.error.message;
         }
       });
     });
@@ -136,7 +140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const phoneValue = phoneInput?.value || '';
     const digitCount = (phoneValue.match(/\d/g) || []).length;
     if (digitCount < 10) {
-      if (phoneErrors) phoneErrors.innerHTML = "<p class='small-text'>Please enter a valid phone number with at least 10 digits.</p>";
+      if (phoneErrors) phoneErrors.textContent = 'Please enter a valid phone number with at least 10 digits.';
       phoneInput?.focus();
       return;
     }
@@ -182,7 +186,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
     } else {
-      if (errors) errors.textContent = 'Payment processing is not available yet (Lambda setup required).';
+      if (errors) errors.textContent = 'Payment processing is temporarily unavailable. Please try again later.';
     }
   });
 
