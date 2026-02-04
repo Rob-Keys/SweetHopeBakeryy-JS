@@ -2,3 +2,7 @@ name = "sweethopebakeryy-js"
 pages_build_output_dir = "src"
 compatibility_date = "2026-02-04"
 compatibility_flags = ["nodejs_compat"]
+
+[[kv_namespaces]]
+binding = "kv-db"
+id = "484eac01223645b5a7d53de5ae5d2917"

@@ -53,9 +53,9 @@ Pull KV data into `src/data` during build:
 CF_API_TOKEN=... CF_ACCOUNT_ID=... CF_KV_NAMESPACE_ID=... node scripts/pull-kv-data.mjs
 ```
 
-Generate `ADMIN_PASSWORD_HASH`:
+Generate `ADMIN_PASSWORD_HASH` (max 100000 iterations — Cloudflare Workers limit):
 ```bash
-node -e "const crypto=require('crypto'); const pw=process.argv[1]; const it=150000; const salt=crypto.randomBytes(16); crypto.pbkdf2(pw,salt,it,32,'sha256',(e,d)=>{ if(e) throw e; console.log(`pbkdf2$${it}$${salt.toString('base64')}$${d.toString('base64')}`);});" "YOUR_PASSWORD"
+node -e "const crypto=require('crypto'); const pw=process.argv[1]; const it=100000; const salt=crypto.randomBytes(16); crypto.pbkdf2(pw,salt,it,32,'sha256',(e,d)=>{ if(e) throw e; console.log('pbkdf2\$'+it+'\$'+salt.toString('base64')+'\$'+d.toString('base64'));});" 'YOUR_PASSWORD'
 ```
 
 ## Security Notes
