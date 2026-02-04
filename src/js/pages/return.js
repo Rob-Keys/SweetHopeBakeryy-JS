@@ -156,7 +156,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           <h2>Order Submitted</h2>
           <div class="alert alert-warning mt-3" role="alert">
             <strong>Payment verification failed.</strong> We could not confirm your payment. If you were charged, please contact us at support@sweethopebakeryy.com and we will resolve this.
-            ${result?.error ? `<div class="small text-muted mt-2">Details: ${escapeHtml(result.error)}</div>` : ''}
           </div>
         </div>`;
     } else {

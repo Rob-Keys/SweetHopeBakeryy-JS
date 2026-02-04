@@ -165,6 +165,17 @@ async function sendEmailViaSES(ses, from, to, subject, body) {
   }));
 }
 
+function getErrorMessage(err) {
+  if (!err) return 'Internal error';
+  if (typeof err === 'string') return err;
+  if (err.message) return String(err.message);
+  return 'Internal error';
+}
+
+function shouldExposeErrors(env) {
+  return env?.DEBUG_ERRORS === 'true' || env?.APP_ENV === 'development';
+}
+
 export async function onRequestPost(context) {
   const { STRIPE_SECRET_KEY, AWS_KEY, AWS_SECRET_KEY, AWS_REGION = 'us-east-1',
           CAROLINE_EMAIL_ADDRESS, DEVELOPER_EMAIL_ADDRESS } = context.env;
@@ -181,7 +192,16 @@ export async function onRequestPost(context) {
     }
 
     // Verify payment with Stripe
-    const session = await stripeRequest(STRIPE_SECRET_KEY, 'GET', `/checkout/sessions/${session_id}`);
+    let session;
+    try {
+      session = await stripeRequest(STRIPE_SECRET_KEY, 'GET', `/checkout/sessions/${session_id}`);
+    } catch (err) {
+      console.error('Stripe verification failed:', err);
+      const message = shouldExposeErrors(context.env)
+        ? getErrorMessage(err)
+        : 'Stripe verification failed';
+      return Response.json({ error: message }, { status: 502 });
+    }
     const paid = session.payment_status === 'paid';
     const customerEmail = session.customer_details?.email || customerDetails?.customer_email || null;
 
@@ -281,6 +301,9 @@ export async function onRequestPost(context) {
     });
   } catch (err) {
     console.error('verify-checkout error:', err);
-    return Response.json({ error: 'Internal error' }, { status: 500 });
+    const message = shouldExposeErrors(context.env)
+      ? getErrorMessage(err)
+      : 'Internal error';
+    return Response.json({ error: message }, { status: 500 });
   }
 }

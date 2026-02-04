@@ -94,16 +94,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     checkoutActions = loadResult.actions;
 
-    // Email validation on blur
-    const emailErrors = document.getElementById('email-errors');
-    emailInput?.addEventListener('blur', async () => {
-      if (checkoutActions?.updateEmail) {
-        const result = await checkoutActions.updateEmail(emailInput.value);
-        if (result?.error) {
-          emailErrors.textContent = result.error.message;
-        }
+  const setUserError = (el, message) => {
+    if (el) el.textContent = message || '';
+  };
+
+  // Email validation on blur
+  const emailErrors = document.getElementById('email-errors');
+  emailInput?.addEventListener('blur', async () => {
+    if (checkoutActions?.updateEmail) {
+      const result = await checkoutActions.updateEmail(emailInput.value);
+      if (result?.error) {
+        setUserError(emailErrors, 'Please enter a valid email address.');
       }
-    });
+    }
+  });
   } catch (err) {
     console.error('Stripe checkout initialization failed:', err.message);
     checkout = null;
@@ -124,14 +128,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e && e.defaultPrevented) return;
 
     // Clear previous errors
-    if (errors) errors.textContent = '';
-    if (phoneErrors) phoneErrors.textContent = '';
-    if (emailErrors) emailErrors.textContent = '';
+    setUserError(errors, '');
+    setUserError(phoneErrors, '');
+    setUserError(emailErrors, '');
 
     // Validate name
     const nameValue = (nameInput?.value || '').trim();
     if (!nameValue) {
-      if (errors) errors.textContent = 'Please enter your name.';
+      setUserError(errors, 'Please enter your name.');
       nameInput?.focus();
       return;
     }
@@ -140,7 +144,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const emailValue = (emailInput?.value || '').trim();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(emailValue)) {
-      if (emailErrors) emailErrors.textContent = 'Please enter a valid email address.';
+      setUserError(emailErrors, 'Please enter a valid email address.');
       emailInput?.focus();
       return;
     }
@@ -149,7 +153,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const phoneValue = phoneInput?.value || '';
     const digitCount = (phoneValue.match(/\d/g) || []).length;
     if (digitCount < 10) {
-      if (phoneErrors) phoneErrors.textContent = 'Please enter a valid phone number with at least 10 digits.';
+      setUserError(phoneErrors, 'Please enter a valid phone number with at least 10 digits.');
       phoneInput?.focus();
       return;
     }
@@ -157,7 +161,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Validate pickup date
     const dateValue = pickupDateInput?.value || '';
     if (!dateValue) {
-      if (errors) errors.textContent = 'Please select a pickup date.';
+      setUserError(errors, 'Please select a pickup date.');
       pickupDateInput?.focus();
       return;
     }
@@ -166,7 +170,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const minDate = new Date();
     minDate.setDate(minDate.getDate() + 2);
     if (selectedDate < minDate) {
-      if (errors) errors.textContent = 'Pickup date must be at least 3 days from today.';
+      setUserError(errors, 'Pickup date must be at least 3 days from today.');
       pickupDateInput?.focus();
       return;
     }
@@ -192,13 +196,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         const result = await checkoutActions.confirm();
         if (result.type === 'error') {
-          if (errors) errors.textContent = result.error.message;
+          setUserError(errors, 'Payment could not be completed. Please try again.');
         }
       } catch (confirmErr) {
-        if (errors) errors.textContent = confirmErr.message || 'Payment failed. Please try again.';
+        setUserError(errors, 'Payment failed. Please try again.');
       }
     } else {
-      if (errors) errors.textContent = 'Payment processing is temporarily unavailable. Please try again later.';
+      setUserError(errors, 'Payment processing is temporarily unavailable. Please try again later.');
     }
   });
 
