@@ -2,6 +2,47 @@
 // Adapted from public/js/shared.js as an ES6 module
 // Must call initShared() AFTER all dynamic content is in the DOM.
 
+const originalConsole = {
+  log: console.log?.bind(console),
+  warn: console.warn?.bind(console),
+  error: console.error?.bind(console)
+};
+
+function setConsoleEnabled(enabled) {
+  if (typeof console === 'undefined') return;
+  const noop = () => {};
+  try {
+    if (enabled) {
+      if (originalConsole.log) console.log = originalConsole.log;
+      if (originalConsole.warn) console.warn = originalConsole.warn;
+      if (originalConsole.error) console.error = originalConsole.error;
+    } else {
+      console.log = noop;
+      console.warn = noop;
+      console.error = noop;
+    }
+  } catch {
+    // ignore if console is not writable
+  }
+}
+
+async function applyConsoleGate() {
+  // Default to hiding logs unless server says otherwise
+  setConsoleEnabled(false);
+  try {
+    const response = await fetch('/api/rate/get-debug-flags');
+    if (!response.ok) return;
+    const data = await response.json();
+    if (data?.debugErrors === true) {
+      setConsoleEnabled(true);
+    }
+  } catch {
+    // swallow any errors to avoid leaking internals
+  }
+}
+
+applyConsoleGate();
+
 export class ImageSlider {
   constructor(containerSelector) {
     this.container = typeof containerSelector === 'string'

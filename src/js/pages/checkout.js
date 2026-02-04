@@ -77,6 +77,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const clientSecretPromise = createStripeCheckout();
 
+  const setUserError = (el, message) => {
+    if (el) el.textContent = message || '';
+  };
+
+  const emailErrors = document.getElementById('email-errors');
+  const phoneErrors = document.getElementById('phone-errors');
+
   let checkout = null;
   let checkoutActions = null;
   try {
@@ -94,20 +101,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     checkoutActions = loadResult.actions;
 
-  const setUserError = (el, message) => {
-    if (el) el.textContent = message || '';
-  };
-
-  // Email validation on blur
-  const emailErrors = document.getElementById('email-errors');
-  emailInput?.addEventListener('blur', async () => {
-    if (checkoutActions?.updateEmail) {
-      const result = await checkoutActions.updateEmail(emailInput.value);
-      if (result?.error) {
-        setUserError(emailErrors, 'Please enter a valid email address.');
+    // Email validation on blur
+    emailInput?.addEventListener('blur', async () => {
+      if (checkoutActions?.updateEmail) {
+        const result = await checkoutActions.updateEmail(emailInput.value);
+        if (result?.error) {
+          setUserError(emailErrors, 'Please enter a valid email address.');
+        }
       }
-    }
-  });
+    });
   } catch (err) {
     console.error('Stripe checkout initialization failed:', err.message);
     checkout = null;
@@ -121,8 +123,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── Pay button handler (from stripe/checkout.js:38-115) ──
   const payButton = document.getElementById('pay-button');
   const errors = document.getElementById('confirm-errors');
-  const emailErrors = document.getElementById('email-errors');
-  const phoneErrors = document.getElementById('phone-errors');
 
   payButton?.addEventListener('click', async (e) => {
     if (e && e.defaultPrevented) return;
