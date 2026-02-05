@@ -206,6 +206,14 @@ function setButtonBusy(button, busy, busyLabel = 'Saving...') {
   }
 }
 
+function hideElements(elements) {
+  elements.forEach(el => { el.style.display = 'none'; });
+}
+
+function showElements(elements) {
+  elements.forEach(el => { el.style.removeProperty('display'); });
+}
+
 function buildSlidesHTML(imageURLs, itemName) {
   const safeName = escapeHtml(itemName || '');
   return imageURLs.map(url =>
@@ -293,8 +301,8 @@ function initProductEditHandlers() {
 
     editBtn?.addEventListener('click', () => {
       imagesToRemove = [];
-      viewModeElements.forEach(el => el.style.display = 'none');
-      editModeElements.forEach(el => el.style.display = 'block');
+      hideElements(viewModeElements);
+      showElements(editModeElements);
       editBtn.style.display = 'none';
       saveBtn.style.display = 'inline-block';
     });
@@ -391,8 +399,8 @@ function initProductEditHandlers() {
         imagesToRemove = [];
 
         // Switch back to view mode
-        viewModeElements.forEach(el => el.style.display = 'block');
-        editModeElements.forEach(el => el.style.display = 'none');
+        showElements(viewModeElements);
+        hideElements(editModeElements);
         editBtn.style.display = 'inline-block';
         saveBtn.style.display = 'none';
         const fileInput = row.querySelector('.add-images-input');
@@ -434,8 +442,8 @@ function initSectionEditHandlers() {
 
     editBtn?.addEventListener('click', () => {
       imageToRemove = null;
-      viewModeElements.forEach(el => el.style.display = 'none');
-      editModeElements.forEach(el => el.style.display = 'block');
+      hideElements(viewModeElements);
+      showElements(editModeElements);
       editBtn.style.display = 'none';
       saveBtn.style.display = 'inline-block';
     });
@@ -525,8 +533,8 @@ function initSectionEditHandlers() {
         });
 
         // Switch back to view mode
-        viewModeElements.forEach(el => el.style.display = 'block');
-        editModeElements.forEach(el => el.style.display = 'none');
+        showElements(viewModeElements);
+        hideElements(editModeElements);
         editBtn.style.display = 'inline-block';
         saveBtn.style.display = 'none';
         const fileInput = row.querySelector('.add-images-input');

@@ -41,9 +41,9 @@ Deploy the `src/` directory to any static host (Cloudflare Pages, AWS Amplify, e
 
 Optional: `AWS_REGION` (defaults to `us-east-1`)
 Optional: `PAGES_DEPLOY_HOOK_URL` (triggers a deploy after admin edits)
-Optional: `PAGES_DEPLOY_HOOK_DEBOUNCE_MS` (debounce deploy hook calls, e.g. `10000`)
 Optional: `PAGES_PURGE_AFTER_DEPLOY` (set to `true` to purge Cloudflare cache after deploy)
 Optional: `PAGES_PURGE_DELAY_MS` (delay purge after deploy, e.g. `15000`)
+Optional: `PAGES_PURGE_DEBUG` (set to `true` to log purge/deploy hook status)
 Optional: `CLOUDFLARE_ZONE_ID` or `CF_ZONE_ID` (required for cache purge)
 Optional: `CLOUDFLARE_API_TOKEN` or `CF_API_TOKEN` (required for cache purge; needs Cache Purge permission)
 
