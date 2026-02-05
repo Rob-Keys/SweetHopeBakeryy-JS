@@ -171,6 +171,7 @@ function ensureRowStatus(row) {
     if (!actionCol) return null;
     status = document.createElement('div');
     status.className = 'row-status mt-2 w-100';
+    status.style.alignSelf = 'stretch';
     actionCol.appendChild(status);
   }
   return status;
@@ -394,9 +395,12 @@ function initProductEditHandlers() {
         editModeElements.forEach(el => el.style.display = 'none');
         editBtn.style.display = 'inline-block';
         saveBtn.style.display = 'none';
+        const fileInput = row.querySelector('.add-images-input');
+        if (fileInput) fileInput.value = '';
         setRowStatus(row, 'Saved. Live site updates after the deploy finishes.', 'success');
         setTimeout(() => setRowStatus(row, ''), 3000);
       } catch (err) {
+        console.error('Product save failed:', err);
         setRowStatus(row, err?.message || 'Save failed.', 'danger');
       } finally {
         saveBtn.dataset.saving = 'false';
@@ -525,9 +529,12 @@ function initSectionEditHandlers() {
         editModeElements.forEach(el => el.style.display = 'none');
         editBtn.style.display = 'inline-block';
         saveBtn.style.display = 'none';
+        const fileInput = row.querySelector('.add-images-input');
+        if (fileInput) fileInput.value = '';
         setRowStatus(row, 'Saved. Live site updates after the deploy finishes.', 'success');
         setTimeout(() => setRowStatus(row, ''), 3000);
       } catch (err) {
+        console.error('Section save failed:', err);
         setRowStatus(row, err?.message || 'Save failed.', 'danger');
       } finally {
         saveBtn.dataset.saving = 'false';
