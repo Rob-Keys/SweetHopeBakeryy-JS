@@ -8,6 +8,9 @@ import { createStripeCheckout, fetchStripePublicKey } from '../stripe/stripe.js'
 import config from '../modules/config.js';
 
 const STRIPE_SCRIPT_SRC = 'https://js.stripe.com/clover/stripe.js';
+const STRIPE_SCRIPT_ATTR = 'data-stripe-loader';
+const STRIPE_RETRY_MAX = 3;
+const STRIPE_RETRY_BASE_DELAY = 800;
 let stripeScriptPromise = null;
 
 function loadStripeScript() {
@@ -19,6 +22,7 @@ function loadStripeScript() {
     script.src = STRIPE_SCRIPT_SRC;
     script.async = true;
     script.defer = true;
+    script.setAttribute(STRIPE_SCRIPT_ATTR, 'true');
     script.onload = () => {
       if (window.Stripe) {
         resolve(window.Stripe);
@@ -28,6 +32,10 @@ function loadStripeScript() {
     };
     script.onerror = () => reject(new Error('Stripe failed to load.'));
     document.head.appendChild(script);
+  }).catch((err) => {
+    stripeScriptPromise = null;
+    document.querySelector(`script[${STRIPE_SCRIPT_ATTR}]`)?.remove();
+    throw err;
   });
 
   return stripeScriptPromise;
@@ -116,10 +124,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let checkout = null;
   let checkoutActions = null;
+  let stripeInitInFlight = false;
+  let stripeInitAttempts = 0;
+  let stripeInitComplete = false;
 
-  if (paymentEl) {
-    paymentEl.innerHTML = `<div class="alert alert-info mt-2">Loading secure payment form...</div>`;
-  }
+  const setPaymentStatus = (message, type = 'info', showRetry = false) => {
+    if (!paymentEl) return;
+    const safeMessage = message || '';
+    const retryButton = showRetry
+      ? '<button type="button" class="btn btn-sm btn-cookie" data-stripe-retry="true">Retry</button>'
+      : '';
+    paymentEl.innerHTML = `
+      <div class="alert alert-${type} mt-2 d-flex justify-content-between align-items-center gap-2">
+        <div>${safeMessage}</div>
+        ${retryButton}
+      </div>`;
+    const retry = paymentEl.querySelector('[data-stripe-retry="true"]');
+    retry?.addEventListener('click', () => {
+      stripeInitAttempts = 0;
+      initStripeCheckout({ manual: true });
+    });
+  };
+
+  setPaymentStatus('Loading secure payment form...');
   if (payButton) {
     payButton.disabled = true;
     payButton.setAttribute('aria-busy', 'true');
@@ -209,7 +236,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  const initStripeCheckout = async () => {
+  const initStripeCheckout = async ({ manual = false } = {}) => {
+    if (stripeInitComplete || stripeInitInFlight) return;
+    stripeInitInFlight = true;
+    stripeInitAttempts += 1;
+    setPaymentStatus(manual ? 'Retrying secure payment form...' : 'Loading secure payment form...');
     try {
       await loadStripeScript();
 
@@ -221,12 +252,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       const stripe = Stripe(stripePublicKey);
-      const clientSecretPromise = createStripeCheckout();
+      const clientSecret = await createStripeCheckout();
+      if (!clientSecret) {
+        throw new Error('Missing checkout client secret.');
+      }
 
       // clover build: initCheckout is synchronous, returns checkout object immediately
-      checkout = stripe.initCheckout({ clientSecret: clientSecretPromise });
+      checkout = stripe.initCheckout({ clientSecret });
 
       // Mount payment element (works before loadActions)
+      if (paymentEl) paymentEl.innerHTML = '';
       const paymentElement = checkout.createPaymentElement();
       paymentElement.mount('#payment-element');
 
@@ -236,6 +271,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         throw new Error(loadResult.error?.message || 'Failed to load checkout');
       }
       checkoutActions = loadResult.actions;
+      stripeInitComplete = true;
 
       if (payButton) {
         payButton.disabled = false;
@@ -255,13 +291,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       debugLog('Stripe checkout initialization failed:', err);
       checkout = null;
       checkoutActions = null;
-      if (paymentEl) {
-        paymentEl.innerHTML = `<div class="alert alert-danger mt-2">Payment processing is temporarily unavailable. Please try again later or contact us at support@sweethopebakeryy.com.</div>`;
+      if (stripeInitAttempts < STRIPE_RETRY_MAX) {
+        const delay = STRIPE_RETRY_BASE_DELAY * Math.pow(2, stripeInitAttempts - 1);
+        setPaymentStatus('Still loading payment form... retrying in a moment.', 'warning');
+        setTimeout(() => initStripeCheckout(), delay);
+      } else {
+        setPaymentStatus(
+          'Payment processing is temporarily unavailable. Please try again or contact us at support@sweethopebakeryy.com.',
+          'danger',
+          true
+        );
       }
       if (payButton) {
         payButton.disabled = true;
         payButton.removeAttribute('aria-busy');
       }
+    } finally {
+      stripeInitInFlight = false;
     }
   };
 
