@@ -24,7 +24,6 @@ Admin dev password: `password` (only if you generated `ADMIN_PASSWORD_HASH` for 
 - `src/js/components/` — reusable HTML generators: `header.js`, `footer.js`, `product.js`, `customize-page.js`
 - `src/js/aws/` + `src/js/stripe/` — client-side modules that call `/api/*` endpoints
 - `src/js/shared.js` — ImageSlider class + fade-in scroll animations
-- `src/data/` — JSON data files (fallback/seed only; live data is served from KV via `/api/get-data`)
 - `functions/api/` — Cloudflare Pages Functions (server-side, access env vars)
   - `_jwt.js`, `_auth.js` — helpers (prefixed with `_`, not routed as endpoints)
 
