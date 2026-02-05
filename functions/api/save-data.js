@@ -5,7 +5,7 @@
 
 import { checkAuth } from './_auth.js';
 import { getKv, isValidTableName } from './_kv.js';
-import { queueDeployHook } from './_deploy.js';
+import { queueCachePurge } from './_deploy.js';
 
 export async function onRequestPost(context) {
   const denied = await checkAuth(context);
@@ -48,7 +48,7 @@ export async function onRequestPost(context) {
     // Persist the updated table.
     await kv.put(key, JSON.stringify(data));
 
-    await queueDeployHook(context);
+    queueCachePurge(context);
 
     return Response.json({ success: true });
   } catch (err) {
