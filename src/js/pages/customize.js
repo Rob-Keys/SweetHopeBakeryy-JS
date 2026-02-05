@@ -216,8 +216,9 @@ function initProductEditHandlers() {
         });
       }
 
-      // Build current image URLs (start with existing, minus removed)
-      const currentImageURLs = (product.imageURLs || []).filter(url => !imagesToRemove.includes(url));
+      // Build current image URLs from remaining DOM elements (minus removed)
+      const currentImageURLs = Array.from(row.querySelectorAll('.edit-image-item'))
+        .map(el => el.dataset.imageUrl);
 
       // Delete removed images from S3
       if (imagesToRemove.length > 0) {

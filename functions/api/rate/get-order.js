@@ -1,11 +1,7 @@
 // GET /api/rate/get-order?session_id=...
 // Returns a short-lived, non-PII order snapshot for the return page
 
-const KV_BINDING = 'kv-db';
-
-function getKv(context) {
-  return context.env[KV_BINDING];
-}
+import { getKv } from '../_kv.js';
 
 export async function onRequestGet(context) {
   const url = new URL(context.request.url);

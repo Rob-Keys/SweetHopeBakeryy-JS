@@ -2,8 +2,9 @@
 // Lists and reads emails from S3 inbox
 // Env vars: AWS_KEY, AWS_SECRET_KEY, AWS_REGION (optional, defaults to us-east-1)
 
-import { S3Client, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client } from '@aws-sdk/client-s3';
 import { checkAuth } from './_auth.js';
+import { listEmails } from './_s3.js';
 
 export async function onRequestGet(context) {
   const denied = await checkAuth(context);
@@ -17,27 +18,7 @@ export async function onRequestGet(context) {
   try {
     const credentials = { accessKeyId: AWS_KEY, secretAccessKey: AWS_SECRET_KEY };
     const s3 = new S3Client({ region: AWS_REGION, credentials });
-
-    const list = await s3.send(new ListObjectsV2Command({
-      Bucket: 'sweethopebakeryy-emails',
-      Prefix: 'inbox/'
-    }));
-
-    const emails = [];
-    for (const obj of (list.Contents || [])) {
-      if (obj.Key === 'inbox/') continue; // skip directory marker
-      const data = await s3.send(new GetObjectCommand({
-        Bucket: 'sweethopebakeryy-emails',
-        Key: obj.Key
-      }));
-      const text = await data.Body.transformToString();
-      try {
-        emails.push(JSON.parse(text));
-      } catch {
-        // If not JSON (raw MIME), return as-is with key as identifier
-        emails.push({ key: obj.Key, body: text, date: obj.LastModified });
-      }
-    }
+    const emails = await listEmails(s3, 'inbox/');
 
     return Response.json({ emails });
   } catch (err) {

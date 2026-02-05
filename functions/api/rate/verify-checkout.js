@@ -5,13 +5,10 @@
 
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { S3Client, HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getKv } from '../_kv.js';
+import { stripeRequest } from '../_stripe.js';
 
-const KV_BINDING = 'kv-db';
 const PRODUCTS_KEY = 'data/products.json';
-
-function getKv(context) {
-  return context.env[KV_BINDING];
-}
 
 async function loadProductsFromKv(context) {
   const kv = getKv(context);
@@ -51,29 +48,6 @@ function buildValidatedCart(cartLines, products) {
   }
 
   return { valid: true, cart, total };
-}
-
-async function stripeRequest(secretKey, method, path) {
-  const res = await fetch(`https://api.stripe.com/v1${path}`, {
-    method,
-    headers: {
-      'Authorization': `Bearer ${secretKey}`,
-      'Stripe-Version': '2026-01-28.clover'
-    }
-  });
-  const text = await res.text();
-  let data;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = { error: { message: text || 'Stripe API error' } };
-  }
-
-  if (!res.ok) {
-    const message = data?.error?.message || `Stripe API error (${res.status})`;
-    throw new Error(message);
-  }
-  return data;
 }
 
 // Server-safe HTML escaping (no DOM APIs)

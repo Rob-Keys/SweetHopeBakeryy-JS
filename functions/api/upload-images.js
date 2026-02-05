@@ -5,16 +5,9 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { checkAuth } from './_auth.js';
+import { isSafeKey } from './_s3.js';
 
-const ALLOWED_PREFIXES = ['images/', 'header/'];
 const ALLOWED_EXTENSIONS = new Set(['avif', 'jpg', 'jpeg', 'png', 'webp', 'gif', 'ico']);
-
-function isSafeKey(key) {
-  if (typeof key !== 'string' || key.length === 0) return false;
-  if (key.startsWith('/') || key.includes('..') || key.includes('\\')) return false;
-  if (key === 'sweethopebakeryy.ico') return true;
-  return ALLOWED_PREFIXES.some(prefix => key.startsWith(prefix));
-}
 
 export async function onRequestPost(context) {
   const denied = await checkAuth(context);

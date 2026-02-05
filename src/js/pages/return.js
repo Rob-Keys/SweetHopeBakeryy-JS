@@ -16,6 +16,7 @@ import {
   getCartLines
 } from '../modules/cart.js';
 import { didCheckoutSucceed } from '../stripe/stripe.js';
+import { escapeHtml } from '../modules/escape.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   renderHeader();
@@ -66,16 +67,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (result?.error && typeof globalThis.__debugLog === 'function') {
     globalThis.__debugLog('verify-checkout error:', result.error);
   }
-
-  const escapeHtml = (str) => {
-    if (!str) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  };
 
   if (result.success && completedOrder) {
     const customerEmail = escapeHtml(result.customerEmail || customerDetails.customer_email || 'your email');

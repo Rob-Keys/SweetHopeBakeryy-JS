@@ -1,19 +1,8 @@
 // GET /api/get-data?tableName=products&key=optional
 // Reads a JSON table from Cloudflare KV.
-// KV binding name: "kv-db"
 
 import { checkAuth } from './_auth.js';
-
-const ALLOWED_TABLES = new Set(['products', 'home_page', 'about_page', 'contact_page']);
-const KV_BINDING = 'kv-db';
-
-function isValidTableName(name) {
-  return ALLOWED_TABLES.has(name);
-}
-
-function getKv(context) {
-  return context.env[KV_BINDING];
-}
+import { getKv, isValidTableName } from './_kv.js';
 
 export async function onRequestGet(context) {
   const denied = await checkAuth(context);
@@ -21,7 +10,7 @@ export async function onRequestGet(context) {
 
   const kv = getKv(context);
   if (!kv) {
-    return Response.json({ error: `KV binding "${KV_BINDING}" not configured` }, { status: 500 });
+    return Response.json({ error: 'KV binding not configured' }, { status: 500 });
   }
 
   try {

@@ -2,7 +2,9 @@
 // Creates a Stripe checkout session
 // Env vars: STRIPE_SECRET_KEY
 
-const KV_BINDING = 'kv-db';
+import { getKv } from '../_kv.js';
+import { stripeRequest } from '../_stripe.js';
+
 const PRODUCTS_KEY = 'data/products.json';
 
 function getReturnUrl(request, env) {
@@ -20,10 +22,6 @@ function getReturnUrl(request, env) {
     }
   }
   return new URL('/return?session_id={CHECKOUT_SESSION_ID}', base).toString();
-}
-
-function getKv(context) {
-  return context.env[KV_BINDING];
 }
 
 async function loadProducts(context) {
@@ -104,54 +102,6 @@ async function persistOrderSnapshot(context, sessionId, cartLines, cartSummary) 
   } catch (err) {
     console.warn('persistOrderSnapshot failed:', err);
   }
-}
-
-function appendForm(params, key, value) {
-  if (value === null || value === undefined) return;
-  if (Array.isArray(value)) {
-    value.forEach((item, index) => {
-      appendForm(params, `${key}[${index}]`, item);
-    });
-    return;
-  }
-  if (typeof value === 'object') {
-    for (const [childKey, childValue] of Object.entries(value)) {
-      appendForm(params, `${key}[${childKey}]`, childValue);
-    }
-    return;
-  }
-  params.append(key, String(value));
-}
-
-async function stripeRequest(secretKey, method, path, body) {
-  const headers = {
-    'Authorization': `Bearer ${secretKey}`,
-    'Content-Type': 'application/x-www-form-urlencoded',
-    'Stripe-Version': '2026-01-28.clover'
-  };
-  const init = { method, headers };
-  if (body) {
-    const params = new URLSearchParams();
-    for (const [key, value] of Object.entries(body)) {
-      appendForm(params, key, value);
-    }
-    init.body = params.toString();
-  }
-
-  const res = await fetch(`https://api.stripe.com/v1${path}`, init);
-  const text = await res.text();
-  let data;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = { error: { message: text || 'Stripe API error' } };
-  }
-
-  if (!res.ok) {
-    const message = data?.error?.message || `Stripe API error (${res.status})`;
-    throw new Error(message);
-  }
-  return data;
 }
 
 export async function onRequestPost(context) {

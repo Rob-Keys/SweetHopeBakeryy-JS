@@ -4,15 +4,7 @@
 
 import { S3Client, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { checkAuth } from './_auth.js';
-
-const ALLOWED_PREFIXES = ['images/', 'header/'];
-
-function isSafeKey(key) {
-  if (typeof key !== 'string' || key.length === 0) return false;
-  if (key.startsWith('/') || key.includes('..') || key.includes('\\')) return false;
-  if (key === 'sweethopebakeryy.ico') return true;
-  return ALLOWED_PREFIXES.some(prefix => key.startsWith(prefix));
-}
+import { isSafeKey } from './_s3.js';
 
 export async function onRequestPost(context) {
   const denied = await checkAuth(context);

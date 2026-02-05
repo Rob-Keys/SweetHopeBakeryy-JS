@@ -22,20 +22,12 @@
 	border: 8px #3f2a14 solid;
 	z-index: 999;
 }
-.order-title{
-	padding: 2vh 0 2vh 2vw !important;
-}
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
 div.mobile-container{
 	display: none !important;
-}
-@media (min-width: 500px) {
-	#dropdownButton{
-		display: none;
-	}
 }
 @media (max-width: 991px) {
 	.product-quantity{
@@ -49,10 +41,6 @@ div.mobile-container{
 	}
 	.product-image{
 		width:100%;
-	}
-	.order-title{
-		text-align: center;
-		padding: 0;
 	}
 	.order-content{
 		width: 100vw;

@@ -5,6 +5,7 @@ import { renderFooter } from '../components/footer.js';
 import { isAuthenticated, setDesiredPage } from '../modules/auth.js';
 import { getInbox, getOutbox } from '../aws/s3.js';
 import { sendEmail } from '../aws/ses.js';
+import { escapeHtml } from '../modules/escape.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   renderHeader();
@@ -26,16 +27,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Sort by date, newest first (mirrors mail.php:24-27)
   inbox.sort((a, b) => (b.date || 0) - (a.date || 0));
   outbox.sort((a, b) => (b.date || 0) - (a.date || 0));
-
-  const escapeHtml = (str) => {
-    if (!str) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  };
 
   const formatBody = (value) => escapeHtml(value).replace(/\n/g, '<br>');
 
