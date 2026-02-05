@@ -40,7 +40,7 @@ async function createStripeCheckout() {
  */
 async function fetchStripePublicKey() {
   try {
-    const response = await fetch('/api/rate/get-stripe-public-key');
+    const response = await fetch('/api/public/get-stripe-public-key');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     return data.publicKey || data.stripePublicKey || null;

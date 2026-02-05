@@ -44,7 +44,7 @@ async function applyConsoleGate() {
     // ignore if globalThis is not writable
   }
   try {
-    const response = await fetch('/api/rate/get-debug-flags');
+    const response = await fetch('/api/public/get-debug-flags');
     if (!response.ok) return;
     const data = await response.json();
     if (data?.debugErrors === true) {

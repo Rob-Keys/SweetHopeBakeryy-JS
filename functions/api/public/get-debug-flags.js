@@ -1,4 +1,4 @@
-// GET /api/rate/get-debug-flags
+// GET /api/public/get-debug-flags
 // Exposes debug flags for client-side logging (non-sensitive)
 
 export async function onRequestGet(context) {

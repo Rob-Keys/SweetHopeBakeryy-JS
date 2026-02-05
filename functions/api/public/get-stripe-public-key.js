@@ -1,4 +1,4 @@
-// GET /api/rate/get-stripe-public-key
+// GET /api/public/get-stripe-public-key
 // Returns the Stripe publishable key for the active environment
 
 export async function onRequestGet(context) {
