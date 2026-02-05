@@ -257,8 +257,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         throw new Error('Missing checkout client secret.');
       }
 
-      // clover build: initCheckout is synchronous, returns checkout object immediately
-      checkout = stripe.initCheckout({ clientSecret });
+      checkout = await stripe.initCheckout({ clientSecret });
 
       // Mount payment element (works before loadActions)
       if (paymentEl) paymentEl.innerHTML = '';
