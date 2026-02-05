@@ -3,7 +3,7 @@
 
 import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
-import { initShared } from '../shared.js';
+import { initShared, ImageSlider } from '../shared.js';
 import { isAuthenticated, setDesiredPage } from '../modules/auth.js';
 import { getTable, putItem, removeItem } from '../modules/database.js';
 import { uploadImages, deleteImages } from '../aws/s3.js';
@@ -163,6 +163,109 @@ document.addEventListener('DOMContentLoaded', async () => {
   initShared();
 });
 
+function ensureRowStatus(row) {
+  if (!row) return null;
+  let status = row.querySelector('.row-status');
+  if (!status) {
+    const actionCol = row.querySelector('.right-align');
+    if (!actionCol) return null;
+    status = document.createElement('div');
+    status.className = 'row-status mt-2 w-100';
+    actionCol.appendChild(status);
+  }
+  return status;
+}
+
+function setRowStatus(row, message, type = 'info') {
+  const status = ensureRowStatus(row);
+  if (!status) return;
+  status.innerHTML = '';
+  if (!message) return;
+  const alert = document.createElement('div');
+  alert.className = `alert alert-${type} py-1 px-2 mb-0`;
+  alert.textContent = message;
+  status.appendChild(alert);
+}
+
+function setButtonBusy(button, busy, busyLabel = 'Saving...') {
+  if (!button) return;
+  if (busy) {
+    if (!button.dataset.originalLabel) {
+      button.dataset.originalLabel = button.textContent || '';
+    }
+    button.textContent = busyLabel;
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+  } else {
+    if (button.dataset.originalLabel !== undefined) {
+      button.textContent = button.dataset.originalLabel;
+    }
+    button.disabled = false;
+    button.removeAttribute('aria-busy');
+  }
+}
+
+function buildSlidesHTML(imageURLs, itemName) {
+  const safeName = escapeHtml(itemName || '');
+  return imageURLs.map(url =>
+    `<div class="slide"><img src="${escapeHtml(url)}" alt="${safeName} picture" class="product-image" loading="lazy" decoding="async"></div>`
+  ).join('');
+}
+
+function updateProductView(row, { itemName, description, pricesText, customText, imageURLs }) {
+  const viewCols = row.querySelectorAll('.col-2.view-mode');
+  if (viewCols[0]) viewCols[0].querySelector('p')?.replaceChildren(document.createTextNode(itemName || ''));
+  if (viewCols[1]) viewCols[1].querySelector('p')?.replaceChildren(document.createTextNode(description || ''));
+  if (viewCols[2]) viewCols[2].querySelector('p')?.replaceChildren(document.createTextNode(pricesText || ''));
+  if (viewCols[3]) viewCols[3].querySelector('p')?.replaceChildren(document.createTextNode(customText || ''));
+
+  const sliderContainer = row.querySelector('.slider-container.view-mode');
+  if (sliderContainer) {
+    const slidesHTML = buildSlidesHTML(imageURLs, itemName);
+    const arrowsHTML = imageURLs.length > 1
+      ? `<button class="arrow left">&#8249;</button><button class="arrow right">&#8250;</button>`
+      : '';
+    sliderContainer.innerHTML = `<div class="slider-wrapper">${slidesHTML}</div>${arrowsHTML}`;
+    if (imageURLs.length > 1) {
+      new ImageSlider(sliderContainer);
+    }
+  }
+}
+
+function rebuildEditImages(row, imageURLs, onRemove) {
+  const container = row.querySelector('.edit-images-container');
+  if (!container) return;
+  container.innerHTML = '';
+  imageURLs.forEach(url => {
+    const item = document.createElement('div');
+    item.className = 'edit-image-item';
+    item.dataset.imageUrl = url;
+
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = 'Product image';
+    img.className = 'edit-product-image';
+    img.style.width = '80px';
+    img.style.height = '80px';
+    img.style.objectFit = 'cover';
+    img.loading = 'lazy';
+    img.decoding = 'async';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-sm btn-danger remove-image-btn';
+    btn.textContent = '×';
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      onRemove(url, item);
+    });
+
+    item.appendChild(img);
+    item.appendChild(btn);
+    container.appendChild(item);
+  });
+}
+
 // ── Product edit/save handlers (mirrors customize.js:1-88) ──
 function initProductEditHandlers() {
   const menuRows = document.querySelectorAll('.menu-row[data-item-index]');
@@ -173,15 +276,19 @@ function initProductEditHandlers() {
     const editModeElements = row.querySelectorAll('.edit-mode');
     let imagesToRemove = [];
 
-    // Remove image buttons
-    row.querySelectorAll('.remove-image-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const imageItem = btn.closest('.edit-image-item');
-        imagesToRemove.push(imageItem.dataset.imageUrl);
-        imageItem.remove();
+    const bindRemoveButtons = () => {
+      row.querySelectorAll('.remove-image-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const imageItem = btn.closest('.edit-image-item');
+          if (!imageItem) return;
+          imagesToRemove.push(imageItem.dataset.imageUrl);
+          imageItem.remove();
+        });
       });
-    });
+    };
+
+    bindRemoveButtons();
 
     editBtn?.addEventListener('click', () => {
       imagesToRemove = [];
@@ -192,6 +299,11 @@ function initProductEditHandlers() {
     });
 
     saveBtn?.addEventListener('click', async () => {
+      if (saveBtn?.dataset.saving === 'true') return;
+      saveBtn.dataset.saving = 'true';
+      setRowStatus(row, 'Saving...', 'info');
+      setButtonBusy(saveBtn, true);
+      if (editBtn) editBtn.disabled = true;
       const itemName = row.querySelector('.edit-itemName')?.value;
       const originalItemName = row.querySelector('.original-itemName')?.value;
       const description = row.querySelector('.edit-description')?.value;
@@ -220,34 +332,77 @@ function initProductEditHandlers() {
       const currentImageURLs = Array.from(row.querySelectorAll('.edit-image-item'))
         .map(el => el.dataset.imageUrl);
 
-      // Delete removed images from S3
-      if (imagesToRemove.length > 0) {
-        const s3Keys = imagesToRemove.map(url => {
-          try { return new URL(url).pathname.replace(/^\//, ''); } catch { return url; }
-        });
-        await deleteImages(s3Keys);
-      }
-
-      // Upload new images and collect their public URLs
-      let newImageURLs = [];
-      const newImagesInput = row.querySelector('.add-images-input');
-      if (newImagesInput?.files?.length > 0) {
-        const files = Array.from(newImagesInput.files);
-        const filenames = files.map(f => `products/${Date.now()}-${f.name}`);
-        const result = await uploadImages(filenames, files);
-        if (result.success && result.urls) {
-          newImageURLs = result.urls;
+      try {
+        // Delete removed images from S3
+        if (imagesToRemove.length > 0) {
+          const s3Keys = imagesToRemove.map(url => {
+            try { return new URL(url).pathname.replace(/^\//, ''); } catch { return url; }
+          });
+          const deleteResult = await deleteImages(s3Keys);
+          if (!deleteResult.success) {
+            throw new Error(deleteResult.error || 'Failed to delete images.');
+          }
         }
-      }
 
-      // Save item with combined image URLs
-      await putItem('products', {
-        itemName,
-        description,
-        prices: parsedPrices,
-        customizations: parsedCustom,
-        imageURLs: [...currentImageURLs, ...newImageURLs]
-      });
+        // Upload new images and collect their public URLs
+        let newImageURLs = [];
+        const newImagesInput = row.querySelector('.add-images-input');
+        if (newImagesInput?.files?.length > 0) {
+          const files = Array.from(newImagesInput.files);
+          const filenames = files.map(f => `products/${Date.now()}-${f.name}`);
+          const result = await uploadImages(filenames, files);
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to upload images.');
+          }
+          if (result.urls) {
+            newImageURLs = result.urls;
+          }
+        }
+
+        const imageURLs = [...currentImageURLs, ...newImageURLs];
+        const saveResult = await putItem('products', {
+          itemName,
+          description,
+          prices: parsedPrices,
+          customizations: parsedCustom,
+          imageURLs
+        });
+        if (!saveResult.success) {
+          throw new Error(saveResult.error || 'Save failed.');
+        }
+
+        // Update view mode with new values
+        const pricesText = Object.entries(parsedPrices).map(([q, p]) => `${q}:${p}`).join(', ');
+        const customText = Object.entries(parsedCustom).map(([c, p]) => `${c}:${p}`).join(', ');
+        updateProductView(row, { itemName, description, pricesText, customText, imageURLs });
+
+        // Update hidden fields for future edits/removals
+        const originalNameInput = row.querySelector('.original-itemName');
+        if (originalNameInput) originalNameInput.value = itemName || '';
+        const removeKeyInput = row.querySelector('.remove-item-form [name="partitionKeyValue"]');
+        if (removeKeyInput) removeKeyInput.value = itemName || '';
+
+        // Refresh edit images to match saved state
+        rebuildEditImages(row, imageURLs, (url, item) => {
+          imagesToRemove.push(url);
+          item.remove();
+        });
+        imagesToRemove = [];
+
+        // Switch back to view mode
+        viewModeElements.forEach(el => el.style.display = 'block');
+        editModeElements.forEach(el => el.style.display = 'none');
+        editBtn.style.display = 'inline-block';
+        saveBtn.style.display = 'none';
+        setRowStatus(row, 'Saved. Live site updates after the deploy finishes.', 'success');
+        setTimeout(() => setRowStatus(row, ''), 3000);
+      } catch (err) {
+        setRowStatus(row, err?.message || 'Save failed.', 'danger');
+      } finally {
+        saveBtn.dataset.saving = 'false';
+        setButtonBusy(saveBtn, false);
+        if (editBtn) editBtn.disabled = false;
+      }
     });
   });
 }
@@ -282,6 +437,11 @@ function initSectionEditHandlers() {
     });
 
     saveBtn?.addEventListener('click', async () => {
+      if (saveBtn?.dataset.saving === 'true') return;
+      saveBtn.dataset.saving = 'true';
+      setRowStatus(row, 'Saving...', 'info');
+      setButtonBusy(saveBtn, true);
+      if (editBtn) editBtn.disabled = true;
       const sectionIndex = row.querySelector('.edit-sectionIndex')?.value;
       const headerTextEl = row.querySelector('.edit-headerText');
       const headerText = headerTextEl ? headerTextEl.value : '';
@@ -293,32 +453,87 @@ function initSectionEditHandlers() {
         ? existingImages.filter(url => url !== imageToRemove)
         : [...existingImages];
 
-      // Delete removed image from S3
-      if (imageToRemove) {
-        try {
-          const s3Key = new URL(imageToRemove).pathname.replace(/^\//, '');
-          await deleteImages([s3Key]);
-        } catch { /* local image path */ }
-      }
-
-      // Upload new images
-      let newImageURLs = [];
-      const newImageInput = row.querySelector('.add-images-input');
-      if (newImageInput?.files?.length > 0) {
-        const files = Array.from(newImageInput.files);
-        const filenames = files.map(f => `${pageName}/${Date.now()}-${f.name}`);
-        const result = await uploadImages(filenames, files);
-        if (result.success && result.urls) {
-          newImageURLs = result.urls;
+      try {
+        // Delete removed image from S3
+        if (imageToRemove) {
+          try {
+            const s3Key = new URL(imageToRemove).pathname.replace(/^\//, '');
+            const deleteResult = await deleteImages([s3Key]);
+            if (!deleteResult.success) {
+              throw new Error(deleteResult.error || 'Failed to delete image.');
+            }
+          } catch {
+            // local image path; ignore
+          }
         }
-      }
 
-      await putItem(pageName, {
-        sectionIndex,
-        headerText,
-        bodyText,
-        imageURLs: [...currentImageURLs, ...newImageURLs]
-      });
+        // Upload new images
+        let newImageURLs = [];
+        const newImageInput = row.querySelector('.add-images-input');
+        if (newImageInput?.files?.length > 0) {
+          const files = Array.from(newImageInput.files);
+          const filenames = files.map(f => `${pageName}/${Date.now()}-${f.name}`);
+          const result = await uploadImages(filenames, files);
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to upload image.');
+          }
+          if (result.urls) {
+            newImageURLs = result.urls;
+          }
+        }
+
+        const imageURLs = [...currentImageURLs, ...newImageURLs];
+        const saveResult = await putItem(pageName, {
+          sectionIndex,
+          headerText,
+          bodyText,
+          imageURLs
+        });
+        if (!saveResult.success) {
+          throw new Error(saveResult.error || 'Save failed.');
+        }
+
+        // Update view mode text
+        const viewCols = row.querySelectorAll('.view-mode');
+        const viewIndex = viewCols[0]?.querySelector('p');
+        if (viewIndex) viewIndex.textContent = sectionIndex || '';
+        let viewOffset = 1;
+        if (row.querySelector('.edit-headerText')) {
+          const viewHeader = viewCols[1]?.querySelector('p');
+          if (viewHeader) viewHeader.textContent = headerText || '';
+          viewOffset = 2;
+        }
+        const viewBody = viewCols[viewOffset]?.querySelector('p');
+        if (viewBody) viewBody.textContent = bodyText || '';
+
+        // Update view mode image
+        const viewImg = row.querySelector('.view-mode img.demo-photo');
+        if (viewImg && imageURLs[0]) viewImg.src = imageURLs[0];
+
+        // Update stored image URLs for next edit
+        row.dataset.imageUrls = JSON.stringify(imageURLs);
+        imageToRemove = null;
+
+        // Refresh edit images
+        rebuildEditImages(row, imageURLs, (url, item) => {
+          imageToRemove = url;
+          item.remove();
+        });
+
+        // Switch back to view mode
+        viewModeElements.forEach(el => el.style.display = 'block');
+        editModeElements.forEach(el => el.style.display = 'none');
+        editBtn.style.display = 'inline-block';
+        saveBtn.style.display = 'none';
+        setRowStatus(row, 'Saved. Live site updates after the deploy finishes.', 'success');
+        setTimeout(() => setRowStatus(row, ''), 3000);
+      } catch (err) {
+        setRowStatus(row, err?.message || 'Save failed.', 'danger');
+      } finally {
+        saveBtn.dataset.saving = 'false';
+        setButtonBusy(saveBtn, false);
+        if (editBtn) editBtn.disabled = false;
+      }
     });
   });
 }

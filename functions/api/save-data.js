@@ -6,6 +6,7 @@
 
 import { checkAuth } from './_auth.js';
 import { getKv, isValidTableName } from './_kv.js';
+import { queueDeployHook } from './_deploy.js';
 
 export async function onRequestPost(context) {
   const denied = await checkAuth(context);
@@ -48,10 +49,7 @@ export async function onRequestPost(context) {
     // Write back
     await kv.put(key, JSON.stringify(data));
 
-    const deployHook = context.env.PAGES_DEPLOY_HOOK_URL;
-    if (deployHook) {
-      context.waitUntil(fetch(deployHook, { method: 'POST' }).catch(() => {}));
-    }
+    await queueDeployHook(context);
 
     return Response.json({ success: true });
   } catch (err) {
