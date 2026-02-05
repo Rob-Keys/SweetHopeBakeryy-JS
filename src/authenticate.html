@@ -21,7 +21,7 @@
             <div class="content ms-5 mt-5 mb-5">
                 <h2 class="subtitle">Provide your password to access this page</h2>
                 <form id="auth-form" method="POST" action="">
-                    <!-- Dummy username field -->
+                    <!-- Hidden username field to improve password manager autofill. -->
                     <input type="text" name="username" autocomplete="username" style="display:none">
                     <label for="password">Password:</label>
                     <input type="password" id="password" name="password" autocomplete="current-password" required>

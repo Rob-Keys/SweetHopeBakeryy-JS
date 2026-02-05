@@ -1,5 +1,4 @@
-// contact.js - Contact page initialization
-// Replaces private/frontend/pages/contact.php dynamic content
+// contact.js - Contact page initialization.
 
 import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
@@ -10,11 +9,11 @@ import { escapeHtml } from '../modules/escape.js';
 document.addEventListener('DOMContentLoaded', async () => {
   renderHeader();
 
-  // Fetch contact page sections (mirrors Controller.php:96-97)
+  // Fetch and sort contact page sections.
   const sections = await getTable('contact_page');
   sections.sort((a, b) => Number(a.sectionIndex) - Number(b.sectionIndex));
 
-  // Render contact content (mirrors contact.php:31-36)
+  // Render contact content.
   const container = document.getElementById('contact-content');
   if (container && sections.length >= 3) {
     const safeHeader0 = escapeHtml(sections[0].headerText);

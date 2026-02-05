@@ -14,7 +14,7 @@
 	flex-direction: column;
 	color: white;
 }
-/* Add with ::before, ::after, and a child div */
+/* Layered hero background uses ::before, ::after, and a `.bg-third` child. */
 .front-page::before {
   content: '';
   position: absolute;
@@ -58,7 +58,7 @@
 
 .rhombus {
 	display: inline-block;
-	background: linear-gradient(90deg,#A00000,#700000); /* Background color of the rhombus */
+	background: linear-gradient(90deg,#A00000,#700000); /* Accent gradient for the hero badge */
 	clip-path: polygon(7% 10%, 97% 10%, 92% 100%, 2% 100%); /* Rhombus shape */
         color:#fffdfd;
 	padding: 20px 60px;

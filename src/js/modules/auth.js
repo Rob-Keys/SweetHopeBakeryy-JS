@@ -1,5 +1,5 @@
-// auth.js - Client-side admin authentication via JWT
-// POSTs password to /api/rate/authenticate, stores JWT in sessionStorage
+// auth.js - client-side admin authentication via JWT.
+// Authenticates via /api/rate/authenticate and stores the token in sessionStorage.
 
 const AUTH_KEY = 'shb_auth';
 const DESIRED_PAGE_KEY = 'shb_desired_page';

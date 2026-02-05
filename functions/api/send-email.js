@@ -1,7 +1,7 @@
 // POST /api/send-email
-// Auth-protected — admin mail compose only
-// Sends a single email via AWS SES and archives to S3 outbox
-// Env vars: AWS_KEY, AWS_SECRET_KEY, AWS_REGION (optional)
+// Auth-protected; admin compose only.
+// Sends a single email via SES and archives the payload to S3 outbox.
+// Requires env: AWS_KEY, AWS_SECRET_KEY, AWS_REGION (optional)
 
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
@@ -23,7 +23,7 @@ export async function onRequestPost(context) {
     const ses = new SESClient({ region: AWS_REGION, credentials });
     const s3 = new S3Client({ region: AWS_REGION, credentials });
 
-    // Send email
+    // Send via SES.
     await ses.send(new SendEmailCommand({
       Source: from,
       Destination: { ToAddresses: Array.isArray(to) ? to : [to] },
@@ -33,7 +33,7 @@ export async function onRequestPost(context) {
       }
     }));
 
-    // Archive to S3 outbox
+    // Archive payload for audit/replay.
     const timestamp = date || Date.now();
     await s3.send(new PutObjectCommand({
       Bucket: 'sweethopebakeryy-emails',

@@ -1,6 +1,6 @@
-// return.js - Return page initialization
-// Verifies payment and displays order confirmation
-// Order emails are sent server-side by verify-checkout — no client email logic needed
+// return.js - post-checkout confirmation page.
+// Verifies payment status and renders the order summary.
+// Emails are sent server-side by verify-checkout.
 
 import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
@@ -24,15 +24,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   const container = document.getElementById('return-content');
   if (!container) { renderFooter(); return; }
 
-  // Parse session_id from URL
+  // Parse session_id from URL.
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get('session_id');
 
-  // Get completed order from localStorage (saved before payment in checkout.js)
+  // Load the completed order snapshot saved before payment.
   let completedOrder = getCompletedOrder();
   const customerDetails = getCustomerDetails();
 
-  // Fallback: reconstruct from cart storage if snapshot is missing
+  // Fallback: reconstruct from cart storage if the snapshot is missing.
   if (!completedOrder) {
     const cart = getCart();
     if (cart && Object.keys(cart).length > 0) {
@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Fallback: fetch short-lived order snapshot from server (for cross-origin return URLs)
+  // Fallback: fetch short-lived snapshot from the server (cross-origin return URLs).
   if (!completedOrder && sessionId) {
     try {
       const response = await fetch(`/api/rate/get-order?session_id=${encodeURIComponent(sessionId)}`);
@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Verify payment and trigger server-side emails (POST with order data)
+  // Verify payment and trigger server-side emails.
   const result = await didCheckoutSucceed(
     sessionId,
     completedOrder?.cart,
@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (result.success && completedOrder) {
     const customerEmail = escapeHtml(result.customerEmail || customerDetails.customer_email || 'your email');
 
-    // Render order summary
+    // Render order summary.
     const cart = completedOrder.cart;
     const cartTotal = completedOrder.cart_total;
 
@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         </div>
       </div>`;
 
-    // Clear cart and order data after successful display
+    // Clear cart and order data after successful display.
     clearCart();
     clearCustomerDetails();
     clearCompletedOrder();
@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     sessionStorage.removeItem('checkout_pickup_date');
 
   } else {
-    // Payment verification not available or failed
+    // Payment verification not available or failed.
     if (completedOrder) {
       const cart = completedOrder.cart;
       const cartTotal = completedOrder.cart_total;

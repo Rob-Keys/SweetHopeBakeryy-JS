@@ -1,7 +1,7 @@
 // POST /api/rate/verify-checkout
-// Verifies Stripe payment and sends order confirmation emails server-side
-// No auth required — triggered by customer after checkout
-// Env vars: STRIPE_SECRET_KEY, AWS_KEY, AWS_SECRET_KEY, CAROLINE_EMAIL_ADDRESS, DEVELOPER_EMAIL_ADDRESS
+// Verifies payment with Stripe, validates cart totals, and sends confirmation emails.
+// No auth required; called by the customer after checkout.
+// Requires env: STRIPE_SECRET_KEY, AWS_KEY, AWS_SECRET_KEY, CAROLINE_EMAIL_ADDRESS, DEVELOPER_EMAIL_ADDRESS
 
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { S3Client, HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
@@ -50,7 +50,7 @@ function buildValidatedCart(cartLines, products) {
   return { valid: true, cart, total };
 }
 
-// Server-safe HTML escaping (no DOM APIs)
+// Escape user-provided values for HTML email templates; avoids DOM APIs in Workers runtime.
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -193,7 +193,7 @@ export async function onRequestPost(context) {
       return Response.json({ error: 'session_id is required' }, { status: 400 });
     }
 
-    // Verify payment with Stripe
+    // Stripe is the source of truth for payment status.
     let session;
     try {
       session = await stripeRequest(STRIPE_SECRET_KEY, 'GET', `/checkout/sessions/${session_id}`);
@@ -215,7 +215,7 @@ export async function onRequestPost(context) {
     const products = await loadProductsFromKv(context);
     const validated = products ? buildValidatedCart(cartLines, products) : { valid: false, cart: {}, total: 0 };
 
-    // Compare client cart to server-validated cart (best-effort)
+    // Best-effort validation: compare client cart against server pricing.
     let cartMismatch = !validated.valid || !cart || Number(cartTotal) !== Number(validated.total);
     if (!cartMismatch) {
       const cartKeys = Object.keys(cart);
@@ -242,7 +242,7 @@ export async function onRequestPost(context) {
       cartTotalServer: validated.total
     });
 
-    // Send order confirmation emails if payment succeeded and cart validated
+    // Send confirmation emails only when paid and cart validation passes.
     if (success && customerDetails && AWS_KEY && AWS_SECRET_KEY) {
       try {
         debugLog(context.env, 'verify-checkout: email pipeline start');
@@ -251,7 +251,7 @@ export async function onRequestPost(context) {
         const ses = new SESClient({ region: AWS_REGION, credentials });
         const from = 'support@sweethopebakeryy.com';
 
-        // Replay protection: only send once per session_id
+        // Replay protection: only send once per session_id.
         const receiptKey = `orders/${session_id}.json`;
         let alreadySent = false;
         try {
@@ -266,7 +266,7 @@ export async function onRequestPost(context) {
         }
 
         if (!alreadySent) {
-          // Update customer email from Stripe if available
+          // Prefer Stripe-provided email when available.
           if (customerEmail) {
             customerDetails.customer_email = customerEmail;
           }
@@ -274,10 +274,10 @@ export async function onRequestPost(context) {
           const receipt = buildCustomerReceipt(validated.cart, validated.total, customerDetails);
           const ownerNotif = buildOwnerNotification(validated.cart, validated.total, customerDetails);
 
-          // Send all 3 emails in parallel
+          // Send notifications in parallel to reduce latency.
           const emailPromises = [];
 
-          // 1. Customer receipt
+          // Customer receipt.
           if (customerEmail) {
             emailPromises.push(
               sendEmailViaSES(ses, from, customerEmail, receipt.subject, receipt.body)
@@ -290,7 +290,7 @@ export async function onRequestPost(context) {
             debugLog(context.env, 'verify-checkout: customer email skipped (missing email)');
           }
 
-          // 2. Owner notification
+          // Owner notification.
           if (CAROLINE_EMAIL_ADDRESS) {
             emailPromises.push(
               sendEmailViaSES(ses, from, CAROLINE_EMAIL_ADDRESS, ownerNotif.subject, ownerNotif.body)
@@ -303,7 +303,7 @@ export async function onRequestPost(context) {
             debugLog(context.env, 'verify-checkout: owner email skipped (missing env)');
           }
 
-          // 3. Developer notification
+          // Developer notification.
           if (DEVELOPER_EMAIL_ADDRESS) {
             emailPromises.push(
               sendEmailViaSES(ses, from, DEVELOPER_EMAIL_ADDRESS, ownerNotif.subject, ownerNotif.body)
@@ -318,7 +318,7 @@ export async function onRequestPost(context) {
 
           await Promise.all(emailPromises);
 
-          // Mark session as processed
+          // Persist a receipt marker to prevent duplicate sends.
           try {
             await s3.send(new PutObjectCommand({
               Bucket: 'sweethopebakeryy',
@@ -334,7 +334,7 @@ export async function onRequestPost(context) {
         }
       } catch (err) {
         console.error('Email pipeline failed:', err);
-        // Do not fail checkout verification if email pipeline errors
+        // Email failures should not block checkout verification.
       }
     } else {
       debugLog(context.env, 'verify-checkout: email pipeline skipped', {

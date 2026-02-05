@@ -1,9 +1,8 @@
-// footer.js - Inject site footer
-// Replaces private/frontend/components/footer.php
+// footer.js - injects the site footer.
 
 /**
  * Render the footer into #footer-placeholder.
- * Exact HTML from footer.php, including Bootstrap JS CDN.
+ * Includes Bootstrap JS injection so components can rely on it.
  */
 export function renderFooter() {
   const el = document.getElementById('footer-placeholder');
@@ -16,7 +15,7 @@ export function renderFooter() {
       <p class="footer-socials"><i class="fa-brands fa-instagram"></i> Instagram: <a href="https://www.instagram.com/sweethopebakeryy/">@sweethopebakeryy </a> </p>
     </footer>`;
 
-  // Load Bootstrap JS (was in footer.php)
+  // Load Bootstrap JS once for components that depend on it.
   if (!document.querySelector('script[src*="bootstrap.bundle.min.js"]')) {
     const script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js';

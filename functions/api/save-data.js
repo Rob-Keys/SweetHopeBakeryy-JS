@@ -1,8 +1,7 @@
 // POST /api/save-data
-// Writes an item to a JSON table in Cloudflare KV.
-//
-// This function reads the current JSON array from KV, upserts the item, and writes it back.
-// The partition key is 'itemName' for products and 'sectionIndex' for page tables.
+// Upserts an item into a JSON table stored in Cloudflare KV.
+// Reads the full array, replaces/append the item, then writes back.
+// Partition key: `itemName` for products, `sectionIndex` for page tables.
 
 import { checkAuth } from './_auth.js';
 import { getKv, isValidTableName } from './_kv.js';
@@ -25,7 +24,7 @@ export async function onRequestPost(context) {
 
     const key = `data/${tableName}.json`;
 
-    // Read current data
+    // Read current data (best-effort).
     let data = [];
     try {
       const existing = await kv.get(key, 'json');
@@ -34,11 +33,11 @@ export async function onRequestPost(context) {
       console.error('KV read error:', err);
     }
 
-    // Determine partition key
+    // Select the partition key based on the table shape.
     const partitionKey = tableName === 'products' ? 'itemName' : 'sectionIndex';
     const partitionValue = item[partitionKey];
 
-    // Upsert: replace existing or append
+    // Upsert: replace existing or append.
     const existingIndex = data.findIndex(d => String(d[partitionKey]) === String(partitionValue));
     if (existingIndex >= 0) {
       data[existingIndex] = item;
@@ -46,7 +45,7 @@ export async function onRequestPost(context) {
       data.push(item);
     }
 
-    // Write back
+    // Persist the updated table.
     await kv.put(key, JSON.stringify(data));
 
     await queueDeployHook(context);

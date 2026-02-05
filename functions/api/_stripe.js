@@ -1,4 +1,4 @@
-// Shared Stripe helpers for Cloudflare Pages Functions
+// Stripe API helpers for Cloudflare Pages Functions.
 
 function appendForm(params, key, value) {
   if (value === null || value === undefined) return;

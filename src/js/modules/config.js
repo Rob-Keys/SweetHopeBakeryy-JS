@@ -1,10 +1,9 @@
-// config.js - Client-safe configuration
-// Sensitive keys (AWS, Stripe secret) are in Cloudflare Pages env vars, accessed by functions/api/*
+// config.js - client-safe configuration.
+// Sensitive keys (AWS, Stripe secret) live in environment variables and stay server-side.
 
 const config = {
-  // Stripe publishable key — safe to include client-side (this is its intended use).
-  // Server fetch is preferred to stay in sync, but this acts as a fallback
-  // when the fetch is rate-limited or unavailable.
+  // Stripe publishable key (safe for client use).
+  // Prefer fetching from the server to stay in sync; this is a fallback.
   stripePublicKey: 'pk_live_51SFzIfAEKe5eKbDNqRlQeB7ireuGTYpSiCROz7WO0IDW2nqWMzUpKA6n5HKyqClX02ZBJEggEN7YegYXvAzGaqKn00pkageJQl'
 };
 

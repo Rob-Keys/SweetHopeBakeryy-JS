@@ -1,9 +1,8 @@
-// header.js - Inject site navigation header
-// Replaces private/frontend/components/header.php
+// header.js - injects the site navigation header.
 
 /**
  * Render the header into #header-placeholder.
- * Exact HTML from header.php.
+ * HTML is inline to avoid extra requests and keep markup consistent.
  */
 export function renderHeader() {
   const el = document.getElementById('header-placeholder');

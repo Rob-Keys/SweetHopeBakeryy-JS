@@ -1,5 +1,5 @@
 // GET /api/rate/get-order?session_id=...
-// Returns a short-lived, non-PII order snapshot for the return page
+// Returns the short-lived, non-PII order snapshot used by the return page.
 
 import { getKv } from '../_kv.js';
 

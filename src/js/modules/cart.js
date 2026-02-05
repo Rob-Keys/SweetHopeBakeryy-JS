@@ -1,5 +1,4 @@
-// cart.js - localStorage-based cart management
-// Replaces PHP $_SESSION['cart'] and Controller.php cart methods (lines 624-654)
+// cart.js - localStorage-backed cart state and checkout payload helpers.
 
 import { getTable } from './database.js';
 
@@ -7,7 +6,7 @@ const CART_KEY = 'shb_cart';
 const CUSTOMER_KEY = 'shb_customer';
 const COMPLETED_ORDER_KEY = 'shb_completed_order';
 
-// ── Cart Operations ──
+// Cart operations.
 
 function getCartStore() {
   const stored = localStorage.getItem(CART_KEY);
@@ -18,11 +17,11 @@ function getCartStore() {
       return parsed;
     }
     if (parsed && typeof parsed === 'object') {
-      // Legacy format: summary-only map (force refresh to avoid mismatched pricing)
+      // Back-compat: summary-only map from older format; reset to avoid price mismatch.
       return { lines: [], summary: {} };
     }
   } catch {
-    // ignore parse errors
+    // Ignore parse errors and fall back to an empty cart.
   }
   return { lines: [], summary: {} };
 }
@@ -36,7 +35,7 @@ function getCart() {
 }
 
 /**
- * Add item to cart. Looks up price from database (mirrors Controller.php:624-643).
+ * Add item to the cart using the latest catalog price.
  * @param {string} name - Product name
  * @param {string} quantityKey - The quantity key (e.g. "6") to look up in product prices
  * @returns {Promise<{name, quantity, price}>} - The item added (for UI feedback)
@@ -85,8 +84,7 @@ function isCartEmpty() {
   return Object.keys(getCart()).length === 0;
 }
 
-// ── Line Items (for Stripe) ──
-// Mirrors stripe.php:19-32 create_checkout_session()
+// Line items for Stripe.
 
 function buildLineItems() {
   const cart = getCart();
@@ -105,8 +103,7 @@ function getCartLines() {
   return getCartStore().lines;
 }
 
-// ── Customer Details ──
-// Replaces $_SESSION['customer_name'], $_SESSION['customer_phone'], etc.
+// Customer details.
 
 function saveCustomerDetails(details) {
   localStorage.setItem(CUSTOMER_KEY, JSON.stringify(details));
@@ -121,8 +118,7 @@ function clearCustomerDetails() {
   localStorage.removeItem(CUSTOMER_KEY);
 }
 
-// ── Completed Order Snapshot ──
-// Saved before Stripe redirect, used on return page (mirrors Controller.php:146-149)
+// Completed order snapshot (saved before Stripe redirect, used on return page).
 
 function saveCompletedOrder() {
   const cart = getCart();

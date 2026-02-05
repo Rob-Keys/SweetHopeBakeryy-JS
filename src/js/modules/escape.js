@@ -1,4 +1,4 @@
-// escape.js - HTML escaping utilities
+// escape.js - HTML escaping utilities.
 
 function escapeHtml(value) {
   if (value === null || value === undefined) return '';

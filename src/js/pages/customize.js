@@ -1,5 +1,4 @@
-// customize.js - Admin customize page initialization
-// Replaces private/frontend/pages/customize.php + public/js/customize.js
+// customize.js - admin customize page initialization.
 
 import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
@@ -13,7 +12,7 @@ import { escapeHtml } from '../modules/escape.js';
 document.addEventListener('DOMContentLoaded', async () => {
   renderHeader();
 
-  // Auth guard (mirrors Controller.php:180-191)
+  // Auth guard: redirect to login if session is missing.
   if (!isAuthenticated()) {
     setDesiredPage('/customize');
     window.location.href = '/authenticate';
@@ -23,7 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const container = document.getElementById('customize-content');
   if (!container) { renderFooter(); return; }
 
-  // Fetch all data (mirrors Controller.php:182-185)
+  // Fetch all editable data.
   const [products, homeSections, aboutSections, contactSections] = await Promise.all([
     getTable('products'),
     getTable('home_page'),
@@ -31,12 +30,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     getTable('contact_page')
   ]);
 
-  // Sort sections
+  // Sort sections by index.
   homeSections.sort((a, b) => Number(a.sectionIndex) - Number(b.sectionIndex));
   aboutSections.sort((a, b) => Number(a.sectionIndex) - Number(b.sectionIndex));
   contactSections.sort((a, b) => Number(a.sectionIndex) - Number(b.sectionIndex));
 
-  // Format sections for the component (mirrors Controller.php:585-598 get_page_sections_from_database)
+  // Normalize section shape for the editor.
   const formatSections = (sections) => sections.map(s => ({
     sectionIndex: s.sectionIndex,
     headerText: s.headerText || '',
@@ -45,7 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     imageURLs: s.imageURLs || []
   }));
 
-  // ── Render product editor (mirrors customize.php:26-155) ──
+  // ── Render product editor ──
   let html = `<div class="m-5">
     <h2 class="subtitle">Edit Menu</h2>
     <p>"Prices" will create a dropdown menu of those quantities at those prices. So "6:10, 12:15", would mean 6 for $10, or 12 for $15.</p>
@@ -60,7 +59,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="col-2 right-align"><h5>Actions</h5></div>
     </div>`;
 
-  // Product rows
+  // Product rows.
   products.forEach((product, i) => {
     const pricesStr = Object.entries(product.prices || {}).map(([q, p]) => `${q}:${p}`).join(', ');
     const customStr = Object.entries(product.customizations || {}).map(([c, p]) => `${c}:${p}`).join(', ');
@@ -70,7 +69,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const safePricesStr = escapeHtml(pricesStr);
     const safeCustomStr = escapeHtml(customStr);
 
-    // Slides for view mode
+    // Slides for view mode.
     const slidesHTML = imageURLs.map(url =>
       `<div class="slide"><img src="${escapeHtml(url)}" alt="${safeItemName} picture" class="product-image" loading="lazy" decoding="async"></div>`
     ).join('');
@@ -78,7 +77,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       ? `<button class="arrow left">&#8249;</button><button class="arrow right">&#8250;</button>`
       : '';
 
-    // Edit mode images
+    // Edit mode images.
     const editImagesHTML = imageURLs.map(url => `
       <div class="edit-image-item" data-image-url="${escapeHtml(url)}">
         <img src="${escapeHtml(url)}" alt="Product image" class="edit-product-image" style="width: 80px; height: 80px; object-fit: cover;" loading="lazy" decoding="async">
@@ -130,7 +129,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     </div>`;
   });
 
-  // Add new product form
+  // Add new product form.
   html += `
     <form class="row menu-row add-product-form">
       <div class="col-2"><textarea rows="4" name="partitionKeyValue" placeholder="Product Name" required></textarea></div>
@@ -146,14 +145,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     </form>
   </div>`;
 
-  // Page section editors (mirrors customize.php:157-163)
+  // Page section editors.
   html += renderPageSectionEditor(formatSections(homeSections), 'home_page');
   html += renderPageSectionEditor(formatSections(aboutSections), 'about_page');
   html += renderPageSectionEditor(formatSections(contactSections), 'contact_page');
 
   container.innerHTML = html;
 
-  // ── Event handlers (from public/js/customize.js) ──
+  // ── Event handlers ──
   initProductEditHandlers();
   initSectionEditHandlers();
   initRemoveHandlers();
@@ -275,7 +274,7 @@ function rebuildEditImages(row, imageURLs, onRemove) {
   });
 }
 
-// ── Product edit/save handlers (mirrors customize.js:1-88) ──
+// ── Product edit/save handlers ──
 function initProductEditHandlers() {
   const menuRows = document.querySelectorAll('.menu-row[data-item-index]');
   menuRows.forEach(row => {
@@ -319,7 +318,7 @@ function initProductEditHandlers() {
       const prices = row.querySelector('.edit-prices')?.value;
       const customizations = row.querySelector('.edit-customizations')?.value;
 
-      // Parse prices
+      // Parse prices.
       const parsedPrices = {};
       if (prices) {
         prices.split(',').forEach(pair => {
@@ -328,7 +327,7 @@ function initProductEditHandlers() {
         });
       }
 
-      // Parse customizations
+      // Parse customizations.
       const parsedCustom = {};
       if (customizations) {
         customizations.split(',').forEach(pair => {
@@ -337,12 +336,12 @@ function initProductEditHandlers() {
         });
       }
 
-      // Build current image URLs from remaining DOM elements (minus removed)
+      // Build current image URLs from remaining DOM elements (minus removed).
       const currentImageURLs = Array.from(row.querySelectorAll('.edit-image-item'))
         .map(el => el.dataset.imageUrl);
 
       try {
-        // Delete removed images from S3
+        // Delete removed images from S3.
         if (imagesToRemove.length > 0) {
           const s3Keys = imagesToRemove.map(url => {
             try { return new URL(url).pathname.replace(/^\//, ''); } catch { return url; }
@@ -353,7 +352,7 @@ function initProductEditHandlers() {
           }
         }
 
-        // Upload new images and collect their public URLs
+        // Upload new images and collect their public URLs.
         let newImageURLs = [];
         const newImagesInput = row.querySelector('.add-images-input');
         if (newImagesInput?.files?.length > 0) {
@@ -380,25 +379,25 @@ function initProductEditHandlers() {
           throw new Error(saveResult.error || 'Save failed.');
         }
 
-        // Update view mode with new values
+        // Update view mode with new values.
         const pricesText = Object.entries(parsedPrices).map(([q, p]) => `${q}:${p}`).join(', ');
         const customText = Object.entries(parsedCustom).map(([c, p]) => `${c}:${p}`).join(', ');
         updateProductView(row, { itemName, description, pricesText, customText, imageURLs });
 
-        // Update hidden fields for future edits/removals
+        // Update hidden fields for future edits/removals.
         const originalNameInput = row.querySelector('.original-itemName');
         if (originalNameInput) originalNameInput.value = itemName || '';
         const removeKeyInput = row.querySelector('.remove-item-form [name="partitionKeyValue"]');
         if (removeKeyInput) removeKeyInput.value = itemName || '';
 
-        // Refresh edit images to match saved state
+        // Refresh edit images to match saved state.
         rebuildEditImages(row, imageURLs, (url, item) => {
           imagesToRemove.push(url);
           item.remove();
         });
         imagesToRemove = [];
 
-        // Switch back to view mode
+        // Switch back to view mode.
         showElements(viewModeElements);
         hideElements(editModeElements);
         editBtn.style.display = 'inline-block';
@@ -419,7 +418,7 @@ function initProductEditHandlers() {
   });
 }
 
-// ── Section edit/save handlers (mirrors customize.js:90-179) ──
+// ── Section edit/save handlers ──
 function initSectionEditHandlers() {
   const sectionRows = document.querySelectorAll('.menu-row[data-section-index]');
   sectionRows.forEach(row => {
@@ -459,14 +458,14 @@ function initSectionEditHandlers() {
       const headerText = headerTextEl ? headerTextEl.value : '';
       const bodyText = row.querySelector('.edit-bodyText')?.value;
 
-      // Start with existing images, minus any removed
+      // Start with existing images, minus any removed.
       const existingImages = row.dataset.imageUrls ? JSON.parse(row.dataset.imageUrls) : [];
       let currentImageURLs = imageToRemove
         ? existingImages.filter(url => url !== imageToRemove)
         : [...existingImages];
 
       try {
-        // Delete removed image from S3
+        // Delete removed image from S3.
         if (imageToRemove) {
           try {
             const s3Key = new URL(imageToRemove).pathname.replace(/^\//, '');
@@ -475,11 +474,11 @@ function initSectionEditHandlers() {
               throw new Error(deleteResult.error || 'Failed to delete image.');
             }
           } catch {
-            // local image path; ignore
+            // Local image path; skip deletion.
           }
         }
 
-        // Upload new images
+        // Upload new images.
         let newImageURLs = [];
         const newImageInput = row.querySelector('.add-images-input');
         if (newImageInput?.files?.length > 0) {
@@ -505,7 +504,7 @@ function initSectionEditHandlers() {
           throw new Error(saveResult.error || 'Save failed.');
         }
 
-        // Update view mode text
+        // Update view mode text.
         const viewCols = row.querySelectorAll('.view-mode');
         const viewIndex = viewCols[0]?.querySelector('p');
         if (viewIndex) viewIndex.textContent = sectionIndex || '';
@@ -518,21 +517,21 @@ function initSectionEditHandlers() {
         const viewBody = viewCols[viewOffset]?.querySelector('p');
         if (viewBody) viewBody.textContent = bodyText || '';
 
-        // Update view mode image
+        // Update view mode image.
         const viewImg = row.querySelector('.view-mode img.demo-photo');
         if (viewImg && imageURLs[0]) viewImg.src = imageURLs[0];
 
-        // Update stored image URLs for next edit
+        // Update stored image URLs for next edit.
         row.dataset.imageUrls = JSON.stringify(imageURLs);
         imageToRemove = null;
 
-        // Refresh edit images
+        // Refresh edit images.
         rebuildEditImages(row, imageURLs, (url, item) => {
           imageToRemove = url;
           item.remove();
         });
 
-        // Switch back to view mode
+        // Switch back to view mode.
         showElements(viewModeElements);
         hideElements(editModeElements);
         editBtn.style.display = 'inline-block';
@@ -555,7 +554,7 @@ function initSectionEditHandlers() {
 
 // ── Remove handlers ──
 function initRemoveHandlers() {
-  // Product remove
+  // Remove product.
   document.querySelectorAll('.remove-item-form').forEach(form => {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -565,7 +564,7 @@ function initRemoveHandlers() {
     });
   });
 
-  // Section remove
+  // Remove section.
   document.querySelectorAll('.remove-section-form').forEach(form => {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -578,7 +577,7 @@ function initRemoveHandlers() {
 
 // ── Add handlers ──
 function initAddHandlers() {
-  // Add product
+  // Add product.
   document.querySelector('.add-product-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = e.target;
@@ -588,21 +587,21 @@ function initAddHandlers() {
     const csvCustomizations = form.querySelector('[name="csvCustomizations"]')?.value || '';
     if (!name) return;
 
-    // Parse prices
+    // Parse prices.
     const prices = {};
     csvPrices.split(',').forEach(pair => {
       const [q, p] = pair.split(':').map(s => s.trim());
       if (q && p) prices[q] = parseInt(p);
     });
 
-    // Parse customizations
+    // Parse customizations.
     const customizations = {};
     csvCustomizations.split(',').forEach(pair => {
       const [c, p] = pair.split(':').map(s => s.trim());
       if (c && p) customizations[c] = p;
     });
 
-    // Upload images
+    // Upload images.
     let imageURLs = [];
     const imageInput = form.querySelector('[name="images[]"]');
     if (imageInput?.files?.length > 0) {
@@ -617,7 +616,7 @@ function initAddHandlers() {
     await putItem('products', { itemName: name, description, prices, customizations, imageURLs });
   });
 
-  // Add section
+  // Add section.
   document.querySelectorAll('.add-section-form').forEach(form => {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -627,7 +626,7 @@ function initAddHandlers() {
       const bodyText = form.querySelector('[name="bodyText"]')?.value || '';
       if (!sectionIndex) return;
 
-      // Upload image if provided
+      // Upload image if provided.
       let imageURLs = [];
       const imageInput = form.querySelector('[name="images[]"]');
       if (imageInput?.files?.length > 0) {

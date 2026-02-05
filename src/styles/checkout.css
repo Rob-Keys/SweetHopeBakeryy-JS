@@ -11,14 +11,14 @@
     -webkit-font-smoothing: antialiased;
 }
 
-/* Constrain date input width and ensure it doesn't force container width on iOS */
+/* Constrain date input width and ensure it doesn't force container width on iOS. */
 input[type="date"] {
     min-width: 0;
     max-width: 100%;
     box-sizing: border-box;
 }
 
-/* Allow visible overflow so the native picker isn't clipped oddly */
+/* Allow visible overflow so the native picker isn't clipped oddly. */
 .pickup-details-container {
     overflow: visible;
 }

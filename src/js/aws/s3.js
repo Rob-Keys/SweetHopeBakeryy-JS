@@ -1,4 +1,4 @@
-// s3.js - AWS S3 operations via Cloudflare Pages Functions at /api/*
+// s3.js - client helpers for S3-related admin endpoints.
 
 import { getAuthToken, handle401 } from '../modules/auth.js';
 
@@ -14,9 +14,8 @@ function authHeaders() {
 }
 
 /**
- * Upload images to S3 via presigned URLs. Requires admin auth.
- * 1. Requests presigned URLs from the server
- * 2. Uploads each file directly to S3 using the presigned URL
+ * Upload images via presigned URLs. Requires admin auth.
+ * Flow: request presigned URLs from the server, then PUT directly to S3.
  * @param {string[]} filenames - S3 object keys (e.g., 'products/image.avif')
  * @param {File[]} files - File objects to upload
  * @returns {Promise<{success: boolean, urls?: string[], error?: string}>}
@@ -32,7 +31,7 @@ async function uploadImages(filenames, files) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const { uploads } = await response.json();
 
-    // Upload each file directly to S3 via presigned URL
+    // Upload each file directly to S3 using the presigned URL.
     const urls = [];
     for (let i = 0; i < uploads.length; i++) {
       const { presignedUrl, publicUrl } = uploads[i];

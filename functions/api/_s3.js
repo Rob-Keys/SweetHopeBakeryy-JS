@@ -1,4 +1,4 @@
-// Shared S3 helpers for Cloudflare Pages Functions
+// S3 helper utilities for Cloudflare Pages Functions.
 
 import { S3Client, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
 

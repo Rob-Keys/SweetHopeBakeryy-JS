@@ -1,5 +1,5 @@
 // GET /api/get-data?tableName=products&key=optional
-// Reads a JSON table from Cloudflare KV.
+// Reads a JSON table (or a single item by key) from Cloudflare KV.
 
 import { checkAuth } from './_auth.js';
 import { getKv, isValidTableName } from './_kv.js';

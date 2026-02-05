@@ -1,5 +1,4 @@
-// home.js - Home page initialization
-// Replaces the dynamic PHP loop in private/frontend/pages/home.php:45-58
+// home.js - Home page initialization.
 
 import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
@@ -10,11 +9,11 @@ import { escapeHtml } from '../modules/escape.js';
 document.addEventListener('DOMContentLoaded', async () => {
   renderHeader();
 
-  // Fetch home page sections (mirrors Controller.php:87-88)
+  // Fetch and sort home page sections.
   const sections = await getTable('home_page');
   sections.sort((a, b) => Number(a.sectionIndex) - Number(b.sectionIndex));
 
-  // Render alternating image+text rows (mirrors home.php:46-57)
+  // Render alternating image/text rows.
   const container = document.getElementById('home-sections');
   if (container) {
     let html = '';

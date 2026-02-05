@@ -12,7 +12,7 @@
     height: auto;
 }
 
-/* Image editing styles */
+/* Image editing styles. */
 .edit-images-container {
     display: flex;
     flex-wrap: wrap;

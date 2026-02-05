@@ -1,5 +1,4 @@
-// about.js - About page initialization
-// Replaces the dynamic PHP loop in private/frontend/pages/about.php:31-42
+// about.js - About page initialization.
 
 import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
@@ -10,11 +9,11 @@ import { escapeHtml } from '../modules/escape.js';
 document.addEventListener('DOMContentLoaded', async () => {
   renderHeader();
 
-  // Fetch about page sections (mirrors Controller.php:91-92)
+  // Fetch and sort about page sections.
   const sections = await getTable('about_page');
   sections.sort((a, b) => Number(a.sectionIndex) - Number(b.sectionIndex));
 
-  // Render alternating image+text rows (mirrors about.php:31-41)
+  // Render alternating image/text rows.
   const container = document.getElementById('about-sections');
   if (container) {
     let html = '';

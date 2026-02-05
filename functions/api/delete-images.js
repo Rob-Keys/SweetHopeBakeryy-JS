@@ -1,6 +1,6 @@
 // POST /api/delete-images
-// Deletes images from S3
-// Env vars: AWS_KEY, AWS_SECRET_KEY, AWS_REGION (optional, defaults to us-east-1)
+// Deletes images from S3.
+// Requires env: AWS_KEY, AWS_SECRET_KEY, AWS_REGION (optional, defaults to us-east-1)
 
 import { S3Client, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { checkAuth } from './_auth.js';

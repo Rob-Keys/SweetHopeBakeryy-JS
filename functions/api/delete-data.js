@@ -1,5 +1,5 @@
 // POST /api/delete-data
-// Removes an item from a JSON table in Cloudflare KV.
+// Removes an item from a JSON table stored in Cloudflare KV.
 
 import { checkAuth } from './_auth.js';
 import { getKv, isValidTableName } from './_kv.js';
@@ -22,7 +22,7 @@ export async function onRequestPost(context) {
 
     const kvKey = `data/${tableName}.json`;
 
-    // Read current data
+    // Read current data (best-effort).
     let data = [];
     try {
       const existing = await kv.get(kvKey, 'json');
@@ -31,11 +31,11 @@ export async function onRequestPost(context) {
       console.error('KV read error:', err);
     }
 
-    // Determine partition key and filter out the item
+    // Select the partition key and filter out the target item.
     const partitionKey = tableName === 'products' ? 'itemName' : 'sectionIndex';
     data = data.filter(d => String(d[partitionKey]) !== String(partitionValue));
 
-    // Write back
+    // Persist the updated table.
     await kv.put(kvKey, JSON.stringify(data));
 
     await queueDeployHook(context);

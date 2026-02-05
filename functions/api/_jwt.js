@@ -1,5 +1,5 @@
-// JWT helper — sign and verify tokens using Web Crypto API (HMAC-SHA-256)
-// No npm dependencies — uses native Cloudflare Workers runtime APIs
+// JWT helpers using Web Crypto HMAC-SHA-256.
+// No dependencies; uses native Cloudflare Workers runtime APIs.
 
 function base64urlEncode(data) {
   const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : new Uint8Array(data);

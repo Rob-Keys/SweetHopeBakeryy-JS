@@ -1,9 +1,7 @@
-// customize-page.js - Render page section editor
-// Replaces private/frontend/components/customize_page.php
+// customize-page.js - renders the admin page section editor.
 
 /**
  * Render the page section editor for a given page.
- * Matches customize_page.php structure exactly.
  * @param {Array} sections - Array of { sectionIndex, headerText, bodyText, imageURL }
  * @param {string} pageName - 'home_page', 'about_page', or 'contact_page'
  * @returns {string} HTML string
@@ -17,7 +15,7 @@ export function renderPageSectionEditor(sections, pageName) {
   const bodyColClass = pageName === 'about_page' ? 'col-4' : 'col-6';
   const editBodyColClass = pageName === 'home_page' ? 'col-4' : 'col-6';
 
-  // Table header row
+  // Table header.
   let html = `
     <div class="m-5">
       <h2 class="subtitle">Edit ${displayName} Content</h2>
@@ -34,7 +32,7 @@ export function renderPageSectionEditor(sections, pageName) {
   html += `<div class="col-2 right-align"><h5>Actions</h5></div>
       </div>`;
 
-  // Section rows
+  // Existing sections.
   sections.forEach((section, i) => {
     const safeSectionIndex = escapeHtml(section.sectionIndex);
     const safeHeaderText = escapeHtml(section.headerText || '');
@@ -52,7 +50,7 @@ export function renderPageSectionEditor(sections, pageName) {
     }
     html += `<div class="${bodyColClass} view-mode"><p>${safeBodyText}</p></div>`;
 
-    // Edit Mode
+    // Edit mode markup.
     html += `
         <div class="col-2 edit-mode" style="display: none;">
           <textarea class="form-control edit-sectionIndex" rows="2" disabled>${safeSectionIndex}</textarea>
@@ -103,7 +101,7 @@ export function renderPageSectionEditor(sections, pageName) {
       </div>`;
   });
 
-  // Add new section form
+  // Add-section form.
   html += `
     <form class="row menu-row add-section-form" data-page-name="${pageName}">
       <div class="col-2">

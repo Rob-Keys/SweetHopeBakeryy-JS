@@ -1,6 +1,5 @@
-// shared.js - ImageSlider class + fade-in scroll effects
-// Adapted from public/js/shared.js as an ES6 module
-// Must call initShared() AFTER all dynamic content is in the DOM.
+// shared.js - shared UI behavior (image slider, scroll fade-in effects).
+// Call initShared() after dynamic content is injected into the DOM.
 
 const originalConsole = {
   log: console.log?.bind(console),
@@ -31,17 +30,17 @@ function setConsoleEnabled(enabled) {
       console.error = noop;
     }
   } catch {
-    // ignore if console is not writable
+    // Best-effort: console may be read-only in some environments.
   }
 }
 
 async function applyConsoleGate() {
-  // Default to hiding logs unless server says otherwise
+  // Disable logs by default; enable only when the server allows it.
   setConsoleEnabled(false);
   try {
     globalThis.__debugErrors = false;
   } catch {
-    // ignore if globalThis is not writable
+    // Best-effort: globalThis may be read-only in some environments.
   }
   try {
     const response = await fetch('/api/public/get-debug-flags');
@@ -52,11 +51,11 @@ async function applyConsoleGate() {
       try {
         globalThis.__debugErrors = true;
       } catch {
-        // ignore if globalThis is not writable
+        // Best-effort: globalThis may be read-only in some environments.
       }
     }
   } catch {
-    // swallow any errors to avoid leaking internals
+    // Never surface debug-gating failures to end users.
   }
 }
 
@@ -84,7 +83,7 @@ export class ImageSlider {
       this.rightArrow.addEventListener('click', () => this.nextSlide());
     }
 
-    // Touch support
+    // Basic touch swipe support.
     this.touchStartX = 0;
     this.touchEndX = 0;
 

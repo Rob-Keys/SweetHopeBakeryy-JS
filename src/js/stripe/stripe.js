@@ -1,5 +1,4 @@
-// stripe.js - Stripe checkout flow
-// Session creation and verification call Cloudflare Pages Functions at /api/*
+// stripe.js - client wrappers for Stripe checkout via Pages Functions.
 
 import { buildLineItems, getCartLines } from '../modules/cart.js';
 

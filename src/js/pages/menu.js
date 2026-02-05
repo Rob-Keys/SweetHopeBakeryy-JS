@@ -1,6 +1,4 @@
-// menu.js - Menu page initialization
-// Replaces private/frontend/pages/menu.php + public/js/menu.js
-// Fetches products from database, renders product grid, manages cart via localStorage
+// menu.js - menu page initialization (product grid + cart UI).
 
 import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
@@ -14,10 +12,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderHeader();
 
   // ── Fetch and render products ──
-  // Mirrors Controller.php:550-583 get_products_from_database()
   const rawProducts = await getTable('products');
 
-  // Process products: sort prices, ensure defaults (mirrors Controller.php:559-581)
+  // Normalize product data (sort prices, apply defaults).
   const products = rawProducts.map(p => ({
     itemName: p.itemName,
     description: p.description || '',
@@ -26,7 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     customizations: p.customizations || {}
   }));
 
-  // Render products in pairs per row (mirrors menu.php:34-50)
+  // Render products in pairs per row.
   const container = document.getElementById('products-container');
   if (container) {
     let html = '';
@@ -36,7 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div class="col-6">${renderProduct(products[i + 1])}</div>
       </div>`;
     }
-    // Odd last product centered
+    // Center the last product when the count is odd.
     if (products.length % 2 === 1) {
       html += `<div class="row cv-auto"><div class="col-3"></div><div class="col-6">${renderProduct(products[products.length - 1])}</div></div>`;
     }
@@ -47,7 +44,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderCartUI();
 
   // ── Add-to-cart form handlers ──
-  // Replaces public/js/menu.js AJAX POST to /menu
   const forms = document.querySelectorAll('.add-to-cart-form');
   forms.forEach(form => {
     form.addEventListener('submit', async (e) => {
@@ -59,10 +55,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         const data = await addToCart(name, qty);
 
-        // Update cart UI
+        // Update cart UI.
         updateCartAfterAdd(data);
 
-        // Show "Added Successfully!" toast (from menu.js:79-91)
+        // Show a brief confirmation toast.
         const message = document.createElement('h5');
         message.textContent = 'Added Successfully!';
         message.classList.add('fade-in-out');
@@ -99,7 +95,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderFooter();
   initShared();
 
-  // Show cart if not empty (from menu.js:1-5 + 101-127)
+  // Show cart if not empty.
   if (!isCartEmpty()) {
     makeCartVisible();
   }
@@ -117,7 +113,6 @@ function sortPrices(prices) {
 
 /**
  * Render the full cart UI from localStorage.
- * Mirrors menu.php:59-91 server-rendered cart.
  */
 function renderCartUI() {
   const cart = getCart();
@@ -142,7 +137,7 @@ function renderCartUI() {
         </div>
       </li>`).join('');
 
-    // Attach remove handlers
+    // Attach remove handlers.
     cartList.querySelectorAll('.remove-item-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         removeFromCart(btn.dataset.name);
@@ -157,13 +152,12 @@ function renderCartUI() {
 }
 
 /**
- * Update cart UI after adding an item (without full re-render).
- * Mirrors public/js/menu.js:20-77
+ * Update the cart UI after adding an item (without a full re-render).
  */
 function updateCartAfterAdd(data) {
   const cartList = document.getElementById('cart-list');
 
-  // Check if item already exists in DOM
+  // Check if the item already exists in the DOM.
   let existing = false;
   const items = cartList.querySelectorAll('li');
   items.forEach(item => {
@@ -175,7 +169,7 @@ function updateCartAfterAdd(data) {
           node.textContent = node.textContent.replace(qty[0], parseInt(qty[0]) + parseInt(data.quantity));
           existing = true;
 
-          // Update price
+          // Update price.
           const priceContainer = item.querySelector('.price');
           if (priceContainer) {
             const oldPrice = parseFloat(priceContainer.textContent.replace(/[^\d.-]/g, ''));
@@ -200,7 +194,7 @@ function updateCartAfterAdd(data) {
       </li>`;
     cartList.insertAdjacentHTML('beforeend', newItemHTML);
 
-    // Attach remove handler to new item
+    // Attach remove handler to new item.
     const lastBtn = cartList.querySelector('li:last-child .remove-item-btn');
     if (lastBtn) {
       lastBtn.addEventListener('click', () => {
@@ -216,7 +210,7 @@ function updateCartAfterAdd(data) {
       lastElement.style.animation = 'fadeIn 0.6s ease';
     }
 
-    // Remove "Currently Empty" text
+    // Remove the "Currently Empty" placeholder.
     const emptyCart = document.getElementById('empty-cart');
     if (emptyCart) {
       emptyCart.remove();
@@ -224,7 +218,7 @@ function updateCartAfterAdd(data) {
     }
   }
 
-  // Update totals
+  // Update totals.
   const total = getCartTotal();
   const totalPrice = document.getElementById('total-price');
   const mobileTotalPrice = document.getElementById('mobile-total-price');
@@ -233,7 +227,7 @@ function updateCartAfterAdd(data) {
 }
 
 /**
- * Make cart visible on mobile (from public/js/menu.js:101-127)
+ * Make the cart visible on mobile.
  */
 function makeCartVisible() {
   if (window.innerWidth < 991 && !document.querySelector('.cart-container-wrapper')?.classList.contains('visible')) {

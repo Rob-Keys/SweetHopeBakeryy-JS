@@ -1,10 +1,9 @@
-// ses.js - Email sending via Cloudflare Pages Function at /api/send-email
-// Auth-protected — admin compose only
+// ses.js - client wrapper for /api/send-email.
 
 import { getAuthToken, handle401 } from '../modules/auth.js';
 
 /**
- * Send an email via SES (server-side). Requires admin auth. Also archives to S3 outbox.
+ * Send an email via SES (server-side). Requires admin auth; server archives to S3 outbox.
  * @param {Object} mail - { from, to: string[], subject, body, date }
  * @returns {Promise<{success: boolean, error?: string}>}
  */

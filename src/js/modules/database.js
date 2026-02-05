@@ -1,5 +1,4 @@
-// database.js - Client-side database module
-// Reads static JSON data files via fetch(). Writes go to Cloudflare Pages Functions at /api/*
+// database.js - client-side data access (static JSON + admin API writes).
 
 import { getAuthToken, handle401, isAuthenticated } from './auth.js';
 

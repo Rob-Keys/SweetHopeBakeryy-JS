@@ -1,7 +1,7 @@
 // POST /api/rate/authenticate
-// Rate limiting is enforced at the Cloudflare edge (WAF/rate limiting rules).
-// Accepts raw password, hashes server-side, compares to ADMIN_PASSWORD_HASH, returns JWT
-// Env vars: ADMIN_PASSWORD_HASH, JWT_SECRET
+// Authenticates the admin password (PBKDF2 hash) and returns a signed JWT.
+// Rate limiting is enforced at the Cloudflare edge (WAF/Rate Limiting).
+// Requires env: ADMIN_PASSWORD_HASH, JWT_SECRET
 
 import { signJWT } from '../_jwt.js';
 

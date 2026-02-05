@@ -1,9 +1,7 @@
-// product.js - Render a product card
-// Replaces private/frontend/components/product.php
+// product.js - renders a product card.
 
 /**
  * Render a product card as an HTML string.
- * Exact structure from product.php.
  * @param {Object} product - { itemName, description, imageURLs, prices, customizations }
  * @returns {string} HTML string
  */
@@ -14,20 +12,20 @@ export function renderProduct(product) {
   const safeName = escapeHtml(itemName);
   const safeDescription = escapeHtml(description || '');
 
-  // Build image slides
+  // Build the image slider markup.
   const slidesHTML = imageURLs.map(url =>
     `<div class="slide"><img src="${escapeHtml(url)}" alt="${safeName} picture" class="product-image" loading="lazy" decoding="async"></div>`
   ).join('');
 
-  // Arrows only if more than 1 image
+  // Only show arrows when multiple images are available.
   const arrowsHTML = imageURLs.length > 1
     ? `<button class="arrow left">&#8249;</button><button class="arrow right">&#8250;</button>`
     : '';
 
-  // Description (only if non-empty)
+  // Include description only when provided.
   const descHTML = safeDescription ? `<h5 class="mt-2 mb-2">${safeDescription}</h5>` : '';
 
-  // Price options sorted by quantity
+  // Sort price options by quantity for a stable UI order.
   const sortedPrices = Object.entries(prices).sort(([a], [b]) => Number(a) - Number(b));
   const optionsHTML = sortedPrices.map(([qty, price]) =>
     `<option value="${qty}_${price}" style="font-family: sans-serif">${qty} for $${Number(price).toFixed(2)}</option>`

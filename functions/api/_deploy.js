@@ -1,4 +1,4 @@
-// Shared deploy hook helpers (immediate + optional purge)
+// Deploy hook helpers (immediate trigger + optional cache purge).
 
 function parseDelayMs(value) {
   const n = Number(value);
@@ -70,6 +70,6 @@ export async function queueDeployHook(context) {
     const purgeConfig = getPurgeConfig(context.env);
     context.waitUntil(runHookAndPurge(deployHook, purgeConfig));
   } catch {
-    // Ignore deploy hook errors to avoid breaking saves/deletes.
+    // Never fail write operations if the deploy hook/purge fails.
   }
 }

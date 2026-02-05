@@ -1,4 +1,4 @@
-// mail.js - Admin mail page initialization
+// mail.js - admin mail page initialization.
 
 import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
@@ -10,7 +10,7 @@ import { escapeHtml } from '../modules/escape.js';
 document.addEventListener('DOMContentLoaded', async () => {
   renderHeader();
 
-  // Auth guard (mirrors Controller.php:208-215)
+  // Auth guard: redirect to login if session is missing.
   if (!isAuthenticated()) {
     setDesiredPage('/mail');
     window.location.href = '/authenticate';
@@ -20,17 +20,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   const container = document.getElementById('mail-content');
   if (!container) { renderFooter(); return; }
 
-  // Fetch inbox/outbox from S3
+  // Fetch inbox/outbox from S3.
   const inbox = await getInbox();
   const outbox = await getOutbox();
 
-  // Sort by date, newest first (mirrors mail.php:24-27)
+  // Sort by date, newest first.
   inbox.sort((a, b) => (b.date || 0) - (a.date || 0));
   outbox.sort((a, b) => (b.date || 0) - (a.date || 0));
 
   const formatBody = (value) => escapeHtml(value).replace(/\n/g, '<br>');
 
-  // Render inbox (mirrors mail.php:29-37)
+  // Render inbox.
   let html = '<h2> Inbox: </h2>';
   if (inbox.length === 0) {
     html += '<p class="text-muted m-3">Inbox is empty.</p>';
@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>`;
   });
 
-  // Render outbox (mirrors mail.php:45-55)
+  // Render outbox.
   html += '<h2> Sent: </h2>';
   if (outbox.length === 0) {
     html += '<p class="text-muted m-3">Outbox is empty.</p>';
@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>`;
   });
 
-  // Compose form (mirrors mail.php:57-73)
+  // Compose form.
   html += `
     <h2> Send a new email: </h2>
     <div class="row">
@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   container.innerHTML = html;
 
-  // ── Email body preview (from public/js/mail.js) ──
+  // ── Email body preview ──
   const bodyInput = document.getElementById('body-input');
   const bodyPreview = document.getElementById('body-preview');
   if (bodyInput && bodyPreview) {

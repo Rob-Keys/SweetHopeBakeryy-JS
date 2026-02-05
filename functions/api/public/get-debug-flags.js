@@ -1,5 +1,5 @@
 // GET /api/public/get-debug-flags
-// Exposes debug flags for client-side logging (non-sensitive)
+// Public endpoint that exposes non-sensitive debug flags for client logging.
 
 export async function onRequestGet(context) {
   const { DEBUG_ERRORS, APP_ENV } = context.env;

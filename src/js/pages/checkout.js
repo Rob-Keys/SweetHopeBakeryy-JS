@@ -1,4 +1,4 @@
-// checkout.js - Checkout page initialization
+// checkout.js - checkout page initialization.
 
 import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
@@ -44,13 +44,13 @@ function loadStripeScript() {
 document.addEventListener('DOMContentLoaded', async () => {
   renderHeader();
 
-  // Cart guard: redirect if empty (mirrors Controller.php:100-103)
+  // Cart guard: redirect if empty.
   if (isCartEmpty()) {
     window.location.href = '/menu';
     return;
   }
 
-  // ── Render order summary (mirrors checkout.php:40-53) ──
+  // ── Render order summary ──
   const lineItems = buildLineItems();
   const summaryList = document.getElementById('order-summary-list');
   const orderTotal = document.getElementById('order-total');
@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (orderTotal) orderTotal.textContent = `Total: $${total.toFixed(2)}`;
   }
 
-  // ── Form field persistence via sessionStorage (from public/js/checkout.js:10-48) ──
+  // ── Form field persistence via sessionStorage ──
   const nameInput = document.getElementById('name');
   const emailInput = document.getElementById('email');
   const phoneInput = document.getElementById('phone');
@@ -85,7 +85,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   phoneInput?.addEventListener('input', (e) => sessionStorage.setItem('checkout_phone', e.target.value));
   pickupDateInput?.addEventListener('change', (e) => sessionStorage.setItem('checkout_pickup_date', e.target.value));
 
-  // Set minimum date to 3 days from today (from public/js/checkout.js:3-8)
+  // Enforce a minimum pickup date (3 days from today).
   if (pickupDateInput) {
     const minDate = new Date();
     minDate.setDate(minDate.getDate() + 3);
@@ -155,12 +155,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   payButton?.addEventListener('click', async (e) => {
     if (e && e.defaultPrevented) return;
 
-    // Clear previous errors
+    // Clear previous errors.
     setUserError(errors, '');
     setUserError(phoneErrors, '');
     setUserError(emailErrors, '');
 
-    // Validate name
+    // Validate name.
     const nameValue = (nameInput?.value || '').trim();
     if (!nameValue) {
       setUserError(errors, 'Please enter your name.');
@@ -168,7 +168,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // Validate email (from stripe/checkout.js:57-63)
+    // Validate email.
     const emailValue = (emailInput?.value || '').trim();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(emailValue)) {
@@ -177,7 +177,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // Validate phone (from stripe/checkout.js:65-72)
+    // Validate phone.
     const phoneValue = phoneInput?.value || '';
     const digitCount = (phoneValue.match(/\d/g) || []).length;
     if (digitCount < 10) {
@@ -186,7 +186,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // Validate pickup date
+    // Validate pickup date.
     const dateValue = pickupDateInput?.value || '';
     if (!dateValue) {
       setUserError(errors, 'Please select a pickup date.');
@@ -203,7 +203,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // Save customer details to localStorage (replaces POST to /saveCustomerDetails)
+    // Persist customer details for the return page and email flow.
     const acquisitionMethod = document.querySelector('input[name="acquisition_method"]')?.value || 'pickup';
     const deliveryAddress = document.getElementById('delivery-address')?.value || '';
 
@@ -216,10 +216,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       delivery_address: deliveryAddress
     });
 
-    // Save order snapshot before payment redirect (for return page)
+    // Save order snapshot before Stripe redirect (used on return page).
     saveCompletedOrder();
 
-    // Confirm payment with Stripe
+    // Confirm payment with Stripe.
     if (checkoutActions) {
       try {
         const result = await checkoutActions.confirm();
@@ -244,7 +244,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       await loadStripeScript();
 
-      // Prefer server-provided publishable key to avoid mode/account mismatches
+      // Prefer server-provided publishable key to avoid mode/account mismatches.
       const serverPublicKey = await fetchStripePublicKey();
       const stripePublicKey = serverPublicKey || config.stripePublicKey;
       if (!stripePublicKey) {
@@ -259,12 +259,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       checkout = await stripe.initCheckout({ clientSecret });
 
-      // Mount payment element (works before loadActions)
+      // Mount payment element (works before loadActions).
       if (paymentEl) paymentEl.innerHTML = '';
       const paymentElement = checkout.createPaymentElement();
       paymentElement.mount('#payment-element');
 
-      // Load actions (needed for updateEmail, confirm, etc.)
+      // Load actions (needed for updateEmail, confirm, etc.).
       const loadResult = await checkout.loadActions();
       if (loadResult.type === 'error') {
         throw new Error(loadResult.error?.message || 'Failed to load checkout');
@@ -277,7 +277,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         payButton.removeAttribute('aria-busy');
       }
 
-      // Email validation on blur
+      // Email validation on blur.
       emailInput?.addEventListener('blur', async () => {
         if (checkoutActions?.updateEmail) {
           const result = await checkoutActions.updateEmail(emailInput.value);

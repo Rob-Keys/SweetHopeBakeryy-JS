@@ -1,4 +1,4 @@
-// Shared KV helpers for Cloudflare Pages Functions
+// KV helper utilities for Cloudflare Pages Functions.
 
 const ALLOWED_TABLES = new Set(['products', 'home_page', 'about_page', 'contact_page']);
 const KV_BINDING = 'kv-db';

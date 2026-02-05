@@ -17,7 +17,7 @@
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   color: black;
   text-decoration: none;
-  transition: transform 0.1s ease-in-out; /* animate transform changes */
+  transition: transform 0.1s ease-in-out; /* Subtle hover lift. */
   will-change: transform;
 }
 
@@ -25,7 +25,7 @@
   transform: translateY(-10px);
 }
 
-/* Remove default link styling */
+/* Preserve link behavior without default styling. */
 .rob-card[href],
 .rob-card:link,
 .rob-card:visited {
@@ -41,26 +41,26 @@
   text-decoration: none;
 }
 
+/* Responsive circular avatar sized by the column with a max cap. */
 .rob-image {
-  /* Responsive circular avatar: fill the column but never exceed max-width */
-  display: block; /* removes inline-gap and helps sizing behave predictably */
-  width: 100%; /* let the image size to the column width */
-  max-width: 25rem; /* cap the avatar size so it doesn't grow too large */
-  aspect-ratio: 1 / 1; /* keep a 1:1 square regardless of content */
-  height: auto; /* maintain correct intrinsic sizing */
-  border-radius: 50%; /* makes the square a circle */
-  object-fit: cover; /* crop and fill the circle */
-  object-position: center; /* center the crop */
+  display: block;
+  width: 100%;
+  max-width: 25rem;
+  aspect-ratio: 1 / 1;
+  height: auto;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
 }
 
-/* Center the image inside the left column of the card */
+/* Center the image inside the left column of the card. */
 .rob-card > .col-3 {
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .mobile-divider {
-  display: none; /* hidden by default, shown on mobile */
+  display: none; /* Hidden by default; shown on mobile. */
 }
 
 div > h2{
@@ -86,6 +86,6 @@ div > h5{
   }
   .mobile-divider {
     width: 100vw;
-    display: inline; /* hidden by default, shown on mobile */
+    display: inline; /* Shown only on mobile. */
   }
 }

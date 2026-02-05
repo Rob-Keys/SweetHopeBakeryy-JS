@@ -1,6 +1,5 @@
-// Shared auth check for admin API functions
-// Reads Authorization: Bearer <token> header, verifies JWT
-// Returns null if authorized, or a 401 Response if not
+// Shared auth helper for admin API functions.
+// Reads Authorization: Bearer <token>, verifies JWT, returns 401 on failure.
 
 import { verifyJWT } from './_jwt.js';
 
@@ -18,7 +17,7 @@ export async function checkAuth(context) {
   try {
     const token = authHeader.slice(7);
     await verifyJWT(token, JWT_SECRET);
-    return null; // authorized
+    return null;
   } catch (err) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }

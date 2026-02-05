@@ -1,6 +1,6 @@
 // GET /api/get-inbox
-// Lists and reads emails from S3 inbox
-// Env vars: AWS_KEY, AWS_SECRET_KEY, AWS_REGION (optional, defaults to us-east-1)
+// Lists and reads emails from the S3 inbox.
+// Requires env: AWS_KEY, AWS_SECRET_KEY, AWS_REGION (optional, defaults to us-east-1)
 
 import { S3Client } from '@aws-sdk/client-s3';
 import { checkAuth } from './_auth.js';

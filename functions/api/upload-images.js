@@ -1,6 +1,6 @@
 // POST /api/upload-images
-// Generates presigned S3 upload URLs for images
-// Env vars: AWS_KEY, AWS_SECRET_KEY, AWS_REGION (optional, defaults to us-east-1)
+// Generates presigned S3 upload URLs for images.
+// Requires env: AWS_KEY, AWS_SECRET_KEY, AWS_REGION (optional, defaults to us-east-1)
 
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';

@@ -1,6 +1,6 @@
 // POST /api/rate/create-checkout
-// Creates a Stripe checkout session
-// Env vars: STRIPE_SECRET_KEY
+// Creates a Stripe Checkout session for the current cart.
+// Requires env: STRIPE_SECRET_KEY
 
 import { getKv } from '../_kv.js';
 import { stripeRequest } from '../_stripe.js';
@@ -13,12 +13,12 @@ function getReturnUrl(request, env) {
   if (env.PUBLIC_SITE_URL) {
     try {
       const envOrigin = new URL(env.PUBLIC_SITE_URL).origin;
-      // Avoid cross-environment redirects (preview -> prod) that break verification
+      // Avoid cross-environment redirects (preview -> prod) that can invalidate return_url verification.
       if (envOrigin === requestOrigin) {
         base = env.PUBLIC_SITE_URL;
       }
     } catch {
-      // ignore malformed PUBLIC_SITE_URL
+      // Ignore invalid PUBLIC_SITE_URL and fall back to the request origin.
     }
   }
   return new URL('/return?session_id={CHECKOUT_SESSION_ID}', base).toString();

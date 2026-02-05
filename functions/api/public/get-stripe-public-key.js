@@ -1,5 +1,5 @@
 // GET /api/public/get-stripe-public-key
-// Returns the Stripe publishable key for the active environment
+// Public endpoint for the Stripe publishable key (environment-specific).
 
 export async function onRequestGet(context) {
   const { STRIPE_PUBLIC_KEY } = context.env;
