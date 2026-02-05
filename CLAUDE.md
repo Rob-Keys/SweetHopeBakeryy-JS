@@ -24,7 +24,7 @@ Admin dev password: `password` (only if you generated `ADMIN_PASSWORD_HASH` for 
 - `src/js/components/` — reusable HTML generators: `header.js`, `footer.js`, `product.js`, `customize-page.js`
 - `src/js/aws/` + `src/js/stripe/` — client-side modules that call `/api/*` endpoints
 - `src/js/shared.js` — ImageSlider class + fade-in scroll animations
-- `src/data/` — JSON data files (products, home/about/contact page sections)
+- `src/data/` — JSON data files (fallback/seed only; live data is served from KV via `/api/get-data`)
 - `functions/api/` — Cloudflare Pages Functions (server-side, access env vars)
   - `_jwt.js`, `_auth.js` — helpers (prefixed with `_`, not routed as endpoints)
 
@@ -34,6 +34,7 @@ All server-side operations run as Cloudflare Pages Functions. Each file maps to 
 | Endpoint | Method | Auth | Function |
 |---|---|---|---|
 | `/api/authenticate` | POST | — | Verify password, return JWT |
+| `/api/get-data` | GET | — | Read JSON table from KV (edge-cached, purged on writes) |
 | `/api/create-checkout` | POST | — | Create Stripe checkout session (server-side price validation) |
 | `/api/verify-checkout` | POST | — | Verify Stripe payment + send order emails |
 | `/api/send-email` | POST | JWT | Admin compose — send single email via SES |
@@ -41,8 +42,8 @@ All server-side operations run as Cloudflare Pages Functions. Each file maps to 
 | `/api/get-outbox` | GET | JWT | List emails from S3 outbox |
 | `/api/upload-images` | POST | JWT | Generate presigned S3 upload URLs |
 | `/api/delete-images` | POST | JWT | Delete images from S3 |
-| `/api/save-data` | POST | JWT | Upsert item in JSON data file on S3 |
-| `/api/delete-data` | POST | JWT | Remove item from JSON data file on S3 |
+| `/api/save-data` | POST | JWT | Upsert item in JSON data file on KV |
+| `/api/delete-data` | POST | JWT | Remove item from JSON data file on KV |
 
 ## Env Vars (Cloudflare Pages)
 

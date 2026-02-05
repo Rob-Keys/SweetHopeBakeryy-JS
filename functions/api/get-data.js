@@ -1,13 +1,14 @@
 // GET /api/get-data?tableName=products&key=optional
 // Reads a JSON table (or a single item by key) from Cloudflare KV.
+// Public (no auth required) — edge-cached via Cache-Control + purged on writes.
 
-import { checkAuth } from './_auth.js';
 import { getKv, isValidTableName } from './_kv.js';
 
-export async function onRequestGet(context) {
-  const denied = await checkAuth(context);
-  if (denied) return denied;
+const CACHE_HEADERS = {
+  'Cache-Control': 'public, max-age=300, s-maxage=86400, stale-while-revalidate=3600'
+};
 
+export async function onRequestGet(context) {
   const kv = getKv(context);
   if (!kv) {
     return Response.json({ error: 'KV binding not configured' }, { status: 500 });
@@ -30,10 +31,10 @@ export async function onRequestGet(context) {
       const item = Array.isArray(data)
         ? data.find(d => String(d[partitionKey]) === String(partitionValue)) || null
         : null;
-      return Response.json(item);
+      return Response.json(item, { headers: CACHE_HEADERS });
     }
 
-    return Response.json(data);
+    return Response.json(data, { headers: CACHE_HEADERS });
   } catch (err) {
     console.error('get-data error:', err);
     return Response.json({ error: 'Internal error' }, { status: 500 });

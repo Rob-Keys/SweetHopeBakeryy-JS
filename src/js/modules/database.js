@@ -1,6 +1,6 @@
-// database.js - client-side data access (static JSON + admin API writes).
+// database.js - client-side data access (KV API reads + admin API writes).
 
-import { getAuthToken, handle401, isAuthenticated } from './auth.js';
+import { getAuthToken, handle401 } from './auth.js';
 
 const dataCache = {};
 
@@ -13,13 +13,8 @@ const dataCache = {};
  */
 async function getTable(tableName, partitionKeyValue = null) {
   if (!dataCache[tableName]) {
-    const useAdminApi = isAuthenticated();
-    const url = useAdminApi
-      ? `/api/get-data?tableName=${encodeURIComponent(tableName)}`
-      : `/data/${tableName}.json`;
-
-    const response = await fetch(url, useAdminApi ? { headers: authHeaders() } : undefined);
-    if (response.status === 401 && useAdminApi) { handle401(); return null; }
+    const url = `/api/get-data?tableName=${encodeURIComponent(tableName)}`;
+    const response = await fetch(url);
     if (!response.ok) throw new Error(`Failed to load ${tableName}: ${response.status}`);
     dataCache[tableName] = await response.json();
   }

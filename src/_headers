@@ -9,9 +9,6 @@
 /api/*
   Cache-Control: no-store
 
-/data/*
-  Cache-Control: public, max-age=300, s-maxage=86400, stale-while-revalidate=3600
-
 /styles/*
   Cache-Control: public, max-age=604800, s-maxage=2592000, stale-while-revalidate=86400
 
