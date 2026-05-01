@@ -1,7 +1,7 @@
 .menu-row{
     background-color: white;
     border: black 1px solid;
-    padding: 1rem 0 1rem 0;
+    padding: 1rem 0;
 }
 .btn-danger{
 	color: white !important;
@@ -16,8 +16,8 @@
 .edit-images-container {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 10px;
+    gap: 0.625rem;
+    margin-bottom: 0.625rem;
 }
 
 .edit-image-item {
@@ -32,13 +32,13 @@
 
 .edit-image-item .remove-image-btn {
     position: absolute;
-    top: -8px;
-    right: -8px;
-    width: 24px;
-    height: 24px;
+    top: -0.5rem;
+    right: -0.5rem;
+    width: 1.5rem;
+    height: 1.5rem;
     padding: 0;
     border-radius: 50%;
-    font-size: 18px;
+    font-size: 1.125rem;
     line-height: 1;
     display: flex;
     align-items: center;

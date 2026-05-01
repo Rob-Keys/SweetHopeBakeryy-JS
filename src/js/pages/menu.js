@@ -89,7 +89,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── Clear cart button ──
   document.getElementById('clear-cart-btn')?.addEventListener('click', () => {
     clearCart();
-    window.location.reload();
+    renderCartUI();
+    hideCartIfEmpty();
   });
 
   renderFooter();
@@ -141,7 +142,8 @@ function renderCartUI() {
     cartList.querySelectorAll('.remove-item-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         removeFromCart(btn.dataset.name);
-        window.location.reload();
+        renderCartUI();
+        hideCartIfEmpty();
       });
     });
   }
@@ -199,7 +201,8 @@ function updateCartAfterAdd(data) {
     if (lastBtn) {
       lastBtn.addEventListener('click', () => {
         removeFromCart(lastBtn.dataset.name);
-        window.location.reload();
+        renderCartUI();
+        hideCartIfEmpty();
       });
     }
 
@@ -224,6 +227,15 @@ function updateCartAfterAdd(data) {
   const mobileTotalPrice = document.getElementById('mobile-total-price');
   if (totalPrice) totalPrice.textContent = `Total: $${total.toFixed(2)}`;
   if (mobileTotalPrice) mobileTotalPrice.textContent = `Total: $${total.toFixed(2)}`;
+}
+
+/**
+ * Slide the mobile cart off-screen and remove padding when the cart is emptied.
+ */
+function hideCartIfEmpty() {
+  if (!isCartEmpty()) return;
+  document.querySelector('.cart-container-wrapper')?.classList.remove('on-screen');
+  document.querySelector('.products')?.classList.remove('extra-padding');
 }
 
 /**

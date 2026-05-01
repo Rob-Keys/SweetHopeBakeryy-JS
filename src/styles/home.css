@@ -61,7 +61,7 @@
 	background: linear-gradient(90deg,#A00000,#700000); /* Accent gradient for the hero badge */
 	clip-path: polygon(7% 10%, 97% 10%, 92% 100%, 2% 100%); /* Rhombus shape */
         color:#fffdfd;
-	padding: 20px 60px;
+	padding: 1.25rem 3.75rem;
 	z-index: 1;
 }
 .mobile-button {

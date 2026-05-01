@@ -96,8 +96,8 @@ footer {
   background-color: rgba(0, 0, 0, 0.5);
   color: white;
   border: none;
-  font-size: 24px;
-  padding: 15px 10px;
+  font-size: 1.5rem;
+  padding: 1rem 0.625rem;
   cursor: pointer;
   z-index: 1000;
   transition: background-color 0.3s;
@@ -108,11 +108,11 @@ footer {
 }
 
 .arrow.left {
-  left: 10px;
+  left: 0.625rem;
 }
 
 .arrow.right {
-  right: 10px;
+  right: 0.625rem;
 }
 
 /* End product image slider. */
@@ -151,16 +151,19 @@ p {
   opacity: 0;
   transform: translateY(30px);
   transition: opacity 1s ease, transform 1s ease;
+  will-change: transform, opacity;
 }
 .fade-in-right {
   opacity: 0;
   transform: translateX(-30px);
   transition: opacity 1s ease, transform 1s ease;
+  will-change: transform, opacity;
 }
 .fade-in-left {
   opacity: 0;
   transform: translateX(30px);
   transition: opacity 1s ease, transform 1s ease;
+  will-change: transform, opacity;
 }
 
 .fade-in-up.fade-visible, .fade-in-right.fade-visible, .fade-in-left.fade-visible {

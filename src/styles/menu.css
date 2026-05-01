@@ -17,6 +17,10 @@
 	background-color: #DDDDDD;
 	border: 1px solid #3f2a14;
 }
+.product-card {
+	background-color: #fffdf7;
+	box-shadow: 0 2px 8px rgba(63, 42, 20, 0.12), 0 1px 3px rgba(63, 42, 20, 0.08);
+}
 .product-image{
 	width: 95%;
 	border: 8px #3f2a14 solid;
@@ -58,8 +62,8 @@ div.mobile-container{
 		position: relative;
 		top: 0;
 		right: 0;
-		padding: 0.2rem 0.2rem 0.2rem 0.2rem;
-		margin-bottom: 0.1rem;
+		padding: 0.25rem;
+		margin-bottom: 0.25rem;
 		width: 100%;
 		max-height: 200px;
 		border: none;
@@ -70,7 +74,7 @@ div.mobile-container{
 		bottom: 0;
 		width: 100%;
 		background-color: white;
-		padding: 0 0 1rem 0;
+		padding-bottom: 1rem;
 		border: 1px solid #3f2a14;
 		transform: translateY(100%); /* Start off-screen. */
     	transition: transform 0.4s ease;

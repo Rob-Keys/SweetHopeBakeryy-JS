@@ -3,7 +3,7 @@
 	flex-direction: column;
 }
 .content {
-    padding: 20px;
+    padding: 1.25rem;
     max-width: 800px;
     margin: 0 auto;
     background-color: #fff;
@@ -12,12 +12,12 @@
 
 .subtitle {
     font-size: 2.5rem;
-    margin-bottom: 15px;
+    margin-bottom: 1rem;
 }
 
 .description {
     font-size: 1.2rem;
-    margin-bottom: 20px;
+    margin-bottom: 1.25rem;
 }
 
 .contact-info {
@@ -26,14 +26,5 @@
 
 .contact-info-email,
 .contact-info-instagram {
-    margin: 10px 0;
-}
-
-@media (max-width: 991px){
-    .subtitle{
-		font-size:8rem;
-	}
-	.description{
-		font-size: 4rem;
-	}
+    margin: 0.625rem 0;
 }

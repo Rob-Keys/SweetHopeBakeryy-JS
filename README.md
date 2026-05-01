@@ -1,77 +1,61 @@
-# SweetHopeBakeryy
+# Sweet Hope Bakery
 
-A small e-commerce site for a bakery in Arlington, VA. Customers browse products, add to cart, and checkout via Stripe.
+E-commerce site for a bakery in Arlington, VA. Converted from a hand-written PHP 8.3 / Apache app to client-side JavaScript on Cloudflare Pages. Built with Claude as a development tool — I own the architecture and review every line.
 
 https://www.sweethopebakeryy.com
 
-## Tech Stack
+## From PHP to JS
 
-- Pure static HTML + ES6 modules (no server, no framework)
-- Bootstrap 5 for responsive layout
-- Stripe Elements for payment UI
-- localStorage for cart state, sessionStorage for admin auth
-- JSON files for product/page data (fetched via `fetch()`)
-- Cloudflare Pages Functions for Stripe/AWS/auth server endpoints
+The original was a LAMP stack: server-rendered PHP, Apache routing, direct MySQL/S3/SES calls. The rewrite eliminates the server. Static HTML + ES6 modules handle rendering. Server-side work (Stripe, AWS, auth) runs as Cloudflare Pages Functions — small serverless endpoints that only exist where secrets or trust are required.
 
-## Developing Locally
+No framework, no bundler, no build step. The browser loads ES6 modules directly.
 
-```bash
-npm run dev
-# → http://localhost:8080
+## How It Fits Together
+
+Each page has a script in `src/js/pages/` that runs on `DOMContentLoaded`:
+1. Inject header/footer from `src/js/components/`
+2. Fetch data from `/api/get-data` (Cloudflare KV)
+3. Render page content
+4. `initShared()` runs last — attaches scroll animations and image sliders to the now-present DOM
+
+Core modules (`src/js/modules/`) handle cart state, auth tokens, and data fetching. Stripe and AWS client wrappers call `/api/*` endpoints. Reusable UI components live in `src/js/components/`.
+
+## Data + Caching
+
+All content lives in Cloudflare KV. No static JSON files, no database server.
+
+```
+Admin edit  →  POST /api/save-data (writes KV)  →  CDN cache purge
+Page load   →  GET /api/get-data (reads KV)      →  edge-cached 24h
 ```
 
-This runs `npx serve src -l 8080`. Clean URLs are enabled via `src/serve.json`.
+Writes trigger a `purge_everything` against the Cloudflare zone API. Next read hits KV fresh, CDN caches it again. Static assets (JS, CSS, images) are cached aggressively at the edge and invalidated on deploy.
 
-## Deployment
+## Security
 
-Deploy the `src/` directory to any static host (Cloudflare Pages, AWS Amplify, etc.). The host needs to support clean URLs (strip `.html` extensions) — configure rewrite rules accordingly.
+The browser is untrusted. All sensitive operations stay server-side:
 
-## Env Vars (Cloudflare Pages)
+- **Pricing** — Checkout sessions are created server-side from KV prices, not client-submitted totals
+- **Payments** — Stripe verification and order emails run server-side only
+- **Auth** — Admin JWT via PBKDF2 password verification, stored in `sessionStorage`, verified on every write endpoint
+- **Data reads are public** — intentionally, since the data is already visible on the site. Enables CDN caching without auth overhead
+- **Secrets** — Stripe/AWS keys and JWT secret are Cloudflare environment secrets, never exposed to the client
+- **Validation** — KV table names allowlisted, S3 keys validated against path traversal, HTML escaped in mail rendering
 
-| Variable | Purpose |
-|---|---|
-| `STRIPE_SECRET_KEY` | Stripe checkout + verification |
-| `AWS_KEY` | S3, SES |
-| `AWS_SECRET_KEY` | S3, SES |
-| `CAROLINE_EMAIL_ADDRESS` | Owner order notifications |
-| `DEVELOPER_EMAIL_ADDRESS` | Developer order notifications |
-| `ADMIN_PASSWORD_HASH` | PBKDF2 hash of admin password (`pbkdf2$<iterations>$<saltB64>$<hashB64>`) |
-| `JWT_SECRET` | Random string for signing JWT tokens |
-| `PUBLIC_SITE_URL` | Base URL used to build Stripe return URLs |
+## Local Dev
 
-Optional: `AWS_REGION` (defaults to `us-east-1`)
-Optional: `PAGES_DEPLOY_HOOK_URL` (triggers a deploy after admin edits)
-Optional: `PAGES_PURGE_AFTER_DEPLOY` (set to `true` to purge Cloudflare cache after deploy)
-Optional: `PAGES_PURGE_DELAY_MS` (delay purge after deploy, e.g. `15000`)
-Optional: `PAGES_PURGE_DEBUG` (set to `true` to log purge/deploy hook status)
-Optional: `CLOUDFLARE_ZONE_ID` or `CF_ZONE_ID` (required for cache purge)
-Optional: `CLOUDFLARE_API_TOKEN` or `CF_API_TOKEN` (required for cache purge; needs Cache Purge permission)
-
-## Data Storage (KV)
-
-Admin edits from `/customize` are stored in Cloudflare KV. Bind a KV namespace named `sweet-hope-bakeryy` to the binding `kv-db`.
-
-Static page loads still read from `src/data/*.json`. To publish admin edits to the live site, trigger a rebuild that pulls the latest KV data into `src/data/*.json`.
-
-Pull KV data into `src/data` during build:
 ```bash
-CF_API_TOKEN=... CF_ACCOUNT_ID=... CF_KV_NAMESPACE_ID=... node scripts/pull-kv-data.mjs
+npm run dev                    # static files at localhost:8080
+npx wrangler pages dev src     # with Pages Functions + KV
 ```
 
-Generate `ADMIN_PASSWORD_HASH` (max 100000 iterations — Cloudflare Workers limit):
+## Admin Password Hash
+
 ```bash
-node -e "const crypto=require('crypto'); const pw=process.argv[1]; const it=100000; const salt=crypto.randomBytes(16); crypto.pbkdf2(pw,salt,it,32,'sha256',(e,d)=>{ if(e) throw e; console.log('pbkdf2\$'+it+'\$'+salt.toString('base64')+'\$'+d.toString('base64'));});" 'YOUR_PASSWORD'
+node -e "const crypto=require('crypto'); const pw=process.argv[1]; const it=100000; \
+const salt=crypto.randomBytes(16); crypto.pbkdf2(pw,salt,it,32,'sha256',(e,d)=>{ \
+if(e) throw e; console.log('pbkdf2\$'+it+'\$'+salt.toString('base64')+'\$'+d.toString('base64')); \
+});" 'YOUR_PASSWORD'
 ```
 
-## Security Notes
-
-- Stripe checkout pricing is validated server-side against `data/products.json`.
-- Stripe `return_url` is built server-side from `PUBLIC_SITE_URL`.
-- Admin mail inbox/outbox rendering escapes HTML to prevent XSS.
-- Order confirmation emails are sent once per Stripe session (`/api/rate/verify-checkout` replay protection).
-- S3 data/image routes validate table names and object keys to prevent path traversal.
-- Rate limiting for `/api/rate/*` should be enforced via Cloudflare WAF/Rate Limiting rules.
-
-## Original PHP Codebase
-
-The original PHP 8.3/Apache application is preserved in `private/` and `public/` for reference. It is not used by the current site.
+Set the output as `ADMIN_PASSWORD_HASH` in Cloudflare Pages environment variables.

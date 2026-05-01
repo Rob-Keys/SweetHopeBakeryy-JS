@@ -2,3 +2,4 @@ vendor/
 .env
 .claude/
 node_modules/
+.wrangler/
