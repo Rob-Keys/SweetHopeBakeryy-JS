@@ -13,32 +13,16 @@
 	justify-content: center;
 	flex-direction: column;
 	color: white;
-	box-shadow: 0 10px 30px rgba(63, 42, 20, 0.25);
-}
-/* Warm gradient scrim so the brand name and CTA stay legible over the photos. */
-.front-page > .hero-scrim {
-	position: absolute;
-	inset: 0;
-	background: linear-gradient(180deg, rgba(45, 28, 12, 0.35) 0%, rgba(45, 28, 12, 0.15) 40%, rgba(45, 28, 12, 0.55) 100%);
-	z-index: 0;
-}
-.front-page .welcome,
-.front-page .subwelcome,
-.front-page .desktop-button {
-	position: relative;
-	z-index: 1;
 }
 .front-page .welcome {
 	font-family: var(--font-heading) !important;
 	font-weight: 700;
 	color: #fff9f0;
-	text-shadow: 0 2px 12px rgba(30, 18, 8, 0.6), 0 1px 3px rgba(30, 18, 8, 0.7);
 }
 .front-page .subwelcome {
 	color: #fdf5e6;
 	font-size: 1.3rem !important;
 	font-weight: 600;
-	text-shadow: 0 1px 8px rgba(30, 18, 8, 0.7);
 }
 /* Layered hero background uses ::before, ::after, and a `.bg-third` child. */
 .front-page::before {
@@ -89,7 +73,6 @@
         color:#fff9f0;
 	padding: 1.25rem 3.75rem;
 	z-index: 1;
-	filter: drop-shadow(0 6px 14px rgba(63, 42, 20, 0.25));
 }
 .mobile-button {
 	display: none !important;

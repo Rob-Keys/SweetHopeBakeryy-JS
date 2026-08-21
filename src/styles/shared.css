@@ -6,11 +6,8 @@
 	--cream-card: #fffdf7;
 	--accent: #9c3323;
 	--accent-dark: #7a2417;
-	--shadow-warm: 0 6px 20px rgba(63, 42, 20, 0.18);
-	--shadow-soft: 0 2px 8px rgba(63, 42, 20, 0.12), 0 1px 3px rgba(63, 42, 20, 0.08);
 	--font-heading: "Fraunces", Georgia, serif;
 	--font-body: "Nunito", system-ui, -apple-system, sans-serif;
-	--font-display: "Tagesschrift", "Fraunces", serif;
 }
 
 html, body {
@@ -37,7 +34,6 @@ header {
 	background-color: #3f2a14;
 	border-radius: 500px;
 	position: relative;
-	box-shadow: 0 4px 16px rgba(63, 42, 20, 0.22);
 }
 header, footer {
   flex: 0 0 auto; /* Keep header/footer at intrinsic height. */
@@ -62,63 +58,33 @@ footer {
 	a {
 		color: #fff9f0;
 		text-decoration: none;
-		border-bottom: 1px solid rgba(255, 249, 240, 0.4);
-		transition: border-color 0.2s ease;
-	}
-	a:hover {
-		border-color: #fff9f0;
 	}
 }
 
 .nav-link{
 	color: #e8ddce;
-	position: relative;
-	transition: color 0.2s ease;
 }
 .nav-link h5 {
 	font-family: var(--font-heading) !important;
 	font-weight: 600;
 	letter-spacing: 0.01em;
 }
-/* Animated underline that grows from the center on hover. */
-.nav-link::after {
-	content: "";
-	position: absolute;
-	left: 50%;
-	bottom: 0.1rem;
-	width: 0;
-	height: 2px;
-	background-color: #ffffff;
-	transition: width 0.25s ease, left 0.25s ease;
-}
 .nav-link:hover {
 	color: #FFFFFF;
-	text-decoration: none;
-}
-.nav-link:hover::after {
-	width: 60%;
-	left: 20%;
+	text-decoration: underline;
 }
 .navbar-brand {
 	height: 4rem;
 	width: auto;
 	border-radius: 1000px;
-	transition: transform 0.2s ease;
-}
-.navbar-brand:hover {
-	transform: scale(1.05);
 }
 
-/* Warm, rounded pill buttons with a subtle lift on hover. */
+/* Warm bakery button typography and colors. */
 .btn-cookie,
 .btn-invert-cookie {
 	font-family: var(--font-heading) !important;
 	font-weight: 600 !important;
 	letter-spacing: 0.02em;
-	border-radius: 999px !important;
-	border: none !important;
-	box-shadow: var(--shadow-soft);
-	transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease, color 0.18s ease;
 }
 .btn-cookie {
 	color: #fff9f0 !important;
@@ -128,8 +94,6 @@ footer {
 .btn-cookie:focus-visible {
 	color: #fff9f0 !important;
 	background-color: #5a3d22 !important;
-	transform: translateY(-2px);
-	box-shadow: var(--shadow-warm);
 }
 .btn-invert-cookie {
 	color: #3f2a14 !important;
@@ -139,8 +103,6 @@ footer {
 .btn-invert-cookie:focus-visible {
 	color: #3f2a14 !important;
 	background-color: #ffffff !important;
-	transform: translateY(-2px);
-	box-shadow: var(--shadow-warm);
 }
 
 /* Product image slider. */
