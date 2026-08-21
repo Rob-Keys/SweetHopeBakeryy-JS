@@ -49,13 +49,6 @@ npm run dev                    # static files at localhost:8080
 npx wrangler pages dev src     # with Pages Functions + KV
 ```
 
-## Admin Password Hash
+## Admin Authentication
 
-```bash
-node -e "const crypto=require('crypto'); const pw=process.argv[1]; const it=100000; \
-const salt=crypto.randomBytes(16); crypto.pbkdf2(pw,salt,it,32,'sha256',(e,d)=>{ \
-if(e) throw e; console.log('pbkdf2\$'+it+'\$'+salt.toString('base64')+'\$'+d.toString('base64')); \
-});" 'YOUR_PASSWORD'
-```
-
-Set the output as `ADMIN_PASSWORD_HASH` in Cloudflare Pages environment variables.
+Configure `ADMIN_PASSWORD_HASH` as a Cloudflare Pages secret using the project's PBKDF2-SHA256 format. Generate the hash through your approved private deployment tooling or password-management workflow; never commit the password or hash to the repository.

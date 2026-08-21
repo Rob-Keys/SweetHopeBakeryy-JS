@@ -7,7 +7,7 @@ Sweet Hope Bakery — static e-commerce site. Pure HTML + ES6 modules served by 
 ```bash
 npm run dev   # → http://localhost:8080 (static files only, no functions)
 ```
-Admin dev password: `password` (only if you generated `ADMIN_PASSWORD_HASH` for it)
+Admin authentication requires a privately configured `ADMIN_PASSWORD_HASH` when running the Pages Functions locally.
 
 ## Architecture Rules
 - **Page init order matters**: `DOMContentLoaded` → `renderHeader()` → fetch data → render content → `renderFooter()` → `initShared()`. The `initShared()` call MUST come last — it attaches IntersectionObservers and ImageSliders to elements that must already be in the DOM.
