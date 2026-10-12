@@ -2,7 +2,14 @@
 
 import { S3Client, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
 
-const ALLOWED_PREFIXES = ['images/', 'header/'];
+const ALLOWED_PREFIXES = [
+  'images/',
+  'header/',
+  'products/',
+  'home_page/',
+  'about_page/',
+  'contact_page/'
+];
 
 export function isSafeKey(key) {
   if (typeof key !== 'string' || key.length === 0) return false;
