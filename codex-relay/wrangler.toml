@@ -1,0 +1,11 @@
+name = "sweet-hope-codex-relay"
+main = "index.js"
+compatibility_date = "2026-10-12"
+
+[[durable_objects.bindings]]
+name = "CODEX_AGENT_RELAY"
+class_name = "CodeAgentRelay"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["CodeAgentRelay"]

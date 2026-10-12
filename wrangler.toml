@@ -7,6 +7,11 @@ compatibility_flags = ["nodejs_compat"]
 binding = "kv-db"
 id = "484eac01223645b5a7d53de5ae5d2917"
 
+[[durable_objects.bindings]]
+name = "CODEX_AGENT_RELAY"
+class_name = "CodeAgentRelay"
+script_name = "sweet-hope-codex-relay"
+
 [vars]
 DEBUG_ERRORS = "false"
 CLOUDFLARE_ZONE_ID = "dcb06d98570b7699bebf9bab3fc876fb"

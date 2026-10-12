@@ -3,10 +3,10 @@
 import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
 import { initShared, ImageSlider } from '../shared.js';
-import { isAuthenticated, setDesiredPage } from '../modules/auth.js';
+import { isAuthenticated, setDesiredPage, getAuthToken } from '../modules/auth.js';
 import { getTable, putItem, removeItem } from '../modules/database.js';
 import { uploadImages, deleteImages } from '../aws/s3.js';
-import { renderPageSectionEditor } from '../components/customize-page.js';
+import { renderPageSectionEditor, renderSitePreview, renderLocalCodeAgentPanel } from '../components/customize-page.js';
 import { escapeHtml } from '../modules/escape.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -51,6 +51,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     <p>"Prices" will create a dropdown menu of those quantities at those prices. So "6:10, 12:15", would mean 6 for $10, or 12 for $15.</p>
     <p>"Customizations" currently dont do anything and you can just leave that field blank for now.</p>
     <p>I recommend uploading images that are of filetype .avif, as theyre most efficient size-wise and will make your site load faster. To convert a .png or .jpg to .avif you can use a site like: <a href="https://cloudinary.com/tools/jpg-to-avif" target="_blank">JPEG-To-Avif Converter</a></p>
+    ${renderSitePreview(products, homeSections, aboutSections, contactSections)}
+    ${renderLocalCodeAgentPanel()}
     <div class="row menu-row">
       <div class="col-2"><h5>Product Name</h5></div>
       <div class="col-2"><h5>Description</h5></div>
@@ -173,10 +175,132 @@ document.addEventListener('DOMContentLoaded', async () => {
   initSectionEditHandlers();
   initRemoveHandlers();
   initAddHandlers();
+  initLocalCodeAgentHandlers();
 
   renderFooter();
   initShared();
 });
+
+function initLocalCodeAgentHandlers() {
+  const form = document.getElementById('local-code-agent-form');
+  if (!form) return;
+  const connectionLabel = form.parentElement.querySelector('[data-agent-connection]');
+  const indicator = form.parentElement.querySelector('.local-agent-indicator');
+  const taskStatus = form.querySelector('[data-agent-task]');
+  const submitButton = form.querySelector('[data-agent-submit]');
+  const promptInput = form.querySelector('[name="prompt"]');
+  const authToken = getAuthToken();
+  let activePoll = null;
+  let isOnline = false;
+
+  const adminFetch = (url, options = {}) => fetch(url, {
+    ...options,
+    headers: {
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      Authorization: `Bearer ${authToken}`,
+      ...options.headers
+    }
+  });
+
+  const setConnection = (online, busy = false) => {
+    isOnline = online;
+    connectionLabel.textContent = online
+      ? busy ? 'Your Mac is working on a request.' : 'Your Mac is on and connected.'
+      : 'Your Mac is off or disconnected. Start the local agent on your Mac to send a request.';
+    indicator.classList.toggle('is-online', online);
+    indicator.classList.toggle('is-offline', !online);
+    promptInput.disabled = !online || busy || Boolean(activePoll);
+    submitButton.disabled = !online || busy || Boolean(activePoll);
+    if (!activePoll) submitButton.textContent = busy ? 'Mac is busy' : 'Send to Mac';
+  };
+
+  const refreshConnection = async () => {
+    try {
+      const response = await adminFetch('/api/codex/agent/status');
+      if (!response.ok) throw new Error('Could not read agent status.');
+      const { online, busy } = await response.json();
+      setConnection(Boolean(online), Boolean(busy));
+    } catch {
+      setConnection(false);
+    }
+  };
+
+  const pollTask = async (taskId) => {
+    taskStatus.hidden = false;
+    taskStatus.textContent = 'Request sent directly to your Mac.';
+    activePoll = window.setInterval(async () => {
+      try {
+        const response = await adminFetch(`/api/codex/tasks/${encodeURIComponent(taskId)}`);
+        if (!response.ok) throw new Error('Could not get the latest task status.');
+        const task = await response.json();
+        taskStatus.replaceChildren();
+        const title = document.createElement('strong');
+        title.textContent = task.status === 'complete' ? 'Codex response' : task.status === 'failed' ? 'Request failed' : task.message || 'Your Mac is working…';
+        taskStatus.appendChild(title);
+        if (task.summary) {
+          const summary = document.createElement('pre');
+          summary.textContent = task.summary;
+          taskStatus.appendChild(summary);
+        }
+        if (task.status === 'complete' || task.status === 'failed') {
+          window.clearInterval(activePoll);
+          activePoll = null;
+          submitButton.textContent = 'Send another request';
+          refreshConnection();
+        } else {
+          submitButton.disabled = !isOnline;
+          promptInput.disabled = !isOnline;
+        }
+      } catch (error) {
+        taskStatus.textContent = error.message;
+      }
+    }, 2500);
+  };
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const prompt = promptInput.value.trim();
+    if (!prompt || submitButton.disabled || !isOnline) return;
+    submitButton.disabled = true;
+    promptInput.disabled = true;
+    submitButton.textContent = 'Sending…';
+    taskStatus.hidden = false;
+    taskStatus.textContent = 'Sending directly to your Mac…';
+    try {
+      const response = await adminFetch('/api/codex/tasks', {
+        method: 'POST',
+        body: JSON.stringify({ prompt })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Could not send the request.');
+      submitButton.textContent = 'Working…';
+      pollTask(result.taskId);
+    } catch (error) {
+      taskStatus.textContent = error.message;
+      await refreshConnection();
+      promptInput.disabled = !isOnline;
+      submitButton.disabled = !isOnline;
+      submitButton.textContent = 'Try again';
+    }
+  });
+
+  let connectionPoll = null;
+  const startConnectionPolling = () => {
+    if (document.hidden || connectionPoll) return;
+    refreshConnection();
+    connectionPoll = window.setInterval(refreshConnection, 15000);
+  };
+  const stopConnectionPolling = () => {
+    if (!connectionPoll) return;
+    window.clearInterval(connectionPoll);
+    connectionPoll = null;
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopConnectionPolling();
+    else startConnectionPolling();
+  });
+  startConnectionPolling();
+}
 
 function ensureRowStatus(row) {
   if (!row) return null;

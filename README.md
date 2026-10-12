@@ -52,3 +52,25 @@ npx wrangler pages dev src     # with Pages Functions + KV
 ## Admin Authentication
 
 Configure `ADMIN_PASSWORD_HASH` as a Cloudflare Pages secret using the project's PBKDF2-SHA256 format. Generate the hash through your approved private deployment tooling or password-management workflow; never commit the password or hash to the repository.
+
+## Local Code Agent
+
+The Customize page can send a source-code request directly to a Codex agent running on the owner's Mac. The Mac opens an outbound WebSocket to a small Cloudflare Worker; it exposes no listening port. The Mac sends no periodic application heartbeat. Instead, each authenticated, visible-page status check asks the relay to send a nonce challenge over the WebSocket; the Mac answers, and the status request reports online only if it receives that response within 2.5 seconds. The page checks presence every 15 seconds while visible and disables the prompt when the probe fails. The relay rejects submissions if the Mac does not answer a fresh challenge or is already working on another request. There is no offline request queue or cloud coding container; the relay is designed to fit within Cloudflare's Free plan allowances for this low-volume use.
+
+The Durable Object hibernates while the WebSocket is idle, so the connection can remain available without periodic Mac-to-Cloudflare application messages. The relay holds one task status and final summary in a Durable Object for up to 15 minutes, then deletes them. It never persists the prompt; that is delivered over the live connection to the Mac. The Mac runs `codex exec` with `gpt-6-luna` through the locally signed-in Codex CLI and edits this checkout. Every run has outbound network access so a code change can be pushed. The agent answers questions without editing files; for a code change it reviews the relevant authentication/security paths, commits only files changed for the request, and pushes a new `codex/` branch by default. It never force-pushes or pushes directly to the default branch unless that branch is explicitly named. ChatGPT and GitHub credentials remain on the Mac.
+
+To connect the Mac agent:
+
+1. Deploy the relay Worker from `codex-relay/` with `npx wrangler deploy --config codex-relay/wrangler.toml`.
+2. Set the same random `CODEX_AGENT_RELAY_TOKEN` secret on the relay Worker and the Pages project. For the Worker, run `openssl rand -hex 32` to create a token, then `npx wrangler secret put CODEX_AGENT_RELAY_TOKEN --config codex-relay/wrangler.toml`; for Pages, run `npx wrangler pages secret put CODEX_AGENT_RELAY_TOKEN --project-name sweethopebakeryy-js`.
+3. Bind the deployed `CodeAgentRelay` Durable Object to the Pages project as `CODEX_AGENT_RELAY` (the `wrangler.toml` binding already names the Worker and class).
+4. Add the same token and relay URL to the ignored local `.env` file. Use the Worker URL printed by Wrangler, with `/agent` at the end:
+
+   ```text
+   CODEX_AGENT_RELAY_TOKEN=<generated-token>
+   CODEX_AGENT_RELAY_URL=wss://sweet-hope-codex-relay.<your-workers-subdomain>.workers.dev/agent
+   ```
+
+5. Sign in to Codex on the Mac with the ChatGPT account whose plan should be used (`codex login status` checks the local CLI session). Make sure this checkout's Git remote is configured and GitHub authentication works on the Mac (for example, with `gh auth login` and `gh auth setup-git`). Then run `npm run local-agent` from this repository while the Mac should accept requests. Press Ctrl+C to stop it; the Customize prompt will show the Mac as offline.
+
+The browser never receives the relay token. Page requests still require the existing admin session, and the Pages Function forwards them to the Durable Object over Cloudflare's binding.
