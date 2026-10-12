@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── Render product editor ──
   let html = `<div class="m-5">
     <h2 class="subtitle">Edit Menu</h2>
+    <p class="text-muted small" id="deployment-version">Commit: loading…</p>
     <p>"Prices" will create a dropdown menu of those quantities at those prices. So "6:10, 12:15", would mean 6 for $10, or 12 for $15.</p>
     <p>"Customizations" currently dont do anything and you can just leave that field blank for now.</p>
     <p>I recommend uploading images that are of filetype .avif, as theyre most efficient size-wise and will make your site load faster. To convert a .png or .jpg to .avif you can use a site like: <a href="https://cloudinary.com/tools/jpg-to-avif" target="_blank">JPEG-To-Avif Converter</a></p>
@@ -151,6 +152,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   html += renderPageSectionEditor(formatSections(contactSections), 'contact_page');
 
   container.innerHTML = html;
+
+  const deploymentVersion = container.querySelector('#deployment-version');
+  if (deploymentVersion) {
+    fetch('/api/deployment-version', { cache: 'no-store' })
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then(({ commit }) => {
+        deploymentVersion.textContent = `Commit: ${commit || 'unknown'}`;
+      })
+      .catch(() => {
+        deploymentVersion.textContent = 'Commit: unavailable';
+      });
+  }
 
   // ── Event handlers ──
   initProductEditHandlers();
