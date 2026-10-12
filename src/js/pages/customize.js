@@ -328,7 +328,7 @@ function initProductEditHandlers() {
       setRowStatus(row, 'Saving...', 'info');
       setButtonBusy(saveBtn, true);
       if (editBtn) editBtn.disabled = true;
-      const itemName = row.querySelector('.edit-itemName')?.value;
+      const itemName = row.querySelector('.edit-itemName')?.value.trim();
       const originalItemName = row.querySelector('.original-itemName')?.value;
       const description = row.querySelector('.edit-description')?.value;
       const prices = row.querySelector('.edit-prices')?.value;
@@ -357,16 +357,7 @@ function initProductEditHandlers() {
         .map(el => el.dataset.imageUrl);
 
       try {
-        // Delete removed images from S3.
-        if (imagesToRemove.length > 0) {
-          const s3Keys = imagesToRemove.map(url => {
-            try { return new URL(url).pathname.replace(/^\//, ''); } catch { return url; }
-          });
-          const deleteResult = await deleteImages(s3Keys);
-          if (!deleteResult.success) {
-            throw new Error(deleteResult.error || 'Failed to delete images.');
-          }
-        }
+        if (!itemName) throw new Error('Product name is required.');
 
         // Upload new images and collect their public URLs.
         let newImageURLs = [];
@@ -390,9 +381,20 @@ function initProductEditHandlers() {
           prices: parsedPrices,
           customizations: parsedCustom,
           imageURLs
-        });
+        }, { previousKey: originalItemName });
         if (!saveResult.success) {
           throw new Error(saveResult.error || 'Save failed.');
+        }
+
+        // Delete removed images only after the catalog no longer references them.
+        if (imagesToRemove.length > 0) {
+          const s3Keys = imagesToRemove.map(url => {
+            try { return new URL(url).pathname.replace(/^\//, ''); } catch { return url; }
+          });
+          const deleteResult = await deleteImages(s3Keys);
+          if (!deleteResult.success) {
+            console.warn('Product saved, but removed images could not be deleted:', deleteResult.error);
+          }
         }
 
         // Update view mode with new values.
@@ -597,11 +599,15 @@ function initAddHandlers() {
   document.querySelector('.add-product-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = e.target;
-    const name = form.querySelector('[name="partitionKeyValue"]').value;
+    const name = form.querySelector('[name="partitionKeyValue"]').value.trim();
     const description = form.querySelector('[name="description"]')?.value || '';
     const csvPrices = form.querySelector('[name="csvPrices"]')?.value || '';
     const csvCustomizations = form.querySelector('[name="csvCustomizations"]')?.value || '';
     if (!name) return;
+
+    const submitButton = form.querySelector('[type="submit"]');
+    setRowStatus(form, 'Adding product...', 'info');
+    setButtonBusy(submitButton, true, 'Adding...');
 
     // Parse prices.
     const prices = {};
@@ -617,19 +623,31 @@ function initAddHandlers() {
       if (c && p) customizations[c] = p;
     });
 
-    // Upload images.
-    let imageURLs = [];
-    const imageInput = form.querySelector('[name="images[]"]');
-    if (imageInput?.files?.length > 0) {
-      const files = Array.from(imageInput.files);
-      const filenames = files.map(f => `products/${Date.now()}-${f.name}`);
-      const result = await uploadImages(filenames, files);
-      if (result.success && result.urls) {
+    try {
+      // Upload images before saving, so an upload failure cannot create a product
+      // record with missing image URLs.
+      let imageURLs = [];
+      const imageInput = form.querySelector('[name="images[]"]');
+      if (imageInput?.files?.length > 0) {
+        const files = Array.from(imageInput.files);
+        const filenames = files.map(f => `products/${Date.now()}-${f.name}`);
+        const result = await uploadImages(filenames, files);
+        if (!result.success || !result.urls) {
+          throw new Error(result.error || 'Image upload failed.');
+        }
         imageURLs = result.urls;
       }
-    }
 
-    await putItem('products', { itemName: name, description, prices, customizations, imageURLs });
+      const saveResult = await putItem('products', { itemName: name, description, prices, customizations, imageURLs }, { createOnly: true });
+      if (!saveResult.success) throw new Error(saveResult.error || 'Could not add product.');
+      setRowStatus(form, 'Product added. Reload the page to edit it.', 'success');
+      form.reset();
+    } catch (err) {
+      console.error('Add product failed:', err);
+      setRowStatus(form, err?.message || 'Could not add product.', 'danger');
+    } finally {
+      setButtonBusy(submitButton, false);
+    }
   });
 
   // Add section.
@@ -642,19 +660,39 @@ function initAddHandlers() {
       const bodyText = form.querySelector('[name="bodyText"]')?.value || '';
       if (!sectionIndex) return;
 
-      // Upload image if provided.
-      let imageURLs = [];
-      const imageInput = form.querySelector('[name="images[]"]');
-      if (imageInput?.files?.length > 0) {
-        const files = Array.from(imageInput.files);
-        const filenames = files.map(f => `${pageName}/${Date.now()}-${f.name}`);
-        const result = await uploadImages(filenames, files);
-        if (result.success && result.urls) {
+      const submitButton = form.querySelector('[type="submit"]');
+      setRowStatus(form, 'Saving section...', 'info');
+      setButtonBusy(submitButton, true, 'Adding...');
+
+      try {
+        // Keep Contact's first three sorted records reserved for its fixed intro/email/Instagram layout.
+        if (pageName === 'contact_page' && (!Number.isInteger(Number(sectionIndex)) || Number(sectionIndex) < 3)) {
+          throw new Error('Contact page section indexes must be whole numbers of 3 or greater.');
+        }
+
+        // Upload image if provided. Do not save a section with missing image URLs after an upload failure.
+        let imageURLs = [];
+        const imageInput = form.querySelector('[name="images[]"]');
+        if (imageInput?.files?.length > 0) {
+          const files = Array.from(imageInput.files);
+          const filenames = files.map(f => `${pageName}/${Date.now()}-${f.name}`);
+          const result = await uploadImages(filenames, files);
+          if (!result.success || !result.urls) {
+            throw new Error(result.error || 'Image upload failed.');
+          }
           imageURLs = result.urls;
         }
-      }
 
-      await putItem(pageName, { sectionIndex, headerText, bodyText, imageURLs });
+        const saveResult = await putItem(pageName, { sectionIndex, headerText, bodyText, imageURLs }, { createOnly: true });
+        if (!saveResult.success) throw new Error(saveResult.error || 'Could not add section.');
+        setRowStatus(form, 'Section added. Reload the page to edit it.', 'success');
+        form.reset();
+      } catch (err) {
+        console.error('Add section failed:', err);
+        setRowStatus(form, err?.message || 'Could not add section.', 'danger');
+      } finally {
+        setButtonBusy(submitButton, false);
+      }
     });
   });
 }

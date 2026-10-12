@@ -33,6 +33,13 @@ export async function onRequestPost(context) {
 
     // Select the partition key and filter out the target item.
     const partitionKey = tableName === 'products' ? 'itemName' : 'sectionIndex';
+    if (tableName === 'contact_page') {
+      const sortedSections = [...data].sort((a, b) => Number(a.sectionIndex) - Number(b.sectionIndex));
+      const targetIndex = sortedSections.findIndex(section => String(section[partitionKey]) === String(partitionValue));
+      if (targetIndex >= 0 && targetIndex < 3) {
+        return Response.json({ error: 'The first three contact sections are required and cannot be removed.' }, { status: 409 });
+      }
+    }
     data = data.filter(d => String(d[partitionKey]) !== String(partitionValue));
 
     // Persist the updated table.

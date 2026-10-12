@@ -88,20 +88,20 @@ function buildCartSummary(cartLines, products) {
   return { cart, total };
 }
 
-async function persistOrderSnapshot(context, sessionId, cartLines, cartSummary) {
+async function persistOrderSnapshot(context, sessionId, cartLines, cartSummary, stripeLineItems) {
   const kv = getKv(context);
-  if (!kv || !sessionId) return;
+  if (!kv || !sessionId) throw new Error('Unable to persist checkout order');
   const key = `orders/${sessionId}`;
   const payload = {
     cart: cartSummary.cart,
     cart_total: cartSummary.total,
+    amount_total: stripeLineItems.reduce(
+      (total, item) => total + item.price_data.unit_amount * item.quantity,
+      0
+    ),
     cartLines
   };
-  try {
-    await kv.put(key, JSON.stringify(payload), { expirationTtl: 60 * 60 * 24 });
-  } catch (err) {
-    console.warn('persistOrderSnapshot failed:', err);
-  }
+  await kv.put(key, JSON.stringify(payload), { expirationTtl: 60 * 60 * 24 });
 }
 
 export async function onRequestPost(context) {
@@ -128,7 +128,7 @@ export async function onRequestPost(context) {
       return_url: getReturnUrl(context.request, context.env)
     });
 
-    await persistOrderSnapshot(context, session?.id, cartLines, cartSummary);
+    await persistOrderSnapshot(context, session?.id, cartLines, cartSummary, stripeLineItems);
 
     return Response.json({ clientSecret: session.client_secret });
   } catch (err) {

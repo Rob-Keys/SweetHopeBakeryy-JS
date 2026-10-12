@@ -22,13 +22,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const safeBody1 = escapeHtml(sections[1].bodyText);
     const safeHeader2 = escapeHtml(sections[2].headerText);
     const safeBody2 = escapeHtml(sections[2].bodyText);
+    const extraSections = sections.slice(3).map(section => {
+      const header = escapeHtml(section.headerText || '');
+      const body = escapeHtml(section.bodyText || '');
+      return `<section class="contact-extra-section">${header ? `<h3>${header}</h3>` : ''}${body ? `<p>${body}</p>` : ''}</section>`;
+    }).join('');
     container.innerHTML = `
       <h2 class="subtitle">${safeHeader0}</h2>
       <h5 class="description">${safeBody0}</h5>
       <div class="contact-info">
         <p class="contact-info-email"><strong>${safeHeader1}:</strong> <a href="mailto:${safeBody1}" class="contact-page-link">${safeBody1}</a></p>
         <p class="contact-info-instagram"><strong>${safeHeader2}:</strong> <a href="https://www.instagram.com/sweethopebakeryy/" target="_blank" class="contact-page-link">${safeBody2} <i class="fa-brands fa-instagram"></i></a></p>
-      </div>`;
+      </div>${extraSections}`;
   }
 
   renderFooter();

@@ -52,26 +52,17 @@ async function fetchStripePublicKey() {
 /**
  * Verify that a Stripe checkout succeeded and trigger server-side emails.
  * @param {string} sessionId - Stripe checkout session ID
- * @param {Object} cart - Cart data { "Product Name": { quantity, price } }
- * @param {number} cartTotal - Total amount
  * @param {Object} customerDetails - Customer info { customer_name, customer_email, ... }
- * @param {Array} [cartLinesOverride] - Optional cart lines to validate with server
  * @returns {Promise<{success: boolean, customerEmail: string|null}>}
  */
-async function didCheckoutSucceed(sessionId, cart, cartTotal, customerDetails, cartLinesOverride) {
+async function didCheckoutSucceed(sessionId, customerDetails) {
   try {
-    const cartLines = Array.isArray(cartLinesOverride) && cartLinesOverride.length
-      ? cartLinesOverride
-      : getCartLines();
     const response = await fetch('/api/rate/verify-checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         session_id: sessionId,
-        cart,
-        cartTotal,
-        customerDetails,
-        cartLines
+        customerDetails
       })
     });
     const data = await response.json().catch(() => ({}));

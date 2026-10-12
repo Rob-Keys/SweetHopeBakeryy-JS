@@ -8,46 +8,19 @@ import { S3Client, HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s
 import { getKv } from '../_kv.js';
 import { stripeRequest } from '../_stripe.js';
 
-const PRODUCTS_KEY = 'data/products.json';
-
-async function loadProductsFromKv(context) {
+async function loadOrderSnapshot(context, sessionId) {
   const kv = getKv(context);
   if (!kv) return null;
-  const data = await kv.get(PRODUCTS_KEY, 'json');
-  return Array.isArray(data) ? data : null;
+  return await kv.get(`orders/${sessionId}`, 'json');
 }
 
-function buildValidatedCart(cartLines, products) {
-  if (!Array.isArray(cartLines) || cartLines.length === 0) {
-    return { valid: false, cart: {}, total: 0 };
-  }
-
-  const productMap = new Map(products.map(p => [String(p.itemName), p]));
-  const cart = {};
-  let total = 0;
-
-  for (const line of cartLines) {
-    const name = String(line?.name || '');
-    const quantityKey = String(line?.quantityKey || '');
-    if (!name || !quantityKey) return { valid: false, cart: {}, total: 0 };
-
-    const product = productMap.get(name);
-    if (!product) return { valid: false, cart: {}, total: 0 };
-
-    const priceValue = product.prices?.[quantityKey];
-    const price = Number(priceValue);
-    const quantity = Number(quantityKey);
-    if (!Number.isFinite(price) || !Number.isFinite(quantity)) return { valid: false, cart: {}, total: 0 };
-
-    if (!cart[name]) {
-      cart[name] = { quantity: 0, price: 0 };
-    }
-    cart[name].quantity += quantity;
-    cart[name].price += price;
-    total += price;
-  }
-
-  return { valid: true, cart, total };
+function isValidOrderSnapshot(snapshot) {
+  return Boolean(
+    snapshot &&
+    Array.isArray(snapshot.cartLines) && snapshot.cartLines.length > 0 &&
+    snapshot.cart && typeof snapshot.cart === 'object' && !Array.isArray(snapshot.cart) &&
+    Number.isFinite(Number(snapshot.cart_total)) && Number(snapshot.cart_total) > 0
+  );
 }
 
 // Escape user-provided values for HTML email templates; avoids DOM APIs in Workers runtime.
@@ -187,7 +160,7 @@ export async function onRequestPost(context) {
       hasDevEmail: !!DEVELOPER_EMAIL_ADDRESS
     });
 
-    const { session_id, cart, cartTotal, customerDetails, cartLines } = await context.request.json();
+    const { session_id, customerDetails } = await context.request.json();
 
     if (!session_id) {
       return Response.json({ error: 'session_id is required' }, { status: 400 });
@@ -212,34 +185,26 @@ export async function onRequestPost(context) {
       customerEmailPresent: !!customerEmail
     });
 
-    const products = await loadProductsFromKv(context);
-    const validated = products ? buildValidatedCart(cartLines, products) : { valid: false, cart: {}, total: 0 };
-
-    // Best-effort validation: compare client cart against server pricing.
-    let cartMismatch = !validated.valid || !cart || Number(cartTotal) !== Number(validated.total);
-    if (!cartMismatch) {
-      const cartKeys = Object.keys(cart);
-      const validatedKeys = Object.keys(validated.cart);
-      if (cartKeys.length !== validatedKeys.length) {
-        cartMismatch = true;
-      } else {
-        for (const name of validatedKeys) {
-          const clientItem = cart[name];
-          const serverItem = validated.cart[name];
-          if (!clientItem || !serverItem) { cartMismatch = true; break; }
-          if (Number(clientItem.quantity) !== Number(serverItem.quantity)) { cartMismatch = true; break; }
-          if (Number(clientItem.price) !== Number(serverItem.price)) { cartMismatch = true; break; }
-        }
-      }
-    }
-
-    const success = paid && validated.valid && !cartMismatch;
+    // The snapshot was generated from server-side catalog prices when this
+    // Stripe session was created. Never use the browser's cart as the order.
+    const order = await loadOrderSnapshot(context, session_id);
+    const validOrder = isValidOrderSnapshot(order);
+    const expectedAmount = validOrder
+      ? (Number.isFinite(order.amount_total)
+        ? order.amount_total
+        : Math.round(Number(order.cart_total) * 100))
+      : null;
+    const amountMatches = validOrder &&
+      session.currency === 'usd' &&
+      Number.isFinite(session.amount_total) &&
+      session.amount_total === expectedAmount;
+    const success = paid && amountMatches;
     debugLog(context.env, 'verify-checkout: cart validation', {
       paid,
-      validated: validated.valid,
-      cartMismatch,
-      cartTotalClient: cartTotal,
-      cartTotalServer: validated.total
+      hasOrderSnapshot: validOrder,
+      amountMatches,
+      stripeAmount: session.amount_total,
+      expectedAmount
     });
 
     // Send confirmation emails only when paid and cart validation passes.
@@ -271,8 +236,8 @@ export async function onRequestPost(context) {
             customerDetails.customer_email = customerEmail;
           }
 
-          const receipt = buildCustomerReceipt(validated.cart, validated.total, customerDetails);
-          const ownerNotif = buildOwnerNotification(validated.cart, validated.total, customerDetails);
+          const receipt = buildCustomerReceipt(order.cart, Number(order.cart_total), customerDetails);
+          const ownerNotif = buildOwnerNotification(order.cart, Number(order.cart_total), customerDetails);
 
           // Send notifications in parallel to reduce latency.
           const emailPromises = [];
@@ -347,7 +312,8 @@ export async function onRequestPost(context) {
 
     return Response.json({
       success,
-      customerEmail
+      customerEmail,
+      ...(success ? { cart: order.cart, cartTotal: Number(order.cart_total) } : {})
     });
   } catch (err) {
     console.error('verify-checkout error:', err);

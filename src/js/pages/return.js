@@ -57,23 +57,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Verify payment and trigger server-side emails.
-  const result = await didCheckoutSucceed(
-    sessionId,
-    completedOrder?.cart,
-    completedOrder?.cart_total,
-    customerDetails,
-    completedOrder?.cartLines
-  );
+  const result = await didCheckoutSucceed(sessionId, customerDetails);
+  const verifiedOrder = result.success && result.cart
+    ? { cart: result.cart, cart_total: result.cartTotal }
+    : completedOrder;
   if (result?.error && typeof globalThis.__debugLog === 'function') {
     globalThis.__debugLog('verify-checkout error:', result.error);
   }
 
-  if (result.success && completedOrder) {
+  if (result.success && verifiedOrder) {
     const customerEmail = escapeHtml(result.customerEmail || customerDetails.customer_email || 'your email');
 
     // Render order summary.
-    const cart = completedOrder.cart;
-    const cartTotal = completedOrder.cart_total;
+    const cart = verifiedOrder.cart;
+    const cartTotal = verifiedOrder.cart_total;
 
     let orderItemsHTML = '';
     for (const [name, item] of Object.entries(cart)) {

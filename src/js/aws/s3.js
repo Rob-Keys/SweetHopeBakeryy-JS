@@ -35,11 +35,12 @@ async function uploadImages(filenames, files) {
     const urls = [];
     for (let i = 0; i < uploads.length; i++) {
       const { presignedUrl, publicUrl } = uploads[i];
-      await fetch(presignedUrl, {
+      const uploadResponse = await fetch(presignedUrl, {
         method: 'PUT',
         body: files[i],
         headers: { 'Content-Type': files[i].type }
       });
+      if (!uploadResponse.ok) throw new Error(`Image upload failed: HTTP ${uploadResponse.status}`);
       urls.push(publicUrl);
     }
 

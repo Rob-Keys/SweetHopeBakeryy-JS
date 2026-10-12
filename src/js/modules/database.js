@@ -59,15 +59,24 @@ function authHeaders() {
  * @param {Object} item
  * @returns {Promise<{success: boolean, error?: string}>}
  */
-async function putItem(tableName, item) {
+async function putItem(tableName, item, { createOnly = false, previousKey = null } = {}) {
   try {
     const response = await fetch('/api/save-data', {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ tableName, item })
+      body: JSON.stringify({ tableName, item, createOnly, previousKey })
     });
     if (response.status === 401) { handle401(); return { success: false, error: 'Unauthorized' }; }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) {
+      let message = `HTTP ${response.status}`;
+      try {
+        const body = await response.json();
+        if (body?.error) message = body.error;
+      } catch {
+        // Keep the HTTP status when the response has no JSON error message.
+      }
+      throw new Error(message);
+    }
     clearCache(tableName);
     return await response.json();
   } catch (err) {

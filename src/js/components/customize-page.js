@@ -34,6 +34,7 @@ export function renderPageSectionEditor(sections, pageName) {
 
   // Existing sections.
   sections.forEach((section, i) => {
+    const isRequiredContactSection = pageName === 'contact_page' && i < 3;
     const safeSectionIndex = escapeHtml(section.sectionIndex);
     const safeHeaderText = escapeHtml(section.headerText || '');
     const safeBodyText = escapeHtml(section.bodyText || '');
@@ -95,7 +96,9 @@ export function renderPageSectionEditor(sections, pageName) {
             <input type="hidden" name="tableName" value="${pageName}">
             <input type="hidden" name="partitionKey" value="sectionIndex">
             <input type="hidden" name="partitionKeyValue" value="${safeSectionIndex}">
-            <button type="submit" class="btn btn-danger button-2 mt-2">Remove Section</button>
+            ${isRequiredContactSection
+              ? '<button type="button" class="btn btn-secondary button-2 mt-2" disabled title="Required for the contact page layout">Required Section</button>'
+              : '<button type="submit" class="btn btn-danger button-2 mt-2">Remove Section</button>'}
           </form>
         </div>
       </div>`;
@@ -105,7 +108,7 @@ export function renderPageSectionEditor(sections, pageName) {
   html += `
     <form class="row menu-row add-section-form" data-page-name="${pageName}">
       <div class="col-2">
-        <input type="text" name="partitionKeyValue" placeholder="Section Index">
+        <input type="number" name="partitionKeyValue" placeholder="Section Index" min="${pageName === 'contact_page' ? '3' : '0'}" step="1" required>
       </div>`;
 
   if (showHeader) {
