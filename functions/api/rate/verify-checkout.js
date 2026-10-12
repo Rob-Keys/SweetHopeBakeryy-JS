@@ -5,14 +5,8 @@
 
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { S3Client, HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
-import { getKv } from '../_kv.js';
 import { stripeRequest } from '../_stripe.js';
-
-async function loadOrderSnapshot(context, sessionId) {
-  const kv = getKv(context);
-  if (!kv) return null;
-  return await kv.get(`orders/${sessionId}`, 'json');
-}
+import { loadOrderSnapshot } from '../_orders.js';
 
 function isValidOrderSnapshot(snapshot) {
   return Boolean(

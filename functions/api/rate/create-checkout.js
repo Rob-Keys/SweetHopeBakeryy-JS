@@ -1,9 +1,10 @@
 // POST /api/rate/create-checkout
 // Creates a Stripe Checkout session for the current cart.
-// Requires env: STRIPE_SECRET_KEY
+// Requires env: STRIPE_SECRET_KEY, AWS_KEY, AWS_SECRET_KEY
 
 import { getKv } from '../_kv.js';
 import { stripeRequest } from '../_stripe.js';
+import { saveOrderSnapshot } from '../_orders.js';
 
 const PRODUCTS_KEY = 'data/products.json';
 
@@ -89,9 +90,7 @@ function buildCartSummary(cartLines, products) {
 }
 
 async function persistOrderSnapshot(context, sessionId, cartLines, cartSummary, stripeLineItems) {
-  const kv = getKv(context);
-  if (!kv || !sessionId) throw new Error('Unable to persist checkout order');
-  const key = `orders/${sessionId}`;
+  if (!sessionId) throw new Error('Unable to persist checkout order');
   const payload = {
     cart: cartSummary.cart,
     cart_total: cartSummary.total,
@@ -101,7 +100,7 @@ async function persistOrderSnapshot(context, sessionId, cartLines, cartSummary, 
     ),
     cartLines
   };
-  await kv.put(key, JSON.stringify(payload), { expirationTtl: 60 * 60 * 24 });
+  await saveOrderSnapshot(context, sessionId, payload);
 }
 
 export async function onRequestPost(context) {
@@ -109,6 +108,9 @@ export async function onRequestPost(context) {
   const { STRIPE_SECRET_KEY } = context.env;
   if (!STRIPE_SECRET_KEY) {
     return Response.json({ error: 'STRIPE_SECRET_KEY not configured' }, { status: 500 });
+  }
+  if (!context.env.AWS_KEY || !context.env.AWS_SECRET_KEY) {
+    return Response.json({ error: 'AWS credentials not configured' }, { status: 500 });
   }
 
   try {

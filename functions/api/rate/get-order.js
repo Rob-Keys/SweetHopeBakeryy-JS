@@ -1,7 +1,7 @@
 // GET /api/rate/get-order?session_id=...
-// Returns the short-lived, non-PII order snapshot used by the return page.
+// Returns the non-PII order snapshot used by the return page.
 
-import { getKv } from '../_kv.js';
+import { loadOrderSnapshot } from '../_orders.js';
 
 export async function onRequestGet(context) {
   const url = new URL(context.request.url);
@@ -10,15 +10,14 @@ export async function onRequestGet(context) {
     return Response.json({ error: 'session_id is required' }, { status: 400 });
   }
 
-  const kv = getKv(context);
-  if (!kv) {
-    return Response.json({ error: 'KV binding not available' }, { status: 500 });
+  try {
+    const data = await loadOrderSnapshot(context, sessionId);
+    if (!data) {
+      return Response.json({ error: 'Order not found' }, { status: 404 });
+    }
+    return Response.json(data);
+  } catch (err) {
+    console.error('get-order error:', err);
+    return Response.json({ error: 'Unable to load order' }, { status: 500 });
   }
-
-  const data = await kv.get(`orders/${sessionId}`, 'json');
-  if (!data) {
-    return Response.json({ error: 'Order not found' }, { status: 404 });
-  }
-
-  return Response.json(data);
 }
