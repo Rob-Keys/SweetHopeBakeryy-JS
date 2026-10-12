@@ -6,6 +6,7 @@ import { initShared } from '../shared.js';
 import { isCartEmpty, buildLineItems, getCartLines, saveCustomerDetails, saveCompletedOrder } from '../modules/cart.js';
 import { createStripeCheckout, fetchStripePublicKey } from '../stripe/stripe.js';
 import config from '../modules/config.js';
+import { escapeHtml } from '../modules/escape.js';
 
 const STRIPE_SCRIPT_SRC = 'https://js.stripe.com/clover/stripe.js';
 const STRIPE_SCRIPT_ATTR = 'data-stripe-loader';
@@ -39,6 +40,19 @@ function loadStripeScript() {
   });
 
   return stripeScriptPromise;
+}
+
+function renderOrderSummary(cart, amountTotal) {
+  const summaryList = document.getElementById('order-summary-list');
+  const orderTotal = document.getElementById('order-total');
+  if (!summaryList) return;
+
+  summaryList.innerHTML = Object.entries(cart).map(([name, item]) => `
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      <p><strong>${Number(item.quantity)} ${escapeHtml(name)}</strong></p>
+      <p>$${Number(item.price).toFixed(2)}</p>
+    </li>`).join('');
+  if (orderTotal) orderTotal.textContent = `Total: $${(amountTotal / 100).toFixed(2)}`;
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -124,6 +138,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let checkout = null;
   let checkoutActions = null;
+  let serverPricedOrder = null;
   let stripeInitInFlight = false;
   let stripeInitAttempts = 0;
   let stripeInitComplete = false;
@@ -217,7 +232,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Save order snapshot before Stripe redirect (used on return page).
-    saveCompletedOrder();
+    saveCompletedOrder(serverPricedOrder);
 
     // Confirm payment with Stripe.
     if (checkoutActions) {
@@ -252,12 +267,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       const stripe = Stripe(stripePublicKey);
-      const clientSecret = await createStripeCheckout();
-      if (!clientSecret) {
+      const checkoutSession = await createStripeCheckout();
+      if (!checkoutSession?.clientSecret) {
         throw new Error('Missing checkout client secret.');
       }
+      serverPricedOrder = checkoutSession.order;
+      renderOrderSummary(serverPricedOrder.cart, checkoutSession.amountTotal);
 
-      checkout = await stripe.initCheckout({ clientSecret });
+      checkout = await stripe.initCheckout({ clientSecret: checkoutSession.clientSecret });
 
       // Mount payment element (works before loadActions).
       if (paymentEl) paymentEl.innerHTML = '';

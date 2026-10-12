@@ -120,9 +120,9 @@ function clearCustomerDetails() {
 
 // Completed order snapshot (saved before Stripe redirect, used on return page).
 
-function saveCompletedOrder() {
-  const cart = getCart();
-  const cartTotal = getCartTotal();
+function saveCompletedOrder(order = null) {
+  const cart = order?.cart || getCart();
+  const cartTotal = order?.cart_total ?? getCartTotal();
   localStorage.setItem(COMPLETED_ORDER_KEY, JSON.stringify({ cart, cart_total: cartTotal }));
 }
 

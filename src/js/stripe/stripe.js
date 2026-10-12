@@ -26,7 +26,17 @@ async function createStripeCheckout() {
     const data = await response.json();
     const clientSecret = data.clientSecret || data.client_secret || data.checkoutSessionClientSecret || null;
     if (!clientSecret) throw new Error('Missing checkout client secret');
-    return clientSecret;
+    if (!data.cart || !Number.isSafeInteger(data.amountTotal)) {
+      throw new Error('Missing server-priced order summary');
+    }
+    return {
+      clientSecret,
+      order: {
+        cart: data.cart,
+        cart_total: data.amountTotal / 100
+      },
+      amountTotal: data.amountTotal
+    };
   } catch (err) {
     console.error('createStripeCheckout failed:', err);
     return null;

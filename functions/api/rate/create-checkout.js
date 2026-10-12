@@ -63,7 +63,7 @@ function buildStripeLineItems(cartLines, products) {
 function buildCartSummary(cartLines, products) {
   const productMap = new Map(products.map(p => [p.itemName, p]));
   const cart = {};
-  let total = 0;
+  let totalCents = 0;
 
   for (const line of cartLines) {
     const name = String(line?.name || '');
@@ -72,32 +72,34 @@ function buildCartSummary(cartLines, products) {
     if (!product) throw new Error(`Unknown product: ${name}`);
 
     const priceValue = product.prices?.[quantityKey];
-    const price = Number(priceValue);
+    const priceCents = Math.round(Number(priceValue) * 100);
     const quantity = Number(quantityKey);
-    if (!Number.isFinite(price) || !Number.isFinite(quantity)) {
+    if (!Number.isFinite(priceCents) || !Number.isFinite(quantity)) {
       throw new Error(`Invalid quantity for ${name}`);
     }
 
     if (!cart[name]) {
-      cart[name] = { quantity: 0, price: 0 };
+      cart[name] = { quantity: 0, priceCents: 0 };
     }
     cart[name].quantity += quantity;
-    cart[name].price += price;
-    total += price;
+    cart[name].priceCents += priceCents;
+    totalCents += priceCents;
   }
 
-  return { cart, total };
+  for (const item of Object.values(cart)) {
+    item.price = item.priceCents / 100;
+    delete item.priceCents;
+  }
+
+  return { cart, total: totalCents / 100, amountTotal: totalCents };
 }
 
-async function persistOrderSnapshot(context, sessionId, cartLines, cartSummary, stripeLineItems) {
+async function persistOrderSnapshot(context, sessionId, cartLines, cartSummary) {
   if (!sessionId) throw new Error('Unable to persist checkout order');
   const payload = {
     cart: cartSummary.cart,
     cart_total: cartSummary.total,
-    amount_total: stripeLineItems.reduce(
-      (total, item) => total + item.price_data.unit_amount * item.quantity,
-      0
-    ),
+    amount_total: cartSummary.amountTotal,
     cartLines
   };
   await saveOrderSnapshot(context, sessionId, payload);
@@ -130,9 +132,14 @@ export async function onRequestPost(context) {
       return_url: getReturnUrl(context.request, context.env)
     });
 
-    await persistOrderSnapshot(context, session?.id, cartLines, cartSummary, stripeLineItems);
+    await persistOrderSnapshot(context, session?.id, cartLines, cartSummary);
 
-    return Response.json({ clientSecret: session.client_secret });
+    return Response.json({
+      clientSecret: session.client_secret,
+      cart: cartSummary.cart,
+      cartTotal: cartSummary.total,
+      amountTotal: cartSummary.amountTotal
+    });
   } catch (err) {
     console.error('create-checkout error:', err);
     const message = String(err?.message || '');
