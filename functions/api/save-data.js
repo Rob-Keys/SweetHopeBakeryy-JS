@@ -4,7 +4,7 @@
 // Partition key: `itemName` for products, `sectionIndex` for page tables.
 
 import { checkAuth } from './_auth.js';
-import { getKv, isValidTableName } from './_kv.js';
+import { getKv, isValidTableName, readTable } from './_kv.js';
 import { queueCachePurge } from './_deploy.js';
 
 export async function onRequestPost(context) {
@@ -30,14 +30,9 @@ export async function onRequestPost(context) {
 
     const key = `data/${tableName}.json`;
 
-    // Read current data (best-effort).
-    let data = [];
-    try {
-      const existing = await kv.get(key, 'json');
-      if (Array.isArray(existing)) data = existing;
-    } catch (err) {
-      console.error('KV read error:', err);
-    }
+    // Stop on read errors or corrupt table data; writing an empty fallback here
+    // could replace the complete table with only the submitted item.
+    const data = await readTable(kv, tableName);
 
     // Select the partition key based on the table shape.
     const partitionKey = tableName === 'products' ? 'itemName' : 'sectionIndex';
