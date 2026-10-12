@@ -47,14 +47,14 @@ async function fetchJson(key) {
 }
 
 async function main() {
-  const outDir = path.resolve('src/data');
-  await mkdir(outDir, { recursive: true });
+  const outputRoot = path.resolve('src');
 
   for (const table of TABLES) {
     const key = `${table}.json`;
     try {
       const data = await fetchJson(key);
-      const outPath = path.join(outDir, `${table}.json`);
+      const outPath = path.join(outputRoot, `${table}.json`);
+      await mkdir(path.dirname(outPath), { recursive: true });
       await writeFile(outPath, JSON.stringify(data, null, 2));
       console.log(`Wrote ${outPath}`);
     } catch (err) {
