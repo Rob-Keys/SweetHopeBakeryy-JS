@@ -229,6 +229,37 @@ function showElements(elements) {
   elements.forEach(el => { el.style.removeProperty('display'); });
 }
 
+function parsePrices(value) {
+  const input = String(value || '').trim();
+  if (!input) throw new Error('At least one price option is required.');
+
+  const prices = {};
+  for (const entry of input.split(',')) {
+    const parts = entry.split(':');
+    if (parts.length !== 2) {
+      throw new Error(`Invalid price option "${entry.trim()}". Use quantity: price.`);
+    }
+
+    const [quantity, priceText] = parts.map(part => part.trim());
+    if (!/^\d+$/.test(quantity) || !Number.isSafeInteger(Number(quantity)) || Number(quantity) < 1) {
+      throw new Error(`Invalid quantity "${quantity}". Quantities must be positive whole numbers.`);
+    }
+    if (!/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(priceText)) {
+      throw new Error(`Invalid price "${priceText}". Prices must be positive dollar amounts with up to two decimal places.`);
+    }
+
+    const price = Number(priceText);
+    if (!Number.isFinite(price) || price <= 0) {
+      throw new Error(`Invalid price "${priceText}". Prices must be greater than zero.`);
+    }
+    if (Object.hasOwn(prices, quantity)) {
+      throw new Error(`Quantity "${quantity}" appears more than once.`);
+    }
+    prices[quantity] = price;
+  }
+  return prices;
+}
+
 function buildSlidesHTML(imageURLs, itemName) {
   const safeName = escapeHtml(itemName || '');
   return imageURLs.map(url =>
@@ -334,14 +365,7 @@ function initProductEditHandlers() {
       const prices = row.querySelector('.edit-prices')?.value;
       const customizations = row.querySelector('.edit-customizations')?.value;
 
-      // Parse prices.
-      const parsedPrices = {};
-      if (prices) {
-        prices.split(',').forEach(pair => {
-          const [q, p] = pair.split(':').map(s => s.trim());
-          if (q && p) parsedPrices[q] = parseInt(p);
-        });
-      }
+      let parsedPrices;
 
       // Parse customizations.
       const parsedCustom = {};
@@ -358,6 +382,7 @@ function initProductEditHandlers() {
 
       try {
         if (!itemName) throw new Error('Product name is required.');
+        parsedPrices = parsePrices(prices);
 
         // Upload new images and collect their public URLs.
         let newImageURLs = [];
@@ -483,19 +508,6 @@ function initSectionEditHandlers() {
         : [...existingImages];
 
       try {
-        // Delete removed image from S3.
-        if (imageToRemove) {
-          try {
-            const s3Key = new URL(imageToRemove).pathname.replace(/^\//, '');
-            const deleteResult = await deleteImages([s3Key]);
-            if (!deleteResult.success) {
-              throw new Error(deleteResult.error || 'Failed to delete image.');
-            }
-          } catch {
-            // Local image path; skip deletion.
-          }
-        }
-
         // Upload new images.
         let newImageURLs = [];
         const newImageInput = row.querySelector('.add-images-input');
@@ -520,6 +532,20 @@ function initSectionEditHandlers() {
         });
         if (!saveResult.success) {
           throw new Error(saveResult.error || 'Save failed.');
+        }
+
+        // Delete the old image only after the saved section no longer references it.
+        if (imageToRemove) {
+          try {
+            const imageUrl = new URL(imageToRemove);
+            const s3Key = decodeURIComponent(imageUrl.pathname.replace(/^\//, ''));
+            const deleteResult = await deleteImages([s3Key]);
+            if (!deleteResult.success) {
+              console.warn('Section saved, but removed image could not be deleted:', deleteResult.error);
+            }
+          } catch {
+            // Local image path; skip S3 deletion.
+          }
         }
 
         // Update view mode text.
@@ -609,13 +635,6 @@ function initAddHandlers() {
     setRowStatus(form, 'Adding product...', 'info');
     setButtonBusy(submitButton, true, 'Adding...');
 
-    // Parse prices.
-    const prices = {};
-    csvPrices.split(',').forEach(pair => {
-      const [q, p] = pair.split(':').map(s => s.trim());
-      if (q && p) prices[q] = parseInt(p);
-    });
-
     // Parse customizations.
     const customizations = {};
     csvCustomizations.split(',').forEach(pair => {
@@ -624,6 +643,8 @@ function initAddHandlers() {
     });
 
     try {
+      const prices = parsePrices(csvPrices);
+
       // Upload images before saving, so an upload failure cannot create a product
       // record with missing image URLs.
       let imageURLs = [];
