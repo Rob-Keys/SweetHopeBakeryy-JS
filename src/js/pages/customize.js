@@ -225,23 +225,31 @@ function initLocalCodeAgentHandlers() {
     }
   };
 
-  const pollTask = async (taskId) => {
+  const renderTaskUpdate = (prompt, task) => {
+    taskStatus.replaceChildren();
+    const promptLabel = document.createElement('strong');
+    promptLabel.textContent = 'Exact prompt sent to Luna';
+    const promptEcho = document.createElement('pre');
+    promptEcho.textContent = prompt;
+    const title = document.createElement('strong');
+    title.textContent = task.status === 'complete' ? 'Luna response' : task.status === 'failed' ? 'Request failed' : task.message || 'Your Mac is working…';
+    taskStatus.append(promptLabel, promptEcho, title);
+    if (task.summary) {
+      const summary = document.createElement('pre');
+      summary.textContent = task.summary;
+      taskStatus.appendChild(summary);
+    }
+  };
+
+  const pollTask = async (taskId, prompt) => {
     taskStatus.hidden = false;
-    taskStatus.textContent = 'Request sent directly to your Mac.';
+    renderTaskUpdate(prompt, { status: 'running', message: 'Request sent directly to your Mac.' });
     activePoll = window.setInterval(async () => {
       try {
         const response = await adminFetch(`/api/codex/tasks/${encodeURIComponent(taskId)}`);
         if (!response.ok) throw new Error('Could not get the latest task status.');
         const task = await response.json();
-        taskStatus.replaceChildren();
-        const title = document.createElement('strong');
-        title.textContent = task.status === 'complete' ? 'Codex response' : task.status === 'failed' ? 'Request failed' : task.message || 'Your Mac is working…';
-        taskStatus.appendChild(title);
-        if (task.summary) {
-          const summary = document.createElement('pre');
-          summary.textContent = task.summary;
-          taskStatus.appendChild(summary);
-        }
+        renderTaskUpdate(prompt, task);
         if (task.status === 'complete' || task.status === 'failed') {
           window.clearInterval(activePoll);
           activePoll = null;
@@ -265,7 +273,7 @@ function initLocalCodeAgentHandlers() {
     promptInput.disabled = true;
     submitButton.textContent = 'Sending…';
     taskStatus.hidden = false;
-    taskStatus.textContent = 'Sending directly to your Mac…';
+    renderTaskUpdate(prompt, { status: 'running', message: 'Sending directly to your Mac…' });
     try {
       const response = await adminFetch('/api/codex/tasks', {
         method: 'POST',
@@ -274,9 +282,9 @@ function initLocalCodeAgentHandlers() {
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Could not send the request.');
       submitButton.textContent = 'Working…';
-      pollTask(result.taskId);
+      pollTask(result.taskId, prompt);
     } catch (error) {
-      taskStatus.textContent = error.message;
+      renderTaskUpdate(prompt, { status: 'failed', message: error.message });
       await refreshConnection();
       promptInput.disabled = !isOnline;
       submitButton.disabled = !isOnline;

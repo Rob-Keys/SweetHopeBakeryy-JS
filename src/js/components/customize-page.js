@@ -132,7 +132,7 @@ export function renderLocalCodeAgentPanel() {
       <form class="local-code-agent-form" id="local-code-agent-form">
         <label for="local-code-agent-prompt">Ask a question or describe a change</label>
         <textarea id="local-code-agent-prompt" name="prompt" rows="5" maxlength="12000" placeholder="For example: Add an FAQ accordion to the Contact page with keyboard accessible controls." required disabled></textarea>
-        <div class="local-code-agent-actions"><small>Questions get a direct answer. Code changes are reviewed, committed, and pushed to a new branch.</small><button class="btn btn-cookie" type="submit" data-agent-submit disabled>Send to Mac</button></div>
+        <div class="local-code-agent-actions"><small>Ask Luna about the site or request a visual/content change. Changes are committed and pushed to the deployment branch.</small><button class="btn btn-cookie" type="submit" data-agent-submit disabled>Send to Mac</button></div>
         <div class="local-agent-task" data-agent-task aria-live="polite" hidden></div>
       </form>
     </section>`;
