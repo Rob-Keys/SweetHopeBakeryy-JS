@@ -19,7 +19,7 @@ jobs:
   edit:
     if: github.repository == 'Rob-Keys/SweetHopeBakeryy-JS' && inputs.taskId != ''
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     environment: luna-trace
     permissions:
       contents: read
