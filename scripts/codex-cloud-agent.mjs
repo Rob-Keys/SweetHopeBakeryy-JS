@@ -203,9 +203,8 @@ function runCodex(prompt, outputPath) {
     }
     const args = [
       'exec', '--json', '--ephemeral', '--ignore-user-config',
-      '--model', model, '--sandbox', 'workspace-write', '--approve-for-me',
+      '--model', model, '--dangerously-bypass-approvals-and-sandbox',
       '--config', `developer_instructions=${JSON.stringify(developerInstructions)}`,
-      '--config', 'sandbox_workspace_write.network_access=true',
       '--cd', repoPath, '--output-last-message', outputPath, '-'
     ];
     const child = spawn('codex', args, { cwd: repoPath, env: childEnv, stdio: ['pipe', 'pipe', 'pipe'] });
