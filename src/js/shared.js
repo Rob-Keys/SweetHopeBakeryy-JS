@@ -134,7 +134,9 @@ export function initImageSliders() {
 }
 
 export function initFadeEffects() {
-  const elements = document.querySelectorAll('.fade-in-up, .fade-in-right, .fade-in-left');
+  const elements = [...document.querySelectorAll('.fade-in-up, .fade-in-right, .fade-in-left')]
+    .filter((el) => !el.matches('h1, h2, h3, nav, form, button, .btn, a[href]') &&
+      !el.querySelector('h1, h2, h3, nav, form, button, .btn, a[href]'));
   if (!elements.length) return;
 
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -144,14 +146,21 @@ export function initFadeEffects() {
 
   const observer = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
-      entry.target.classList.toggle('fade-visible', entry.isIntersecting);
+      if (entry.isIntersecting) {
+        entry.target.classList.add('fade-visible');
+        observer.unobserve(entry.target);
+      }
     });
   }, {
-    threshold: 0.2
+    threshold: 0.05,
+    rootMargin: '80px 0px'
   });
 
   const startObserving = () => {
-    elements.forEach((el) => observer.observe(el));
+    elements.forEach((el) => {
+      el.classList.add('fade-ready');
+      observer.observe(el);
+    });
   };
 
   if (typeof requestAnimationFrame === 'function') {

@@ -17,11 +17,12 @@ function appendForm(params, key, value) {
   params.append(key, String(value));
 }
 
-export async function stripeRequest(secretKey, method, path, body) {
+export async function stripeRequest(secretKey, method, path, body, options = {}) {
   const headers = {
     'Authorization': `Bearer ${secretKey}`,
     'Stripe-Version': '2026-01-28.clover'
   };
+  if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey;
   const init = { method, headers };
   if (body) {
     headers['Content-Type'] = 'application/x-www-form-urlencoded';

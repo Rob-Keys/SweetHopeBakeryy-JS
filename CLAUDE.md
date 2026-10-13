@@ -15,7 +15,7 @@ Admin authentication requires a privately configured `ADMIN_PASSWORD_HASH` when 
 - **Clean URLs** (`/about` not `/about.html`): handled by `serve.json` `cleanUrls: true` locally. Cloudflare Pages handles this automatically in production.
 - **Admin auth uses JWT** — password is POST'd to `/api/authenticate`, server verifies PBKDF2 hash in `ADMIN_PASSWORD_HASH`, returns a signed JWT. Token stored in `sessionStorage['shb_auth']`, sent as `Authorization: Bearer <token>` on all admin API calls. Server verifies JWT before executing any admin endpoint.
 - **Rate limiting** — `/api/authenticate` should be protected by Cloudflare WAF/Rate Limiting rules (per-IP).
-- **Order emails are server-side** — sent by `verify-checkout` after confirming Stripe payment. No unprotected email endpoints.
+- **Order emails are server-side** — Stripe's `/api/rate/stripe-webhook` is the primary fulfillment path, and `verify-checkout` is the customer return/recovery path. Both verify payment and share per-recipient idempotent delivery state. No unprotected email endpoints.
 
 ## Where Things Live
 - `src/` — the deployable static site
@@ -49,6 +49,7 @@ All server-side operations run as Cloudflare Pages Functions. Each file maps to 
 | Variable | Purpose |
 |---|---|
 | `STRIPE_SECRET_KEY` | Stripe checkout + verification |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signature verification |
 | `AWS_KEY` | S3, SES |
 | `AWS_SECRET_KEY` | S3, SES |
 | `CAROLINE_EMAIL_ADDRESS` | Owner order notifications |

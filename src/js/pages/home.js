@@ -5,16 +5,26 @@ import { renderFooter } from '../components/footer.js';
 import { initShared } from '../shared.js';
 import { getTable } from '../modules/database.js';
 import { escapeHtml } from '../modules/escape.js';
+import { showLoading, showError, showReady } from '../modules/page-state.js';
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
   renderHeader();
+  renderFooter();
+  initShared();
+  const container = document.getElementById('home-sections');
+  showLoading(container, 'Loading bakery stories…');
+  loadHomeSections();
+});
 
+async function loadHomeSections() {
+  const container = document.getElementById('home-sections');
+  showLoading(container, 'Loading bakery stories…');
+  try {
   // Fetch and sort home page sections.
   const sections = await getTable('home_page');
   sections.sort((a, b) => Number(a.sectionIndex) - Number(b.sectionIndex));
 
   // Render alternating image/text rows.
-  const container = document.getElementById('home-sections');
   if (container) {
     let html = '';
     sections.forEach((section, index) => {
@@ -28,7 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       html += `
         <div class="${rowClass} cv-auto">
           <div class="col-5 ${imgFade}">
-            <img style="width: 100%;" src="${safeImageUrl}" loading="lazy" decoding="async">
+            <img class="home-story-image" src="${safeImageUrl}" alt="" loading="lazy" decoding="async">
           </div>
           <div class="col-6 d-flex align-items-center ${txtFade}">
             <div class="image-caption d-flex flex-column align-items-center">
@@ -40,7 +50,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     container.innerHTML = html;
   }
-
-  renderFooter();
+  showReady(container);
   initShared();
-});
+  } catch {
+    showError(container, 'We could not load these stories. Please try again.', loadHomeSections);
+  }
+}

@@ -1,319 +1,103 @@
 // POST /api/rate/verify-checkout
-// Verifies payment with Stripe, validates cart totals, and sends confirmation emails.
-// No auth required; called by the customer after checkout.
-// Requires env: STRIPE_SECRET_KEY, AWS_KEY, AWS_SECRET_KEY, CAROLINE_EMAIL_ADDRESS, DEVELOPER_EMAIL_ADDRESS
+// Verifies Stripe payment and runs the same idempotent fulfillment path as the webhook.
 
-import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
-import { S3Client, HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { stripeRequest } from '../_stripe.js';
 import { loadOrderSnapshot } from '../_orders.js';
+import { fulfillPaidOrder, NotificationDeliveryError } from '../_fulfillment.js';
 
 function isValidOrderSnapshot(snapshot) {
   return Boolean(
-    snapshot &&
-    Array.isArray(snapshot.cartLines) && snapshot.cartLines.length > 0 &&
+    snapshot && Array.isArray(snapshot.cartLines) && snapshot.cartLines.length > 0 &&
     snapshot.cart && typeof snapshot.cart === 'object' && !Array.isArray(snapshot.cart) &&
+    Number.isSafeInteger(snapshot.amount_total) && snapshot.amount_total > 0 &&
     Number.isFinite(Number(snapshot.cart_total)) && Number(snapshot.cart_total) > 0
   );
 }
 
-// Escape user-provided values for HTML email templates; avoids DOM APIs in Workers runtime.
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-function formatDateForDisplay(isoDate) {
-  if (!isoDate) return '';
-  const dt = new Date(isoDate + 'T00:00:00');
-  if (isNaN(dt.getTime())) return isoDate;
-  const mm = String(dt.getMonth() + 1).padStart(2, '0');
-  const dd = String(dt.getDate()).padStart(2, '0');
-  const yyyy = dt.getFullYear();
-  return `${mm}-${dd}-${yyyy}`;
-}
-
-function formatPrice(amount) {
-  return Number(amount).toFixed(2);
-}
-
-const PICKUP_ADDRESS = 'Arlington, VA, 22207';
-
-function buildCustomerReceipt(cart, cartTotal, details) {
-  let body = `<h3>Thank you for your order with Sweet Hope Bakery!</h3>\n\n`;
-  body += `<div style='background-color: #d4edda; border: 1px solid #28a745; padding: 15px; margin: 15px 0;'>`;
-  body += `<strong>Payment successful!</strong> Your order has been confirmed.`;
-  body += `</div>\n\n`;
-
-  if (details.acquisition_method === 'delivery') {
-    body += `<h4>Delivery Details:</h4>`;
-    body += `<p>Delivery Address: ${escapeHtml(details.delivery_address || '')}</p>`;
-    body += `<p>Requested Delivery on ${formatDateForDisplay(details.acquisition_date)}</p>`;
-  } else {
-    body += `<h4>Pickup Details:</h4>`;
-    body += `<p>${escapeHtml(PICKUP_ADDRESS)}</p>`;
-    body += `<p>Requested Pickup Date: ${formatDateForDisplay(details.acquisition_date)}</p>`;
-    body += `<p>Coordinate a pickup time on your chosen day by texting 703-996-9846.</p>`;
-  }
-
-  body += `<h4>Summary:</h4>`;
-  for (const [name, item] of Object.entries(cart)) {
-    body += `<p>${item.quantity} x ${escapeHtml(name)}: $${formatPrice(item.price)}</p>`;
-  }
-  body += `<p><strong>Total: $${formatPrice(cartTotal)}</strong></p>`;
-  body += `<hr><p>Thank you for your business!</p>`;
-  body += `<p>We will contact you to coordinate pickup details.</p>`;
-  body += `<p>For any questions, please contact support@sweethopebakeryy.com</p>`;
-  body += `<img src='https://sweethopebakeryy.s3.us-east-1.amazonaws.com/header/sweethopebakeryy.avif' alt='Sweet Hope Bakery Logo' style='width:200px;height:auto;'/>`;
-
-  return {
-    subject: 'Your Sweet Hope Bakery Order Confirmation',
-    body
-  };
-}
-
-function buildOwnerNotification(cart, cartTotal, details) {
-  const customerReceipt = buildCustomerReceipt(cart, cartTotal, details);
-
-  let body = `<h3>New order received with the following details:</h3>\n\n`;
-  body += `<div style='background-color: #d4edda; border: 1px solid #28a745; padding: 15px; margin: 15px 0;'>`;
-  body += `<strong>Payment received via Stripe!</strong>`;
-  body += `</div>\n\n`;
-  body += `<h4>Customer Contact Info:</h4>`;
-  body += `<p>Name: ${escapeHtml(details.customer_name || '')}</p>`;
-  body += `<p>Email: ${escapeHtml(details.customer_email || '')}</p>`;
-  body += `<p>Phone: ${escapeHtml(details.customer_phone || '')}</p>`;
-  body += customerReceipt.body;
-
-  const subject = `New Order: ${details.acquisition_method || 'pickup'}: ${formatDateForDisplay(details.acquisition_date)}`;
-
-  return { subject, body };
-}
-
-async function sendEmailViaSES(ses, from, to, subject, body) {
-  await ses.send(new SendEmailCommand({
-    Source: from,
-    Destination: { ToAddresses: Array.isArray(to) ? to : [to] },
-    Message: {
-      Subject: { Data: subject },
-      Body: { Html: { Data: body } }
-    }
+function logVerificationFailure(stage, sessionId, err, request) {
+  console.error(JSON.stringify({
+    message: 'verify_checkout_failed',
+    stage,
+    sessionId: sessionId || null,
+    rayId: request.headers.get('cf-ray') || null,
+    errorName: err?.name || 'Error',
+    error: String(err?.message || 'Unknown error').slice(0, 300)
   }));
 }
 
-function getErrorMessage(err) {
-  if (!err) return 'Internal error';
-  if (typeof err === 'string') return err;
-  if (err.message) return String(err.message);
-  return 'Internal error';
-}
-
-function shouldExposeErrors(env) {
-  return env?.DEBUG_ERRORS === 'true' || env?.APP_ENV === 'development';
-}
-
-function debugLog(env, message, data) {
-  if (!shouldExposeErrors(env)) return;
-  if (data !== undefined) {
-    console.log(message, data);
-  } else {
-    console.log(message);
-  }
-}
-
-function formatAwsError(err) {
-  if (!err) return { message: 'Unknown error' };
-  return {
-    name: err.name,
-    message: err.message,
-    code: err.code,
-    $metadata: err.$metadata
-  };
-}
-
 export async function onRequestPost(context) {
-  const { STRIPE_SECRET_KEY, AWS_KEY, AWS_SECRET_KEY, AWS_REGION = 'us-east-1',
-          CAROLINE_EMAIL_ADDRESS, DEVELOPER_EMAIL_ADDRESS } = context.env;
-
+  const { STRIPE_SECRET_KEY } = context.env;
   if (!STRIPE_SECRET_KEY) {
-    return Response.json({ error: 'STRIPE_SECRET_KEY not configured' }, { status: 500 });
+    return Response.json({ paymentState: 'temporarily_unavailable', error: 'Checkout is temporarily unavailable' }, { status: 503 });
   }
 
+  let sessionId;
+  let stage = 'parse_request';
   try {
-    debugLog(context.env, 'verify-checkout: start', {
-      hasStripeKey: !!STRIPE_SECRET_KEY,
-      hasAwsKey: !!AWS_KEY,
-      hasAwsSecret: !!AWS_SECRET_KEY,
-      awsRegion: AWS_REGION,
-      hasOwnerEmail: !!CAROLINE_EMAIL_ADDRESS,
-      hasDevEmail: !!DEVELOPER_EMAIL_ADDRESS
-    });
-
-    const { session_id, customerDetails } = await context.request.json();
-
-    if (!session_id) {
-      return Response.json({ error: 'session_id is required' }, { status: 400 });
+    const body = await context.request.json();
+    sessionId = String(body?.session_id || '');
+    if (!/^cs_(?:test|live)_[A-Za-z0-9]+$/.test(sessionId)) {
+      return Response.json({ paymentState: 'unpaid', error: 'Invalid checkout session' }, { status: 400 });
     }
 
-    // Stripe is the source of truth for payment status.
-    let session;
-    try {
-      session = await stripeRequest(STRIPE_SECRET_KEY, 'GET', `/checkout/sessions/${session_id}`);
-    } catch (err) {
-      console.error('Stripe verification failed:', err);
-      const message = shouldExposeErrors(context.env)
-        ? getErrorMessage(err)
-        : 'Stripe verification failed';
-      return Response.json({ error: message }, { status: 502 });
-    }
+    stage = 'retrieve_stripe_session';
+    const session = await stripeRequest(STRIPE_SECRET_KEY, 'GET', `/checkout/sessions/${sessionId}`);
     const paid = session.payment_status === 'paid';
-    const customerEmail = session.customer_details?.email || customerDetails?.customer_email || null;
-    debugLog(context.env, 'verify-checkout: stripe session', {
-      sessionId: session_id,
-      paymentStatus: session.payment_status,
-      customerEmailPresent: !!customerEmail
-    });
-
-    // The snapshot was generated from server-side catalog prices when this
-    // Stripe session was created. Never use the browser's cart as the order.
-    const order = await loadOrderSnapshot(context, session_id);
-    const validOrder = isValidOrderSnapshot(order);
-    const expectedAmount = validOrder
-      ? (Number.isFinite(order.amount_total)
-        ? order.amount_total
-        : Math.round(Number(order.cart_total) * 100))
-      : null;
-    const amountMatches = validOrder &&
-      session.currency === 'usd' &&
-      Number.isFinite(session.amount_total) &&
-      session.amount_total === expectedAmount;
-    const success = paid && amountMatches;
-    debugLog(context.env, 'verify-checkout: cart validation', {
-      paid,
-      hasOrderSnapshot: validOrder,
-      amountMatches,
-      stripeAmount: session.amount_total,
-      expectedAmount
-    });
-
-    // Send confirmation emails only when paid and cart validation passes.
-    if (success && customerDetails && AWS_KEY && AWS_SECRET_KEY) {
-      try {
-        debugLog(context.env, 'verify-checkout: email pipeline start');
-        const credentials = { accessKeyId: AWS_KEY, secretAccessKey: AWS_SECRET_KEY };
-        const s3 = new S3Client({ region: AWS_REGION, credentials });
-        const ses = new SESClient({ region: AWS_REGION, credentials });
-        const from = 'support@sweethopebakeryy.com';
-
-        // Replay protection: only send once per session_id.
-        const receiptKey = `orders/${session_id}.json`;
-        let alreadySent = false;
-        try {
-          await s3.send(new HeadObjectCommand({ Bucket: 'sweethopebakeryy', Key: receiptKey }));
-          alreadySent = true;
-          debugLog(context.env, 'verify-checkout: receipt already sent');
-        } catch (err) {
-          if (err?.$metadata?.httpStatusCode !== 404 && err?.name !== 'NotFound') {
-            debugLog(context.env, 'verify-checkout: S3 HeadObject failed', formatAwsError(err));
-            throw err;
-          }
-        }
-
-        if (!alreadySent) {
-          // Prefer Stripe-provided email when available.
-          if (customerEmail) {
-            customerDetails.customer_email = customerEmail;
-          }
-
-          const receipt = buildCustomerReceipt(order.cart, Number(order.cart_total), customerDetails);
-          const ownerNotif = buildOwnerNotification(order.cart, Number(order.cart_total), customerDetails);
-
-          // Send notifications in parallel to reduce latency.
-          const emailPromises = [];
-
-          // Customer receipt.
-          if (customerEmail) {
-            emailPromises.push(
-              sendEmailViaSES(ses, from, customerEmail, receipt.subject, receipt.body)
-                .catch(err => {
-                  debugLog(context.env, 'verify-checkout: customer email failed', formatAwsError(err));
-                  console.error('Customer email failed:', err);
-                })
-            );
-          } else {
-            debugLog(context.env, 'verify-checkout: customer email skipped (missing email)');
-          }
-
-          // Owner notification.
-          if (CAROLINE_EMAIL_ADDRESS) {
-            emailPromises.push(
-              sendEmailViaSES(ses, from, CAROLINE_EMAIL_ADDRESS, ownerNotif.subject, ownerNotif.body)
-                .catch(err => {
-                  debugLog(context.env, 'verify-checkout: owner email failed', formatAwsError(err));
-                  console.error('Owner email failed:', err);
-                })
-            );
-          } else {
-            debugLog(context.env, 'verify-checkout: owner email skipped (missing env)');
-          }
-
-          // Developer notification.
-          if (DEVELOPER_EMAIL_ADDRESS) {
-            emailPromises.push(
-              sendEmailViaSES(ses, from, DEVELOPER_EMAIL_ADDRESS, ownerNotif.subject, ownerNotif.body)
-                .catch(err => {
-                  debugLog(context.env, 'verify-checkout: developer email failed', formatAwsError(err));
-                  console.error('Developer email failed:', err);
-                })
-            );
-          } else {
-            debugLog(context.env, 'verify-checkout: developer email skipped (missing env)');
-          }
-
-          await Promise.all(emailPromises);
-
-          // Persist a receipt marker to prevent duplicate sends.
-          try {
-            await s3.send(new PutObjectCommand({
-              Bucket: 'sweethopebakeryy',
-              Key: receiptKey,
-              Body: JSON.stringify({ session_id, sent_at: Date.now() }),
-              ContentType: 'application/json'
-            }));
-            debugLog(context.env, 'verify-checkout: receipt marker saved');
-          } catch (err) {
-            debugLog(context.env, 'verify-checkout: S3 PutObject failed', formatAwsError(err));
-            throw err;
-          }
-        }
-      } catch (err) {
-        console.error('Email pipeline failed:', err);
-        // Email failures should not block checkout verification.
-      }
-    } else {
-      debugLog(context.env, 'verify-checkout: email pipeline skipped', {
-        success,
-        hasCustomerDetails: !!customerDetails,
-        hasAwsKey: !!AWS_KEY,
-        hasAwsSecret: !!AWS_SECRET_KEY
+    if (!paid) {
+      return Response.json({
+        success: false,
+        paymentState: session.status === 'expired' ? 'unpaid' : 'processing',
+        customerEmail: session.customer_details?.email || null
       });
     }
 
+    stage = 'load_order_snapshot';
+    const order = await loadOrderSnapshot(context, sessionId);
+    const validOrder = isValidOrderSnapshot(order);
+    const expectedAmount = validOrder ? order.amount_total : null;
+    const amountMatches = validOrder && session.currency === 'usd' &&
+      Number.isSafeInteger(session.amount_total) && session.amount_total === expectedAmount;
+    if (!amountMatches || !order.customerDetails) {
+      console.error(JSON.stringify({
+        message: 'paid_checkout_needs_review',
+        sessionId,
+        hasOrderSnapshot: validOrder,
+        hasFulfillmentDetails: !!order?.customerDetails,
+        amountMatches
+      }));
+      return Response.json({
+        success: false,
+        paymentState: 'review',
+        customerEmail: session.customer_details?.email || order?.customerDetails?.customer_email || null
+      });
+    }
+
+    let delivery = {
+      customerEmailSent: false,
+      notificationStatus: 'pending'
+    };
+    stage = 'fulfill_paid_order';
+    try {
+      delivery = await fulfillPaidOrder(context, session, order);
+    } catch (err) {
+      if (err instanceof NotificationDeliveryError) delivery = err.result;
+      logVerificationFailure(stage, sessionId, err, context.request);
+    }
+
     return Response.json({
-      success,
-      customerEmail,
-      ...(success ? { cart: order.cart, cartTotal: Number(order.cart_total) } : {})
+      success: true,
+      paymentState: 'paid',
+      customerEmail: session.customer_details?.email || order.customerDetails.customer_email,
+      customerEmailSent: delivery.customerEmailSent,
+      notificationStatus: delivery.notificationStatus,
+      cart: order.cart,
+      cartTotal: Number(order.cart_total)
     });
   } catch (err) {
-    console.error('verify-checkout error:', err);
-    const message = shouldExposeErrors(context.env)
-      ? getErrorMessage(err)
-      : 'Internal error';
-    return Response.json({ error: message }, { status: 500 });
+    logVerificationFailure(stage, sessionId, err, context.request);
+    const paymentState = stage === 'retrieve_stripe_session' || stage === 'load_order_snapshot'
+      ? 'temporarily_unavailable'
+      : 'temporarily_unavailable';
+    return Response.json({ paymentState, error: 'Payment status is temporarily unavailable' }, { status: 503 });
   }
 }

@@ -5,16 +5,26 @@ import { renderFooter } from '../components/footer.js';
 import { initShared } from '../shared.js';
 import { getTable } from '../modules/database.js';
 import { escapeHtml } from '../modules/escape.js';
+import { showLoading, showError, showReady } from '../modules/page-state.js';
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
   renderHeader();
+  renderFooter();
+  initShared();
+  const container = document.getElementById('contact-content');
+  showLoading(container, 'Loading contact information…');
+  loadContactSections();
+});
 
+async function loadContactSections() {
+  const container = document.getElementById('contact-content');
+  showLoading(container, 'Loading contact information…');
+  try {
   // Fetch and sort contact page sections.
   const sections = await getTable('contact_page');
   sections.sort((a, b) => Number(a.sectionIndex) - Number(b.sectionIndex));
 
   // Render contact content.
-  const container = document.getElementById('contact-content');
   if (container && sections.length >= 3) {
     const safeHeader0 = escapeHtml(sections[0].headerText);
     const safeBody0 = escapeHtml(sections[0].bodyText);
@@ -35,7 +45,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         <p class="contact-info-instagram"><strong>${safeHeader2}:</strong> <a href="https://www.instagram.com/sweethopebakeryy/" target="_blank" class="contact-page-link">${safeBody2} <i class="fa-brands fa-instagram"></i></a></p>
       </div>${extraSections}`;
   }
-
-  renderFooter();
-  initShared();
-});
+  showReady(container);
+  } catch {
+    showError(container, 'We could not load contact information. Please try again.', loadContactSections);
+  }
+}

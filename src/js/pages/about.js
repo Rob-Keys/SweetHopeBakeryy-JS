@@ -5,16 +5,26 @@ import { renderFooter } from '../components/footer.js';
 import { initShared } from '../shared.js';
 import { getTable } from '../modules/database.js';
 import { escapeHtml } from '../modules/escape.js';
+import { showLoading, showError, showReady } from '../modules/page-state.js';
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
   renderHeader();
+  renderFooter();
+  initShared();
+  const container = document.getElementById('about-sections');
+  showLoading(container, 'Loading our story…');
+  loadAboutSections();
+});
 
+async function loadAboutSections() {
+  const container = document.getElementById('about-sections');
+  showLoading(container, 'Loading our story…');
+  try {
   // Fetch and sort about page sections.
   const sections = await getTable('about_page');
   sections.sort((a, b) => Number(a.sectionIndex) - Number(b.sectionIndex));
 
   // Render alternating image/text rows.
-  const container = document.getElementById('about-sections');
   if (container) {
     let html = '';
     sections.forEach((section, index) => {
@@ -29,7 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       html += `
         <div class="${rowClass} cv-auto">
           <div class="col-6 ${imgFade}">
-            <img src="${safeImageUrl}" class="caroline-image" loading="lazy" decoding="async">
+            <img src="${safeImageUrl}" class="caroline-image" alt="${safeHeaderText}" loading="lazy" decoding="async">
           </div>
           <div class="col-6 d-flex flex-column justify-content-center ${txtFade}">
             <h2 class="mb-3">${safeHeaderText}</h2>
@@ -40,7 +50,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     container.innerHTML = html;
   }
-
-  renderFooter();
+  showReady(container);
   initShared();
-});
+  } catch {
+    showError(container, 'We could not load our story. Please try again.', loadAboutSections);
+  }
+}

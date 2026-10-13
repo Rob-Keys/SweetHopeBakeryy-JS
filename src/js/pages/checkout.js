@@ -4,9 +4,10 @@ import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
 import { initShared } from '../shared.js';
 import { isCartEmpty, buildLineItems, getCartLines, saveCustomerDetails, saveCompletedOrder } from '../modules/cart.js';
-import { createStripeCheckout, fetchStripePublicKey } from '../stripe/stripe.js';
+import { createStripeCheckout, fetchStripePublicKey, saveCheckoutDetails } from '../stripe/stripe.js';
 import config from '../modules/config.js';
 import { escapeHtml } from '../modules/escape.js';
+import { isValidPickupDate, minimumPickupDate } from '../modules/pickup-date.js';
 
 const STRIPE_SCRIPT_SRC = 'https://js.stripe.com/clover/stripe.js';
 const STRIPE_SCRIPT_ATTR = 'data-stripe-loader';
@@ -100,11 +101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   pickupDateInput?.addEventListener('change', (e) => sessionStorage.setItem('checkout_pickup_date', e.target.value));
 
   // Enforce a minimum pickup date (3 days from today).
-  if (pickupDateInput) {
-    const minDate = new Date();
-    minDate.setDate(minDate.getDate() + 3);
-    pickupDateInput.min = minDate.toISOString().split('T')[0];
-  }
+  if (pickupDateInput) pickupDateInput.min = minimumPickupDate();
 
   const cartLines = getCartLines();
   if (!cartLines.length) {
@@ -130,8 +127,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
+  const nameErrors = document.getElementById('name-errors');
   const emailErrors = document.getElementById('email-errors');
   const phoneErrors = document.getElementById('phone-errors');
+  const pickupDateErrors = document.getElementById('pickup-date-errors');
   const errors = document.getElementById('confirm-errors');
   const payButton = document.getElementById('pay-button');
   const paymentEl = document.getElementById('payment-element');
@@ -142,6 +141,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let stripeInitInFlight = false;
   let stripeInitAttempts = 0;
   let stripeInitComplete = false;
+  let confirmationInFlight = false;
 
   const setPaymentStatus = (message, type = 'info', showRetry = false) => {
     if (!paymentEl) return;
@@ -167,18 +167,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     payButton.setAttribute('aria-busy', 'true');
   }
 
-  payButton?.addEventListener('click', async (e) => {
-    if (e && e.defaultPrevented) return;
+  const checkoutForm = document.getElementById('checkout-form');
+  checkoutForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (confirmationInFlight) return;
 
     // Clear previous errors.
     setUserError(errors, '');
+    setUserError(nameErrors, '');
     setUserError(phoneErrors, '');
     setUserError(emailErrors, '');
+    setUserError(pickupDateErrors, '');
+    [nameInput, emailInput, phoneInput, pickupDateInput].forEach((input) => input?.removeAttribute('aria-invalid'));
 
     // Validate name.
     const nameValue = (nameInput?.value || '').trim();
     if (!nameValue) {
-      setUserError(errors, 'Please enter your name.');
+      setUserError(nameErrors, 'Please enter your name.');
+      nameInput?.setAttribute('aria-invalid', 'true');
       nameInput?.focus();
       return;
     }
@@ -188,6 +194,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(emailValue)) {
       setUserError(emailErrors, 'Please enter a valid email address.');
+      emailInput?.setAttribute('aria-invalid', 'true');
       emailInput?.focus();
       return;
     }
@@ -197,6 +204,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const digitCount = (phoneValue.match(/\d/g) || []).length;
     if (digitCount < 10) {
       setUserError(phoneErrors, 'Please enter a valid phone number with at least 10 digits.');
+      phoneInput?.setAttribute('aria-invalid', 'true');
       phoneInput?.focus();
       return;
     }
@@ -204,47 +212,68 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Validate pickup date.
     const dateValue = pickupDateInput?.value || '';
     if (!dateValue) {
-      setUserError(errors, 'Please select a pickup date.');
+      setUserError(pickupDateErrors, 'Please select a pickup date.');
+      pickupDateInput?.setAttribute('aria-invalid', 'true');
       pickupDateInput?.focus();
       return;
     }
 
-    const selectedDate = new Date(dateValue);
-    const minDate = new Date();
-    minDate.setDate(minDate.getDate() + 2);
-    if (selectedDate < minDate) {
-      setUserError(errors, 'Pickup date must be at least 3 days from today.');
+    if (!isValidPickupDate(dateValue)) {
+      setUserError(pickupDateErrors, `Pickup date must be at least 3 calendar days from today (${minimumPickupDate()}).`);
+      pickupDateInput?.setAttribute('aria-invalid', 'true');
       pickupDateInput?.focus();
       return;
     }
 
-    // Persist customer details for the return page and email flow.
     const acquisitionMethod = document.querySelector('input[name="acquisition_method"]')?.value || 'pickup';
     const deliveryAddress = document.getElementById('delivery-address')?.value || '';
-
-    saveCustomerDetails({
+    const customerDetails = {
       customer_name: nameValue,
       customer_email: emailValue,
       customer_phone: phoneValue,
       acquisition_date: dateValue,
       acquisition_method: acquisitionMethod,
       delivery_address: deliveryAddress
-    });
+    };
 
-    // Save order snapshot before Stripe redirect (used on return page).
-    saveCompletedOrder(serverPricedOrder);
-
-    // Confirm payment with Stripe.
     if (checkoutActions) {
+      confirmationInFlight = true;
+      const originalPayLabel = payButton?.textContent || 'Pay Now';
+      if (payButton) {
+        payButton.disabled = true;
+        payButton.setAttribute('aria-busy', 'true');
+        payButton.textContent = 'Processing…';
+      }
       try {
-        const result = await checkoutActions.confirm();
+        if (typeof checkoutActions.updateEmail === 'function') {
+          const emailUpdate = await checkoutActions.updateEmail(emailValue);
+          if (emailUpdate?.type === 'error' || emailUpdate?.error) {
+            setUserError(emailErrors, 'Please enter a valid email address.');
+            emailInput?.setAttribute('aria-invalid', 'true');
+            emailInput?.focus();
+            return;
+          }
+        }
+
+        await saveCheckoutDetails(serverPricedOrder?.sessionId, customerDetails);
+        saveCustomerDetails(customerDetails);
+        saveCompletedOrder(serverPricedOrder);
+
+        const result = await checkoutActions.confirm({ email: emailValue });
         if (result.type === 'error') {
           debugLog('Stripe confirm error:', result.error || result);
           setUserError(errors, 'We couldn’t process your payment. Please check your payment details and try again.');
         }
       } catch (confirmErr) {
         debugLog('Stripe confirm exception:', confirmErr);
-        setUserError(errors, 'We couldn’t complete your payment. Please try again or contact support@sweethopebakeryy.com.');
+        setUserError(errors, confirmErr?.message || 'We couldn’t complete checkout. Please try again or contact support@sweethopebakeryy.com.');
+      } finally {
+        if (payButton) {
+          payButton.disabled = false;
+          payButton.removeAttribute('aria-busy');
+          payButton.textContent = originalPayLabel;
+        }
+        confirmationInFlight = false;
       }
     } else {
       setUserError(errors, 'Payment processing is temporarily unavailable. Please try again later.');
@@ -272,6 +301,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         throw new Error('Missing checkout client secret.');
       }
       serverPricedOrder = checkoutSession.order;
+      serverPricedOrder.sessionId = checkoutSession.sessionId;
       renderOrderSummary(serverPricedOrder.cart, checkoutSession.amountTotal);
 
       checkout = await stripe.initCheckout({ clientSecret: checkoutSession.clientSecret });
@@ -294,15 +324,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         payButton.removeAttribute('aria-busy');
       }
 
-      // Email validation on blur.
-      emailInput?.addEventListener('blur', async () => {
-        if (checkoutActions?.updateEmail) {
-          const result = await checkoutActions.updateEmail(emailInput.value);
-          if (result?.error) {
-            setUserError(emailErrors, 'Please enter a valid email address.');
-          }
-        }
-      });
     } catch (err) {
       debugLog('Stripe checkout initialization failed:', err);
       checkout = null;

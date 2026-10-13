@@ -2,14 +2,23 @@
     background-color: white;
     border: black 1px solid;
     padding: 1rem 0;
+    min-width: 900px;
 }
+#customize-content { min-width: 0; }
+#customize-content .m-5 { margin: clamp(1rem, 3vw, 3rem) !important; }
+#customize-content > .m-5 { overflow-x: auto; }
+.customize-loading { min-height: 12rem; }
 .btn-danger{
 	color: white !important;
 	background-color: #AA0000 !important;
 }
 .demo-photo{
+    display: block;
     width: 100%;
+    aspect-ratio: 4 / 3;
     height: auto;
+    object-fit: cover;
+    background: #f2e5d0;
 }
 
 /* Image editing styles. */
@@ -205,3 +214,10 @@
     .site-preview-cart-buttons { justify-content: start; }
     .site-preview-footer { flex-direction: column; }
 }
+
+@media (max-width: 575px) {
+    .menu-row > .col-2 { width: 16.6667% !important; }
+    .menu-row > .col-4 { width: 33.3333% !important; }
+    .menu-row > .col-6 { width: 50% !important; }
+}
+

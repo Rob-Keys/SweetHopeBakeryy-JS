@@ -106,7 +106,6 @@ async function persistOrderSnapshot(context, sessionId, cartLines, cartSummary) 
 }
 
 export async function onRequestPost(context) {
-  console.log('create-checkout: using fetch-based Stripe client');
   const { STRIPE_SECRET_KEY } = context.env;
   if (!STRIPE_SECRET_KEY) {
     return Response.json({ error: 'STRIPE_SECRET_KEY not configured' }, { status: 500 });
@@ -115,33 +114,51 @@ export async function onRequestPost(context) {
     return Response.json({ error: 'AWS credentials not configured' }, { status: 500 });
   }
 
+  let stage = 'parse_request';
+  let stripeSessionId = null;
   try {
-    const { cartLines } = await context.request.json();
+    const { cartLines, idempotencyKey } = await context.request.json();
     if (!Array.isArray(cartLines) || cartLines.length === 0) {
       return Response.json({ error: 'Cart is empty' }, { status: 400 });
     }
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(idempotencyKey || ''))) {
+      return Response.json({ error: 'Invalid checkout request' }, { status: 400 });
+    }
 
+    stage = 'load_catalog';
     const products = await loadProducts(context);
+    stage = 'validate_cart';
     const stripeLineItems = buildStripeLineItems(cartLines, products);
     const cartSummary = buildCartSummary(cartLines, products);
 
+    stage = 'create_stripe_session';
     const session = await stripeRequest(STRIPE_SECRET_KEY, 'POST', '/checkout/sessions', {
       line_items: stripeLineItems,
       mode: 'payment',
       ui_mode: 'custom',
       return_url: getReturnUrl(context.request, context.env)
-    });
+    }, { idempotencyKey });
+    stripeSessionId = session?.id || null;
 
+    stage = 'save_order_snapshot';
     await persistOrderSnapshot(context, session?.id, cartLines, cartSummary);
 
     return Response.json({
       clientSecret: session.client_secret,
+      sessionId: session.id,
       cart: cartSummary.cart,
       cartTotal: cartSummary.total,
       amountTotal: cartSummary.amountTotal
     });
   } catch (err) {
-    console.error('create-checkout error:', err);
+    console.error(JSON.stringify({
+      message: 'create_checkout_failed',
+      stage,
+      sessionId: stripeSessionId,
+      rayId: context.request.headers.get('cf-ray') || null,
+      errorName: err?.name || 'Error',
+      error: String(err?.message || 'Unknown error').slice(0, 300)
+    }));
     const message = String(err?.message || '');
     if (message.includes('Unknown product') || message.includes('Invalid quantity') || message.includes('Cart is empty')) {
       return Response.json({ error: 'Invalid cart' }, { status: 400 });

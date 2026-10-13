@@ -7,10 +7,36 @@ import { getTable } from '../modules/database.js';
 import { renderProduct } from '../components/product.js';
 import { getCart, addToCart, removeFromCart, clearCart, getCartTotal, isCartEmpty } from '../modules/cart.js';
 import { escapeHtml } from '../modules/escape.js';
+import { showLoading, showError, showReady } from '../modules/page-state.js';
 
-document.addEventListener('DOMContentLoaded', async () => {
+const mobileCartQuery = window.matchMedia('(max-width: 991px)');
+
+document.addEventListener('DOMContentLoaded', () => {
   renderHeader();
+  renderFooter();
+  initShared();
+  const container = document.getElementById('products-container');
+  showLoading(container, 'Loading the menu…');
+  renderCartUI();
+  updateCartPresentation();
+  document.getElementById('checkout-btn')?.addEventListener('click', goToCheckout);
+  document.getElementById('mobile-checkout-btn')?.addEventListener('click', goToCheckout);
+  document.getElementById('clear-cart-btn')?.addEventListener('click', () => {
+    clearCart();
+    renderCartUI();
+    updateCartPresentation();
+  });
+  mobileCartQuery.addEventListener('change', updateCartPresentation);
+  if (window.ResizeObserver) {
+    new ResizeObserver(updateCartPresentation).observe(document.querySelector('.cart-container-wrapper'));
+  }
+  loadProducts();
+});
 
+async function loadProducts() {
+  const container = document.getElementById('products-container');
+  showLoading(container, 'Loading the menu…');
+  try {
   // ── Fetch and render products ──
   const rawProducts = await getTable('products');
 
@@ -24,7 +50,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }));
 
   // Render products in pairs per row.
-  const container = document.getElementById('products-container');
   if (container) {
     let html = '';
     for (let i = 0; i < products.length - 1; i += 2) {
@@ -39,9 +64,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     container.innerHTML = html;
   }
-
-  // ── Render cart from localStorage ──
-  renderCartUI();
+  showReady(container);
+  initShared();
 
   // ── Add-to-cart form handlers ──
   const forms = document.querySelectorAll('.add-to-cart-form');
@@ -74,33 +98,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 1000);
       } catch (error) {
         console.error('Error adding to cart:', error);
+        const message = document.createElement('p');
+        message.className = 'text-danger';
+        message.setAttribute('role', 'alert');
+        message.textContent = 'This item could not be added. Please try again.';
+        form.appendChild(message);
       }
     });
   });
-
-  // ── Checkout buttons ──
-  document.getElementById('checkout-btn')?.addEventListener('click', () => {
-    if (!isCartEmpty()) window.location.href = '/checkout';
-  });
-  document.getElementById('mobile-checkout-btn')?.addEventListener('click', () => {
-    if (!isCartEmpty()) window.location.href = '/checkout';
-  });
-
-  // ── Clear cart button ──
-  document.getElementById('clear-cart-btn')?.addEventListener('click', () => {
-    clearCart();
-    renderCartUI();
-    hideCartIfEmpty();
-  });
-
-  renderFooter();
-  initShared();
-
-  // Show cart if not empty.
-  if (!isCartEmpty()) {
-    makeCartVisible();
+  updateCartPresentation();
+  } catch {
+    showError(container, 'We could not load the menu. Please try again.', loadProducts);
   }
-});
+}
+
+function goToCheckout() {
+  if (!isCartEmpty()) window.location.href = '/checkout';
+}
 
 // ── Helper Functions ──
 
@@ -133,7 +147,7 @@ function renderCartUI() {
         <div class="d-flex justify-content-end align-items-center price-container">
           <p class="me-3 price">$${Number(item.price).toFixed(2)}</p>
           <p>
-            <button type="button" class="remove-item-btn" data-name="${escapeHtml(name)}" style="color: red; background: none; border: none;"><p>X</p></button>
+            <button type="button" class="remove-item-btn" aria-label="Remove ${escapeHtml(name)} from cart" data-name="${escapeHtml(name)}" style="color: red; background: none; border: none;"><p aria-hidden="true">X</p></button>
           </p>
         </div>
       </li>`).join('');
@@ -190,7 +204,7 @@ function updateCartAfterAdd(data) {
         <div class="d-flex justify-content-end align-items-center price-container">
           <p class="me-3 price">$${parseFloat(data.price).toFixed(2)}</p>
           <p>
-            <button type="button" class="remove-item-btn" data-name="${escapeHtml(data.name)}" style="color: red; background: none; border: none;"><p>X</p></button>
+            <button type="button" class="remove-item-btn" aria-label="Remove ${escapeHtml(data.name)} from cart" data-name="${escapeHtml(data.name)}" style="color: red; background: none; border: none;"><p aria-hidden="true">X</p></button>
           </p>
         </div>
       </li>`;
@@ -208,7 +222,7 @@ function updateCartAfterAdd(data) {
 
     const lastElement = cartList.lastElementChild;
     if (window.innerWidth < 991) {
-      lastElement.scrollIntoView({ behavior: 'smooth' });
+      cartList.scrollTop = cartList.scrollHeight;
     } else {
       lastElement.style.animation = 'fadeIn 0.6s ease';
     }
@@ -229,41 +243,22 @@ function updateCartAfterAdd(data) {
   if (mobileTotalPrice) mobileTotalPrice.textContent = `Total: $${total.toFixed(2)}`;
 }
 
-/**
- * Slide the mobile cart off-screen and remove padding when the cart is emptied.
- */
+/** Recalculate mobile cart visibility and reserve space after it opens. */
 function hideCartIfEmpty() {
-  if (!isCartEmpty()) return;
-  document.querySelector('.cart-container-wrapper')?.classList.remove('on-screen');
-  document.querySelector('.products')?.classList.remove('extra-padding');
+  updateCartPresentation();
 }
 
-/**
- * Make the cart visible on mobile.
- */
 function makeCartVisible() {
-  if (window.innerWidth < 991 && !document.querySelector('.cart-container-wrapper')?.classList.contains('visible')) {
-    document.querySelector('.cart-container-wrapper')?.classList.add('on-screen');
-    document.querySelector('.products')?.classList.add('extra-padding');
-    setTimeout(() => {
-      const cart = document.getElementById('your-cart');
-      if (cart) {
-        cart.style.transition = 'opacity 0.5s ease';
-        cart.style.opacity = '0';
+  updateCartPresentation();
+}
 
-        setTimeout(() => {
-          const p = document.createElement('h5');
-          p.textContent = cart.textContent;
-          p.style.opacity = '0';
-          p.style.marginBottom = '0';
-          cart.replaceWith(p);
-
-          requestAnimationFrame(() => {
-            p.style.transition = 'opacity 0.5s ease';
-            p.style.opacity = '1';
-          });
-        }, 500);
-      }
-    }, 3000);
+function updateCartPresentation() {
+  const wrapper = document.querySelector('.cart-container-wrapper');
+  const open = !isCartEmpty();
+  wrapper?.classList.toggle('cart-open', open);
+  if (mobileCartQuery.matches && open && wrapper) {
+    document.body.style.paddingBottom = `${Math.ceil(wrapper.getBoundingClientRect().height + 16)}px`;
+  } else {
+    document.body.style.paddingBottom = '';
   }
 }

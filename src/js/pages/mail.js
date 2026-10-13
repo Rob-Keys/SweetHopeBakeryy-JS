@@ -6,9 +6,11 @@ import { isAuthenticated, setDesiredPage } from '../modules/auth.js';
 import { getInbox, getOutbox } from '../aws/s3.js';
 import { sendEmail } from '../aws/ses.js';
 import { escapeHtml } from '../modules/escape.js';
+import { showLoading, showError } from '../modules/page-state.js';
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
   renderHeader();
+  renderFooter();
 
   // Auth guard: redirect to login if session is missing.
   if (!isAuthenticated()) {
@@ -17,12 +19,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  const container = document.getElementById('mail-content');
-  if (!container) { renderFooter(); return; }
+  loadMail();
+});
 
+async function loadMail() {
+  const container = document.getElementById('mail-content');
+  if (!container) return;
+  showLoading(container, 'Loading messages…');
+  try {
   // Fetch inbox/outbox from S3.
-  const inbox = await getInbox();
-  const outbox = await getOutbox();
+  const [inbox, outbox] = await Promise.all([getInbox(), getOutbox()]);
 
   // Sort by date, newest first.
   inbox.sort((a, b) => (b.date || 0) - (a.date || 0));
@@ -100,8 +106,27 @@ document.addEventListener('DOMContentLoaded', async () => {
       body: form.querySelector('[name="body"]').value,
       date: Date.now()
     };
-    await sendEmail(email);
+    const button = form.querySelector('[type="submit"]');
+    button.disabled = true;
+    button.textContent = 'Sending…';
+    try {
+      const result = await sendEmail(email);
+      if (!result?.success) throw new Error(result?.error || 'Send failed');
+      button.textContent = 'Email sent';
+    } catch {
+      button.disabled = false;
+      button.textContent = 'Send Email';
+      let status = form.querySelector('[role="alert"]');
+      if (!status) {
+        status = document.createElement('p');
+        status.setAttribute('role', 'alert');
+        status.className = 'text-danger mt-2';
+        form.appendChild(status);
+      }
+      status.textContent = 'The email could not be sent. Please try again.';
+    }
   });
-
-  renderFooter();
-});
+  } catch {
+    showError(container, 'We could not load messages. Please try again.', loadMail);
+  }
+}

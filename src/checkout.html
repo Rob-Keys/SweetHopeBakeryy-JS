@@ -44,16 +44,18 @@
             <div class="col-md-1"></div>
             <div class="col-md-5 fade-in-left">
                 <form id="checkout-form">
-                    <h4 class="m-0 p-0"> Name: </h4>
-                    <input type="text" name="customer_name" id="name" class="m-0 p-0 mb-2" style="width: 100%" required>
+                    <label for="name" class="m-0 p-0">Name</label>
+                    <input type="text" name="customer_name" id="name" class="m-0 p-0 mb-2" style="width: 100%" autocomplete="name" maxlength="120" aria-describedby="name-errors" required>
+                    <div id="name-errors" class="text-danger" role="status" aria-live="polite"></div>
 
-                    <h4 class="m-0 p-0"> Email: </h4>
-                    <input type="email" name="customer_email" id="email" class="m-0 p-0 mb-2" style="width: 100%" required>
+                    <label for="email" class="m-0 p-0">Email</label>
+                    <input type="email" name="customer_email" id="email" class="m-0 p-0 mb-2" style="width: 100%" autocomplete="email" maxlength="254" aria-describedby="email-errors" required>
 
-                    <h4 class="m-0 p-0"> Phone Number: </h4>
-                    <input type="tel" name="customer_phone" id="phone" class="m-0 p-0 mb-4" style="width: 100%" required>
+                    <label for="phone" class="m-0 p-0">Phone Number</label>
+                    <input type="tel" name="customer_phone" id="phone" class="m-0 p-0 mb-2" style="width: 100%" autocomplete="tel" maxlength="40" aria-describedby="phone-errors" required>
 
-                    <h4 class="m-0 p-0"> Pickup Details: </h4>
+                    <div id="phone-errors" class="text-danger" role="status" aria-live="polite"></div>
+                    <h4 class="m-0 p-0">Pickup Details</h4>
                     <div class="pickup-details-container">
                         <div class="row">
                             <p class="col-md-6">Pickup Location:</p>
@@ -61,25 +63,25 @@
                         </div>
 
                         <div class="row">
-                            <p class="col-md-6">Pickup Date:</p>
-                            <input type="date" name="acquisition_date" id="pickup-date" class="col-md-6" required>
+                            <label for="pickup-date" class="col-md-6">Pickup Date:</label>
+                            <input type="date" name="acquisition_date" id="pickup-date" class="col-md-6" autocomplete="off" aria-describedby="pickup-date-errors" required>
                         </div>
                         <div class="row">
                             <div class="col-6 m-0 p-0"></div>
                             <p class="col-6 m-0 p-0 small-text mt-1" style="text-align: end"> * Final pickup time and address to be coordinated through direct communication post-order. </p>
                         </div>
                     </div>
+                    <div id="pickup-date-errors" class="text-danger" role="status" aria-live="polite"></div>
 
                     <input type="hidden" name="acquisition_method" value="pickup">
 
-                    <h4 class="m-0 p-0"> Payment Method: </h4>
-                    <div id="payment-element"></div>
+                    <h4 class="m-0 p-0">Payment Method</h4>
+                    <div id="payment-element" aria-label="Payment details"></div>
 
-                    <div id="email-errors" class="text-danger"></div>
-                    <div id="phone-errors" class="text-danger"></div>
+                    <div id="email-errors" class="text-danger" role="status" aria-live="polite"></div>
 
-                    <button type="button" id="pay-button" class="btn-cookie btn-lg mt-3">Pay Now</button>
-                    <div id="confirm-errors"></div>
+                    <button type="submit" id="pay-button" class="btn-cookie btn-lg mt-3">Pay Now</button>
+                    <div id="confirm-errors" role="alert" aria-live="assertive"></div>
                 </form>
             </div>
         </div>

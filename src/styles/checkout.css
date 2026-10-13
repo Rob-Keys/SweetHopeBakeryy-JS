@@ -22,6 +22,13 @@ input[type="date"] {
 .pickup-details-container {
     overflow: visible;
 }
+input:not([type="hidden"]), select, textarea {
+    min-height: 2.875rem;
+    padding: .55rem .7rem !important;
+    box-sizing: border-box;
+}
+input[type="date"] { min-height: 2.875rem; padding: .45rem .5rem !important; }
+.page-status { min-height: 10rem; padding: 2rem; text-align: center; }
 @media (max-width: 991px) {
     .left-side{
         margin-bottom: 2rem;

@@ -3,10 +3,13 @@
   color: #3f2a14;
 }
 .caroline-image {
+  display: block;
   width: 100%;
+  aspect-ratio: 4 / 3;
   height: auto;
   border-radius: 8px;
   object-fit: cover;
+  background: #f2e5d0;
 }
 .rob-card {
   display: flex;

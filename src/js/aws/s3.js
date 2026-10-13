@@ -89,7 +89,7 @@ async function getInbox() {
     return emails;
   } catch (err) {
     console.error('getInbox failed:', err);
-    return [];
+    throw err;
   }
 }
 
@@ -110,7 +110,7 @@ async function getOutbox() {
     return emails;
   } catch (err) {
     console.error('getOutbox failed:', err);
-    return [];
+    throw err;
   }
 }
 
