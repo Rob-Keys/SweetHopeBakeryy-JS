@@ -28,7 +28,7 @@ export function renderProduct(product) {
   // Sort price options by quantity for a stable UI order.
   const sortedPrices = Object.entries(prices).sort(([a], [b]) => Number(a) - Number(b));
   const optionsHTML = sortedPrices.map(([qty, price]) =>
-    `<option value="${qty}_${price}" style="font-family: sans-serif">${qty} for $${Number(price).toFixed(2)}</option>`
+    `<option value="${escapeHtml(qty)}_${escapeHtml(price)}" style="font-family: sans-serif">${escapeHtml(qty)} for $${Number(price).toFixed(2)}</option>`
   ).join('');
 
   return `

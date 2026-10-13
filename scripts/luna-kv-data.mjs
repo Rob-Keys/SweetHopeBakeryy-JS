@@ -42,16 +42,35 @@ export function validateKvChanges(changeSet) {
       if (typeof key !== 'string' || !key.trim()) throw new Error(`KV operation ${index + 1} needs a product name.`);
       key = key.trim();
       if (operation.action === 'upsert' && operation.item.itemName !== key) throw new Error(`KV operation ${index + 1} has an inconsistent product name.`);
+      if (operation.action === 'upsert') {
+        const prices = operation.item.prices;
+        if (!prices || typeof prices !== 'object' || Array.isArray(prices) || Object.keys(prices).length === 0) {
+          throw new Error(`KV operation ${index + 1} needs at least one price option.`);
+        }
+        for (const [quantity, price] of Object.entries(prices)) {
+          if (!/^\d+$/.test(quantity) || !Number.isSafeInteger(Number(quantity)) || Number(quantity) < 1) {
+            throw new Error(`KV operation ${index + 1} has an invalid price quantity.`);
+          }
+          if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0) {
+            throw new Error(`KV operation ${index + 1} has an invalid price amount.`);
+          }
+        }
+      }
     } else {
       const numericKey = Number(key);
-      if (!Number.isInteger(numericKey) || numericKey < 0) throw new Error(`KV operation ${index + 1} needs a whole section index.`);
-      if (operation.tableName === 'contact_page' && numericKey < 3) throw new Error('Contact page section indexes must be 3 or greater.');
+      if (!Number.isSafeInteger(numericKey) || numericKey < 0) throw new Error(`KV operation ${index + 1} needs a whole section index.`);
+      if (operation.tableName === 'contact_page' && operation.action === 'delete' && numericKey < 3) {
+        throw new Error('The first three contact sections are required and cannot be removed.');
+      }
       key = String(numericKey);
       if (operation.action === 'upsert' && Number(operation.item.sectionIndex) !== numericKey) throw new Error(`KV operation ${index + 1} has an inconsistent section index.`);
     }
     const identity = `${operation.tableName}\0${key}`;
     if (seen.has(identity)) throw new Error(`KV change artifact repeats ${operation.tableName} item ${key}.`);
     seen.add(identity);
+    if (operation.action === 'upsert' && operation.tableName !== 'products') {
+      return { ...operation, item: { ...operation.item, sectionIndex: key }, key };
+    }
     return { ...operation, key };
   });
 }

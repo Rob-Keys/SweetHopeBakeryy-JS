@@ -184,9 +184,21 @@ async function applyKvChanges(operations, baselineHashes) {
   for (const operation of operations) {
     const table = tables.get(operation.tableName);
     const partitionKey = operation.tableName === 'products' ? 'itemName' : 'sectionIndex';
-    const index = table.findIndex(item => String(item?.[partitionKey]) === operation.key);
+    const index = table.findIndex(item => {
+      if (operation.tableName === 'products') return String(item?.[partitionKey]) === operation.key;
+      const existingKey = item?.[partitionKey];
+      return (typeof existingKey === 'number' || (typeof existingKey === 'string' && existingKey.trim() !== '')) &&
+        Number.isSafeInteger(Number(existingKey)) && Number(existingKey) === Number(operation.key);
+    });
     if (operation.action === 'delete') {
       if (index < 0) throw new Error(`The requested ${operation.tableName} item ${operation.key} no longer exists.`);
+      if (operation.tableName === 'contact_page') {
+        const sortedSections = [...table].sort((a, b) => Number(a?.sectionIndex) - Number(b?.sectionIndex));
+        const requiredIndex = sortedSections.findIndex(item => item === table[index]);
+        if (requiredIndex >= 0 && requiredIndex < 3) {
+          throw new Error('The first three contact sections are required and cannot be removed.');
+        }
+      }
       table.splice(index, 1);
     } else if (index < 0) table.push(operation.item);
     else table[index] = operation.item;
