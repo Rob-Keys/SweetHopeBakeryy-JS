@@ -383,6 +383,8 @@ async function processTask(task) {
     process.exitCode = 1;
   } finally {
     if (tracePath) await rm(tracePath, { force: true });
+    traceS3?.destroy();
+    traceS3 = undefined;
     await rm(codexHome, { recursive: true, force: true });
     socket?.close(1000, 'Task finished');
   }
