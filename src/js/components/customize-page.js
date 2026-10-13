@@ -125,7 +125,7 @@ export function renderLocalCodeAgentPanel() {
     <section class="local-code-agent" aria-labelledby="local-code-agent-title">
       <div class="local-code-agent-copy">
         <h2 id="local-code-agent-title">Agentic Customization</h2>
-        <p>Ask questions about the site or describe a change you’d like. Luna can take it from there and handle your request autonomously.</p>
+        <p>Luna can work for up to 12 minutes per request. Each request starts fresh: Luna can see the current code, but not your previous requests.</p>
         <p class="local-agent-connection"><span class="local-agent-indicator" aria-hidden="true"></span><span data-agent-connection>Checking Luna's availability…</span></p>
       </div>
       <form class="local-code-agent-form" id="local-code-agent-form">

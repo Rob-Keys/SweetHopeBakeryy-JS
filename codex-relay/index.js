@@ -105,7 +105,7 @@ export class CodeAgentRelay {
       taskId: crypto.randomUUID(),
       prompt,
       status: 'running',
-      message: 'Luna is starting a temporary cloud runner.',
+      message: "Creating Luna's environment…",
       createdAt: new Date().toISOString()
     };
     await this.ctx.storage.put('currentTaskId', task.taskId);

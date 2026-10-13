@@ -295,12 +295,13 @@ function initLocalCodeAgentHandlers() {
 
   const renderTaskUpdate = (prompt, task) => {
     taskStatus.replaceChildren();
+    const isCreatingEnvironment = task.status === 'running' && task.message === "Creating Luna's environment…";
     const promptLabel = document.createElement('strong');
     promptLabel.textContent = 'Your request to Luna';
     const promptEcho = document.createElement('pre');
     promptEcho.textContent = prompt;
     const title = document.createElement('strong');
-    title.textContent = ({
+    title.textContent = isCreatingEnvironment ? task.message : ({
       complete: 'Luna response',
       pushed: 'Luna pushed a change',
       uncertain: 'Push outcome needs checking',
@@ -312,12 +313,12 @@ function initLocalCodeAgentHandlers() {
       summary.textContent = task.summary;
       taskStatus.appendChild(summary);
     }
-    if (task.message) {
+    if (task.message && !isCreatingEnvironment) {
       const message = document.createElement('p');
       message.textContent = task.message;
       taskStatus.appendChild(message);
     }
-    if (task.workflowRunUrl) {
+    if (task.workflowRunUrl && !isCreatingEnvironment) {
       const runLink = document.createElement('a');
       runLink.href = task.workflowRunUrl;
       runLink.target = '_blank';
