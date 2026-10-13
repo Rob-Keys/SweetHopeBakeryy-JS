@@ -19,7 +19,9 @@ jobs:
   edit:
     if: github.repository == 'Rob-Keys/SweetHopeBakeryy-JS' && inputs.taskId != ''
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 12
+    outputs:
+      kv_changes: ${{ steps.run-luna.outputs.kv_changes }}
     environment: luna-trace
     permissions:
       contents: read
@@ -29,7 +31,9 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: refs/heads/main
-          persist-credentials: false
+          fetch-depth: 0
+          persist-credentials: true
+          token: ${{ secrets.LUNA_GITHUB_PUSH_TOKEN }}
 
       - name: Record workflow run for task diagnostics
         env:
@@ -50,6 +54,7 @@ jobs:
         run: npm install --global @openai/codex@0.162.1
 
       - name: Run Luna
+        id: run-luna
         env:
           CODEX_AGENT_RELAY_TOKEN: ${{ secrets.CODEX_AGENT_RELAY_TOKEN }}
           CODEX_AGENT_RELAY_URL: ${{ vars.CODEX_AGENT_RELAY_URL }}
@@ -58,7 +63,8 @@ jobs:
           LUNA_TRACE_AWS_ROLE_ARN: ${{ vars.LUNA_TRACE_AWS_ROLE_ARN }}
         run: node scripts/codex-cloud-agent.mjs
 
-      - name: Upload constrained change artifact
+      - name: Upload KV change artifact
+        if: steps.run-luna.outputs.kv_changes == 'true'
         uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08
         with:
           name: luna-${{ inputs.taskId }}
@@ -68,7 +74,7 @@ jobs:
 
   publish:
     needs: edit
-    if: needs.edit.result == 'success'
+    if: needs.edit.result == 'success' && needs.edit.outputs.kv_changes == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -90,7 +96,6 @@ jobs:
         env:
           CODEX_AGENT_RELAY_TOKEN: ${{ secrets.CODEX_AGENT_RELAY_TOKEN }}
           CODEX_AGENT_RELAY_URL: ${{ vars.CODEX_AGENT_RELAY_URL }}
-          LUNA_GITHUB_PUSH_TOKEN: ${{ secrets.LUNA_GITHUB_PUSH_TOKEN }}
           LUNA_CLOUDFLARE_API_TOKEN: ${{ secrets.LUNA_CLOUDFLARE_API_TOKEN }}
           LUNA_CLOUDFLARE_ACCOUNT_ID: ${{ vars.LUNA_CLOUDFLARE_ACCOUNT_ID }}
           LUNA_CLOUDFLARE_KV_NAMESPACE_ID: ${{ vars.LUNA_CLOUDFLARE_KV_NAMESPACE_ID }}

@@ -1,21 +1,14 @@
 #!/usr/bin/env node
 
-import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { isAutonomousPublishPath } from './luna-publish-policy.mjs';
 import { validateKvChanges, hashJson } from './luna-kv-data.mjs';
 
 const relayToken = process.env.CODEX_AGENT_RELAY_TOKEN;
 const relayUrl = process.env.CODEX_AGENT_RELAY_URL;
-const pushToken = process.env.LUNA_GITHUB_PUSH_TOKEN;
 const taskId = process.env.INPUT_TASK_ID;
-const repoPath = resolve(process.env.GITHUB_WORKSPACE || process.cwd());
 const artifactPath = resolve(process.env.LUNA_ARTIFACT_DIR || '');
-const repositoryUrl = 'https://github.com/Rob-Keys/SweetHopeBakeryy-JS.git';
 const summaryPath = join(artifactPath, 'summary.txt');
-const patchPath = join(artifactPath, 'change.patch');
-const basePath = join(artifactPath, 'base.txt');
 const kvChangesPath = join(artifactPath, 'kv-changes.json');
 const kvBaselinePath = join(artifactPath, 'kv-baseline.json');
 const relayHttpUrl = relayUrl?.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:').replace(/\/agent\/?$/, '').replace(/\/$/, '');
@@ -24,7 +17,6 @@ const cloudflareAccountId = process.env.LUNA_CLOUDFLARE_ACCOUNT_ID;
 const cloudflareNamespaceId = process.env.LUNA_CLOUDFLARE_KV_NAMESPACE_ID;
 const cloudflareZoneId = process.env.LUNA_CLOUDFLARE_ZONE_ID;
 let activeLease;
-let pushStarted = false;
 
 function redactSecrets(value) {
   return String(value ?? '')
@@ -33,29 +25,8 @@ function redactSecrets(value) {
     .replace(/\bBearer\s+[A-Za-z0-9._~+/-]{32,}={0,2}/gi, 'Bearer [redacted credential]');
 }
 
-if (!relayToken || !relayUrl || !pushToken || !/^[0-9a-f-]{36}$/i.test(taskId || '') || !process.env.LUNA_ARTIFACT_DIR) {
-  throw new Error('The isolated publisher is missing its task, artifact, relay, or push configuration.');
-}
-
-function git(args, { timeoutMs = 30000 } = {}) {
-  return new Promise((resolveGit, rejectGit) => {
-    const childEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
-    delete childEnv.LUNA_CLOUDFLARE_API_TOKEN;
-    const child = spawn('git', args, { cwd: repoPath, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
-    let stdout = '';
-    let stderr = '';
-    const timer = setTimeout(() => child.kill('SIGTERM'), timeoutMs);
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
-    child.stdout.on('data', chunk => { stdout += chunk; });
-    child.stderr.on('data', chunk => { stderr += chunk; });
-    child.on('error', error => { clearTimeout(timer); rejectGit(error); });
-    child.on('close', code => {
-      clearTimeout(timer);
-      if (code === 0) resolveGit(stdout.trim());
-      else rejectGit(new Error((stderr || stdout || `git ${args[0]} failed with ${code}`).slice(-3000)));
-    });
-  });
+if (!relayToken || !relayUrl || !/^[0-9a-f-]{36}$/i.test(taskId || '') || !process.env.LUNA_ARTIFACT_DIR) {
+  throw new Error('The trusted KV publisher is missing its task, artifact, or relay configuration.');
 }
 
 async function relayAction(action, data = {}) {
@@ -101,50 +72,13 @@ function containsCredential(text) {
     /\bBearer\s+[A-Za-z0-9._~+/-]{32,}={0,2}/i.test(text);
 }
 
-async function validatePatch() {
-  const patch = await readFile(patchPath);
-  if (patch.length > 5 * 1024 * 1024) throw new Error('The requested change exceeds the 5 MB publish limit.');
-  const base = (await readFile(basePath, 'utf8')).trim();
-  if (!/^[0-9a-f]{40}$/i.test(base)) throw new Error('The editing job did not provide a valid base commit.');
-  await git(['fetch', '--quiet', 'origin', 'main']);
-  if (await git(['rev-parse', 'HEAD']) !== base || await git(['rev-parse', 'origin/main']) !== base) {
-    throw new Error('main changed while Luna was working. No changes were published; please submit the request again.');
-  }
-  if (await git(['status', '--porcelain'])) throw new Error('The isolated publisher checkout is not clean.');
-  if (patch.length) await git(['apply', '--index', '--binary', '--', patchPath]);
-  await git(['diff', '--cached', '--check']);
-  const changed = (await git(['diff', '--cached', '--name-only', '-z'])).split('\0').filter(Boolean);
-  const stagedModes = new Map((await git(['ls-files', '--stage', '-z'])).split('\0').filter(Boolean).map(entry => {
-    const separator = entry.indexOf('\t');
-    const metadata = entry.slice(0, separator);
-    const path = entry.slice(separator + 1);
-    return [path, metadata.split(' ')[0]];
-  }));
-  const unapprovedFile = changed.find(file => !isAutonomousPublishPath(file, stagedModes.get(file)));
-  if (unapprovedFile) throw new Error(`This change is outside the autonomous presentation allowlist (${unapprovedFile}) and needs human review.`);
-  for (const file of changed) {
-    const content = await git(['show', `:${file}`]);
-    if (containsCredential(content)) throw new Error(`The change appears to contain a credential in ${file}; it was not published.`);
-  }
-  for (const file of changed.filter(file => /\.(?:m?js|cjs)$/.test(file))) await git(['show', `:${file}`]).then(source => {
-    return new Promise((resolveCheck, rejectCheck) => {
-      const moduleArgs = file.endsWith('.cjs') ? [] : ['--input-type=module'];
-      const child = spawn(process.execPath, [...moduleArgs, '--check', '-'], { cwd: repoPath, stdio: ['pipe', 'ignore', 'pipe'] });
-      let stderr = '';
-      child.stderr.setEncoding('utf8');
-      child.stderr.on('data', chunk => { stderr += chunk; });
-      child.on('error', rejectCheck);
-      child.on('close', code => code === 0 ? resolveCheck() : rejectCheck(new Error(`${file}: ${stderr.slice(-2000)}`)));
-      child.stdin.end(source);
-    });
-  });
+async function validateKvArtifact() {
   let kvOperations = [];
   let kvBaseline = {};
   const kvArtifact = await readFile(kvChangesPath, 'utf8').catch(() => null);
   const baselineArtifact = await readFile(kvBaselinePath, 'utf8').catch(() => null);
   if ((kvArtifact === null) !== (baselineArtifact === null)) throw new Error('The KV change artifact is incomplete.');
   if (kvArtifact !== null) {
-    if (changed.length) throw new Error('Submit KV content edits and source code edits as separate Luna requests.');
     if (Buffer.byteLength(kvArtifact) > 1024 * 1024) throw new Error('The KV change artifact exceeds the 1 MB limit.');
     if (containsCredential(kvArtifact)) throw new Error('The KV change artifact appears to contain a credential; it was not applied.');
     kvOperations = validateKvChanges(JSON.parse(kvArtifact));
@@ -153,7 +87,8 @@ async function validatePatch() {
       if (!/^[0-9a-f]{64}$/i.test(kvBaseline[operation.tableName] || '')) throw new Error(`The baseline hash for ${operation.tableName} is missing.`);
     }
   }
-  return { changed, kvOperations, kvBaseline };
+  if (!kvOperations.length) throw new Error('The KV publisher was started without a KV change artifact.');
+  return { kvOperations, kvBaseline };
 }
 
 async function cloudflareApi(path, init = {}) {
@@ -231,49 +166,16 @@ async function applyKvChanges(operations, baselineHashes) {
   }
 }
 
-async function publishChanges({ changed, kvOperations, kvBaseline }, summary) {
-  if (!changed.length && !kvOperations.length) {
-    await reportTask('complete', 'Luna finished without source changes.', redactSecrets(summary || 'No source changes were needed.'));
-    return;
-  }
+async function publishKvChanges({ kvOperations, kvBaseline }, summary) {
   const lease = await relayAction('claim');
   activeLease = lease;
   await relayAction('validate', { leaseId: lease.leaseId });
-  if (kvOperations.length) {
-    const warning = await applyKvChanges(kvOperations, kvBaseline);
-    const details = `Updated ${kvOperations.length} requested KV change${kvOperations.length === 1 ? '' : 's'}.${warning ? ` ${warning}` : ''}`;
-    let reportError;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        await relayAction('complete', { leaseId: lease.leaseId, summary: `${redactSecrets(summary)}\n\n${details}` });
-        reportError = null;
-        break;
-      } catch (error) {
-        reportError = error;
-        await new Promise(resolveWait => setTimeout(resolveWait, 1000 * (attempt + 1)));
-      }
-    }
-    if (reportError) throw new Error(`KV updates were applied, but the relay could not record completion: ${reportError.message}`);
-    activeLease = null;
-    console.log(details);
-    return;
-  }
-  await git(['-c', 'core.hooksPath=/dev/null', '-c', 'user.name=Luna Cloud Agent', '-c', 'user.email=luna-cloud-agent@users.noreply.github.com', 'commit', '-m', 'Apply Luna customization']);
-  const commit = await git(['rev-parse', '--short=7', 'HEAD']);
-  await relayAction('push-started', { leaseId: lease.leaseId, commit });
-  pushStarted = true;
-  await relayAction('validate', { leaseId: lease.leaseId });
-  const auth = Buffer.from(`x-access-token:${pushToken}`).toString('base64');
-  await git([
-    '-c', `remote.origin.url=${repositoryUrl}`,
-    '-c', 'core.hooksPath=/dev/null',
-    '-c', `http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth}`,
-    'push', 'origin', 'HEAD:main'
-  ], { timeoutMs: 30000 });
+  const warning = await applyKvChanges(kvOperations, kvBaseline);
+  const details = `Updated ${kvOperations.length} requested KV change${kvOperations.length === 1 ? '' : 's'}.${warning ? ` ${warning}` : ''}`;
   let reportError;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      await relayAction('pushed', { leaseId: lease.leaseId, commit, summary: `${redactSecrets(summary)}\n\nPushed commit ${commit}.` });
+      await relayAction('complete', { leaseId: lease.leaseId, summary: `${redactSecrets(summary)}\n\n${details}` });
       reportError = null;
       break;
     } catch (error) {
@@ -281,22 +183,23 @@ async function publishChanges({ changed, kvOperations, kvBaseline }, summary) {
       await new Promise(resolveWait => setTimeout(resolveWait, 1000 * (attempt + 1)));
     }
   }
-  if (reportError) throw new Error(`Pushed commit ${commit}, but the relay could not record the pushed outcome: ${reportError.message}`);
-  console.log(`Pushed commit ${commit}; the Pages deployment has not been verified.`);
+  if (reportError) throw new Error(`KV updates were applied, but the relay could not record completion: ${reportError.message}`);
+  activeLease = null;
+  console.log(details);
 }
 
 try {
   const [summary, result] = await Promise.all([
     readFile(summaryPath, 'utf8').catch(() => 'Luna finished the request.'),
-    validatePatch()
+    validateKvArtifact()
   ]);
-  await publishChanges(result, summary);
+  await publishKvChanges(result, summary);
 } catch (error) {
   const message = redactSecrets(error?.message || error).slice(0, 4000);
   try {
-    if (activeLease && !pushStarted) await relayAction('failed', { leaseId: activeLease.leaseId, message });
-    else if (!pushStarted) await reportTask('failed', 'Luna could not publish the requested change.', message);
-  } catch { /* The relay expiry preserves an uncertain push separately if publication had started. */ }
+    if (activeLease) await relayAction('failed', { leaseId: activeLease.leaseId, message });
+    else await reportTask('failed', 'Luna could not publish the requested KV change.', message);
+  } catch { /* The relay expiry will preserve the pending task outcome. */ }
   console.error(message);
   process.exitCode = 1;
 }

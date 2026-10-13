@@ -341,8 +341,13 @@ export class CodeAgentRelay {
         updatedAt: new Date().toISOString()
       };
       if (typeof data.summary === 'string') updatedTask.summary = (await this.redactTaskText(data.summary)).slice(0, 12000);
+      if (status === 'pushed') {
+        if (typeof data.commit !== 'string' || !/^[0-9a-f]{7,40}$/i.test(data.commit)) return;
+        updatedTask.commit = data.commit;
+      }
       if (data.phase === 'edited' && status === 'running' && attachment.phase === 'agent') updatedTask.phase = 'edited';
       if (attachment.phase === 'finalize' && !['complete', 'pushed', 'failed'].includes(status)) return;
+      if (['complete', 'pushed', 'failed'].includes(status)) delete updatedTask.prompt;
       await this.saveTask(updatedTask);
       if (['complete', 'pushed', 'failed'].includes(status)) {
         updatedTask.retainUntil = Date.now() + TASK_RETENTION_MS;
@@ -403,7 +408,7 @@ export class CodeAgentRelay {
       const attachment = socket.deserializeAttachment();
       if (attachment?.sessionId !== await this.ctx.storage.get('runnerSessionId')) return;
       const task = await this.ctx.storage.get(`task:${attachment.taskId}`);
-      // The workflow closes the editing socket before reconnecting for its isolated publish step.
+      // KV-content requests close this socket before the separate trusted KV publisher runs.
       if (['running', 'publishing'].includes(task?.status) && task.taskId === attachment.taskId) return;
     } catch { /* Ignore a socket that did not authenticate. */ }
   }
