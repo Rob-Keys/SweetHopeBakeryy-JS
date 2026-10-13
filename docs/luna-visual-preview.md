@@ -16,7 +16,7 @@ Use `/`, `/about`, or `/contact` for other pages. To capture the four main pages
 npm run luna:preview -- --all
 ```
 
-The command prints each screenshot's absolute path. Luna opens each relevant desktop and mobile screenshot with Codex's built-in `view_image` tool, makes any visual corrections, then captures and inspects the result again. The default screenshot directory is the runner's temporary directory (`$RUNNER_TEMP/luna-preview`; `/tmp/luna-preview` locally); set `LUNA_PREVIEW_OUTPUT_DIR` to choose another location. The screenshots stay outside the checkout and are not committed.
+The command prints each screenshot's absolute path. Luna opens each relevant desktop and mobile screenshot with Codex's built-in `view_image` tool, makes any visual corrections, then captures and inspects the final result again before staging or committing visual changes. Both viewports must be inspected and free of visible issues. The default screenshot directory is the runner's temporary directory (`$RUNNER_TEMP/luna-preview`; `/tmp/luna-preview` locally); set `LUNA_PREVIEW_OUTPUT_DIR` to choose another location. The screenshots stay outside the checkout and are not committed. If Chromium or page data is unavailable, Luna leaves visual changes uncommitted and reports why.
 
 The preview serves the current checkout's `src/` files, including clean routes such as `/menu`. It supplies data from the runner's read-only `.luna-kv-baseline.json` snapshot when available. A local run without that snapshot falls back to the site's public read-only data endpoint. All other `/api/*` requests are rejected, so checkout, admin, payment, and other write flows cannot affect live services from the preview.
 
