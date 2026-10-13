@@ -74,7 +74,6 @@ function runCodex(prompt, outputPath) {
       '--json',
       '--ephemeral',
       '--model', model,
-      '--sandbox', 'workspace-write',
       '--approve-for-me',
       '--config', `developer_instructions=${JSON.stringify(developerInstructions)}`,
       '--config', 'sandbox_workspace_write.network_access=true',

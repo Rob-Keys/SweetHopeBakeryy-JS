@@ -1,0 +1,31 @@
+# Allow the local agent to perform normal Git synchronization and publish changes.
+# These rules match direct Git subcommands launched from the trusted project.
+prefix_rule(
+    pattern = ["git", "fetch"],
+    decision = "allow",
+    justification = "Luna may fetch refs while working in this repository",
+)
+
+prefix_rule(
+    pattern = ["git", "pull"],
+    decision = "allow",
+    justification = "Luna may update this repository from its remote",
+)
+
+prefix_rule(
+    pattern = ["git", "add"],
+    decision = "allow",
+    justification = "Luna may stage files for the requested commit",
+)
+
+prefix_rule(
+    pattern = ["git", "commit"],
+    decision = "allow",
+    justification = "Luna may commit the requested repository changes",
+)
+
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "allow",
+    justification = "Luna may push the requested commit to the configured remote",
+)
