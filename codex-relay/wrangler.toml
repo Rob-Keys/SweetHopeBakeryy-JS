@@ -16,6 +16,10 @@ head_sampling_rate = 0.1
 name = "CODEX_AGENT_RELAY"
 class_name = "CodeAgentRelay"
 
+[[r2_buckets]]
+binding = "LUNA_ATTACHMENTS"
+bucket_name = "sweet-hope-luna-attachments"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["CodeAgentRelay"]

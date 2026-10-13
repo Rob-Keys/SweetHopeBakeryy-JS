@@ -131,6 +131,9 @@ export function renderLocalCodeAgentPanel() {
       <form class="local-code-agent-form" id="local-code-agent-form">
         <label for="local-code-agent-prompt">Your message</label>
         <textarea id="local-code-agent-prompt" name="prompt" rows="5" maxlength="12000" placeholder="For example: Add an FAQ accordion to the Contact page with keyboard accessible controls." required disabled></textarea>
+        <label for="local-code-agent-files">Attach files or images <span class="text-muted">(up to 5 files, 10 MB each, 25 MB total)</span></label>
+        <input id="local-code-agent-files" class="form-control" name="attachments" type="file" multiple disabled>
+        <small class="local-agent-file-help" data-agent-files-help>Attachments stay private and are deleted after Luna finishes.</small>
         <div class="local-code-agent-actions"><button class="btn btn-cookie" type="submit" data-agent-submit disabled>Send to Luna</button></div>
         <div class="local-agent-history" data-agent-history aria-label="Recent Luna requests"></div>
         <div class="local-agent-task" data-agent-task aria-live="polite" hidden></div>

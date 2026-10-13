@@ -3,6 +3,9 @@ const TASK_RETENTION_MS = 15 * 60 * 1000;
 const TASK_TIMEOUT_MS = 12 * 60 * 1000;
 const TASK_START_TIMEOUT_MS = 5 * 60 * 1000;
 const PUBLISH_LEASE_MS = 90 * 1000;
+const MAX_ATTACHMENT_COUNT = 5;
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+const MAX_ATTACHMENT_TOTAL = 25 * 1024 * 1024;
 const GITHUB_REPOSITORY = 'Rob-Keys/SweetHopeBakeryy-JS';
 const GITHUB_WORKFLOW = 'luna-agent.yml';
 
@@ -42,6 +45,10 @@ export class CodeAgentRelay {
     if (denied) return denied;
     if (url.pathname === '/internal/status' && request.method === 'GET') return this.status();
     if (url.pathname === '/internal/tasks' && request.method === 'POST') return this.startTask(request);
+    const attachmentListMatch = url.pathname.match(/^\/internal\/tasks\/([0-9a-f-]{36})\/attachments$/i);
+    if (attachmentListMatch && request.method === 'GET') return this.readAttachments(attachmentListMatch[1]);
+    const attachmentMatch = url.pathname.match(/^\/internal\/tasks\/([0-9a-f-]{36})\/attachments\/(\d+)$/i);
+    if (attachmentMatch && request.method === 'GET') return this.readAttachment(attachmentMatch[1], Number(attachmentMatch[2]));
     const taskMatch = url.pathname.match(/^\/internal\/tasks\/([0-9a-f-]{36})$/i);
     if (taskMatch && request.method === 'GET') return this.readTask(taskMatch[1]);
     const runMatch = url.pathname.match(/^\/internal\/tasks\/([0-9a-f-]{36})\/run$/i);
@@ -83,15 +90,20 @@ export class CodeAgentRelay {
       this.env.CODEX_AGENT_RELAY_TOKEN &&
       ((await this.ctx.storage.get('codexAuth'))?.tokens?.refresh_token || this.env.CODEX_SIWC_CREDENTIALS)
     );
-    return Response.json({ configured, busy: ['running', 'publishing', 'reporting'].includes(task?.status), taskId: task?.taskId || null });
+    return Response.json({ configured, attachmentsConfigured: Boolean(this.env.LUNA_ATTACHMENTS), busy: ['running', 'publishing', 'reporting'].includes(task?.status), taskId: task?.taskId || null });
   }
 
   async startTask(request) {
-    let body;
-    try { body = await request.json(); } catch { return Response.json({ error: 'Invalid request body.' }, { status: 400 }); }
-    const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
+    let form;
+    try { form = await request.formData(); } catch { return Response.json({ error: 'Invalid request body.' }, { status: 400 }); }
+    const prompt = typeof form.get('prompt') === 'string' ? form.get('prompt').trim() : '';
     if (!prompt) return Response.json({ error: 'Describe the change you want.' }, { status: 400 });
     if (prompt.length > MAX_PROMPT_LENGTH) return Response.json({ error: `Prompt must be ${MAX_PROMPT_LENGTH.toLocaleString()} characters or fewer.` }, { status: 400 });
+    const files = form.getAll('attachments').filter(value => value instanceof File && value.size > 0);
+    if (files.length > MAX_ATTACHMENT_COUNT) return Response.json({ error: `Attach no more than ${MAX_ATTACHMENT_COUNT} files.` }, { status: 400 });
+    if (files.some(file => file.size > MAX_ATTACHMENT_SIZE)) return Response.json({ error: 'Each attachment must be 10 MB or smaller.' }, { status: 400 });
+    if (files.reduce((total, file) => total + file.size, 0) > MAX_ATTACHMENT_TOTAL) return Response.json({ error: 'Attachments must total 25 MB or less.' }, { status: 400 });
+    if (files.length && !this.env.LUNA_ATTACHMENTS) return Response.json({ error: 'Private attachment storage is not configured yet.' }, { status: 503 });
     if (!this.env.LUNA_GITHUB_ACTIONS_TOKEN) return Response.json({ error: 'Luna cloud runner is not configured.' }, { status: 503 });
     if (!(await this.ctx.storage.get('codexAuth')) && !this.env.CODEX_SIWC_CREDENTIALS) {
       return Response.json({ error: 'Luna ChatGPT sign-in is not configured.' }, { status: 503 });
@@ -104,6 +116,7 @@ export class CodeAgentRelay {
     const task = {
       taskId: crypto.randomUUID(),
       prompt,
+      attachments: [],
       status: 'running',
       message: "Creating Luna's environment…",
       createdAt: new Date().toISOString()
@@ -113,6 +126,17 @@ export class CodeAgentRelay {
     await this.ctx.storage.setAlarm(Date.now() + TASK_START_TIMEOUT_MS);
 
     try {
+      for (const [index, file] of files.entries()) {
+        const filename = file.name.replaceAll('\\', '/').split('/').pop().replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 180) || `attachment-${index + 1}`;
+        const key = `tasks/${task.taskId}/${index}`;
+        const contentType = /^[\w.+-]+\/[\w.+-]+$/.test(file.type) ? file.type : 'application/octet-stream';
+        await this.env.LUNA_ATTACHMENTS.put(key, file.stream(), {
+          httpMetadata: { contentType },
+          customMetadata: { filename, size: String(file.size) }
+        });
+        task.attachments.push({ key, filename, contentType, size: file.size });
+      }
+      await this.saveTask(task);
       const response = await fetch(`https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/${GITHUB_WORKFLOW}/dispatches`, {
         method: 'POST',
         headers: {
@@ -127,6 +151,7 @@ export class CodeAgentRelay {
       if (!response.ok) throw new Error(`GitHub returned ${response.status}`);
       this.log('workflow_dispatched', { taskId: task.taskId });
     } catch (error) {
+      await this.deleteTaskAttachments(task);
       this.log('workflow_dispatch_failed', { taskId: task.taskId });
       await this.saveTask({
         taskId: task.taskId,
@@ -143,13 +168,41 @@ export class CodeAgentRelay {
     return Response.json({ taskId: task.taskId, status: task.status }, { status: 202 });
   }
 
+  async readAttachments(taskId) {
+    const task = await this.ctx.storage.get(`task:${taskId}`);
+    if (!task || !['running', 'publishing'].includes(task.status)) return Response.json({ error: 'The Luna task is no longer active.' }, { status: 404 });
+    return Response.json({ attachments: (task.attachments || []).map(({ filename, contentType, size }, index) => ({ index, filename, contentType, size })) });
+  }
+
+  async readAttachment(taskId, index) {
+    const task = await this.ctx.storage.get(`task:${taskId}`);
+    const attachment = task?.attachments?.[index];
+    if (!attachment || !['running', 'publishing'].includes(task.status) || !this.env.LUNA_ATTACHMENTS) return Response.json({ error: 'Attachment not found.' }, { status: 404 });
+    const object = await this.env.LUNA_ATTACHMENTS.get(attachment.key);
+    if (!object) return Response.json({ error: 'Attachment not found.' }, { status: 404 });
+    const headers = new Headers({
+      'Content-Type': attachment.contentType,
+      'Content-Length': String(attachment.size),
+      'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(attachment.filename)}`,
+      'Cache-Control': 'private, no-store'
+    });
+    return new Response(object.body, { headers });
+  }
+
+  async deleteTaskAttachments(task) {
+    if (!this.env.LUNA_ATTACHMENTS || !task?.attachments?.length) return;
+    await Promise.allSettled(task.attachments.map(({ key }) => this.env.LUNA_ATTACHMENTS.delete(key)));
+    task.attachments = [];
+    await this.saveTask(task);
+  }
+
   async readTask(taskId) {
     const task = await this.ctx.storage.get(`task:${taskId}`);
     if (!task || (task.retainUntil && Date.now() >= task.retainUntil)) {
       if (task) await this.ctx.storage.delete(`task:${taskId}`);
       return Response.json({ error: 'Task not found.' }, { status: 404 });
     }
-    const { prompt: _prompt, ...publicTask } = task;
+    const { prompt: _prompt, attachments: _attachments, ...publicTask } = task;
     return Response.json(publicTask);
   }
 
@@ -186,6 +239,7 @@ export class CodeAgentRelay {
     if (body.action === 'failed' && task.status === 'publishing') {
       const failedTask = { ...task, status: 'failed', message: 'Luna could not publish the requested change.', summary: (await this.redactTaskText(body.message || 'Publishing failed.')).slice(0, 4000), updatedAt: new Date().toISOString(), retainUntil: Date.now() + TASK_RETENTION_MS };
       await this.saveTask(failedTask);
+      await this.deleteTaskAttachments(failedTask);
       await this.scheduleCleanup();
       this.log('publish_failed', { taskId });
       return Response.json({ status: 'failed' });
@@ -200,6 +254,7 @@ export class CodeAgentRelay {
         retainUntil: Date.now() + TASK_RETENTION_MS
       };
       await this.saveTask(completedTask);
+      await this.deleteTaskAttachments(completedTask);
       await this.scheduleCleanup();
       this.log('kv_update_recorded', { taskId });
       return Response.json({ status: 'complete' });
@@ -208,6 +263,7 @@ export class CodeAgentRelay {
       if (task.status !== 'reporting' || typeof body.commit !== 'string' || !/^[0-9a-f]{7,40}$/i.test(body.commit)) return Response.json({ error: 'Invalid pushed outcome.' }, { status: 400 });
       const pushedTask = { ...task, status: 'pushed', commit: body.commit, message: `Luna pushed commit ${body.commit}. The Pages deployment has not been verified.`, summary: typeof body.summary === 'string' ? body.summary.slice(0, 12000) : '', updatedAt: new Date().toISOString(), retainUntil: Date.now() + TASK_RETENTION_MS };
       await this.saveTask(pushedTask);
+      await this.deleteTaskAttachments(pushedTask);
       await this.scheduleCleanup();
       this.log('push_recorded', { taskId, commit: body.commit });
       return Response.json({ status: 'pushed', commit: body.commit });
@@ -352,6 +408,7 @@ export class CodeAgentRelay {
       if (['complete', 'pushed', 'failed'].includes(status)) {
         updatedTask.retainUntil = Date.now() + TASK_RETENTION_MS;
         await this.saveTask(updatedTask);
+        await this.deleteTaskAttachments(updatedTask);
         await this.scheduleCleanup();
         this.log('task_terminal', { taskId: task.taskId, status });
       }
@@ -367,14 +424,18 @@ export class CodeAgentRelay {
       return;
     }
     if (task?.status === 'reporting') {
-      await this.saveTask({ ...task, status: 'uncertain', message: `Push started for commit ${task.commit || 'unknown'}, but Luna could not confirm whether it completed. Check GitHub Actions and main before retrying.`, updatedAt: new Date().toISOString(), retainUntil: now + TASK_RETENTION_MS });
+      const uncertainTask = { ...task, status: 'uncertain', message: `Push started for commit ${task.commit || 'unknown'}, but Luna could not confirm whether it completed. Check GitHub Actions and main before retrying.`, updatedAt: new Date().toISOString(), retainUntil: now + TASK_RETENTION_MS };
+      await this.saveTask(uncertainTask);
+      await this.deleteTaskAttachments(uncertainTask);
       await this.scheduleCleanup();
       this.log('push_outcome_uncertain', { taskId: task.taskId, commit: task.commit || null });
       return;
     }
     if (['running', 'publishing'].includes(task?.status)) {
       const { prompt: _prompt, ...expiredTask } = task;
-      await this.saveTask({ ...expiredTask, status: 'failed', message: 'Luna’s temporary runner did not finish before its time limit.', updatedAt: new Date().toISOString(), retainUntil: now + TASK_RETENTION_MS });
+      const failedTask = { ...expiredTask, status: 'failed', message: 'Luna’s temporary runner did not finish before its time limit.', updatedAt: new Date().toISOString(), retainUntil: now + TASK_RETENTION_MS };
+      await this.saveTask(failedTask);
+      await this.deleteTaskAttachments(failedTask);
       this.log('task_expired', { taskId: task.taskId, workflowRunUrl: task.workflowRunUrl || null });
       for (const socket of this.ctx.getWebSockets()) {
         try {

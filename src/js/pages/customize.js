@@ -231,6 +231,8 @@ function initLocalCodeAgentHandlers() {
   const taskHistory = form.querySelector('[data-agent-history]');
   const submitButton = form.querySelector('[data-agent-submit]');
   const promptInput = form.querySelector('[name="prompt"]');
+  const attachmentInput = form.querySelector('[name="attachments"]');
+  const attachmentHelp = form.querySelector('[data-agent-files-help]');
   const authToken = getAuthToken();
   const taskStorageKey = 'luna-task-history';
   let activePoll = null;
@@ -257,26 +259,47 @@ function initLocalCodeAgentHandlers() {
   const adminFetch = (url, options = {}) => fetch(url, {
     ...options,
     headers: {
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
       Authorization: `Bearer ${authToken}`,
       ...options.headers
     }
   });
 
+  let attachmentsAvailable = false;
+
+  attachmentInput.addEventListener('change', () => {
+    const files = Array.from(attachmentInput.files || []);
+    const tooMany = files.length > 5;
+    const tooLarge = files.find(file => file.size > 10 * 1024 * 1024);
+    const totalTooLarge = files.reduce((total, file) => total + file.size, 0) > 25 * 1024 * 1024;
+    attachmentInput.setCustomValidity(tooMany ? 'Attach no more than 5 files.' : tooLarge ? `${tooLarge.name} is larger than 10 MB.` : totalTooLarge ? 'Attachments must total 25 MB or less.' : '');
+    if (tooMany || tooLarge || totalTooLarge) attachmentInput.reportValidity();
+    attachmentHelp.textContent = files.length
+      ? files.map(file => `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`).join(' · ')
+      : 'Attachments stay private and are deleted after Luna finishes.';
+  });
+
   const setControls = () => {
     const blocked = !isOnline || submissionInProgress || Boolean(activePoll) || currentTaskBusy;
     promptInput.disabled = blocked;
+    attachmentInput.disabled = blocked || !attachmentsAvailable;
     submitButton.disabled = blocked;
   };
 
-  const setConnection = (online, busy = false) => {
+  const setConnection = (online, busy = false, attachmentsConfigured = false) => {
     isOnline = online;
+    attachmentsAvailable = online && attachmentsConfigured;
     currentTaskBusy = busy && !activePoll;
     connectionLabel.textContent = online
       ? busy ? 'Busy' : 'Ready'
       : 'Unavailable';
     indicator.classList.toggle('is-online', online);
     indicator.classList.toggle('is-offline', !online);
+    if (!attachmentInput.files?.length) {
+      attachmentHelp.textContent = attachmentsAvailable
+        ? 'Attachments stay private and are deleted after Luna finishes.'
+        : 'File attachments are not configured for Luna yet.';
+    }
     setControls();
     if (!submissionInProgress && !activePoll) submitButton.textContent = 'Send to Luna';
   };
@@ -286,8 +309,8 @@ function initLocalCodeAgentHandlers() {
       const response = await adminFetch('/api/codex/agent/status');
       if (response.status === 401) { handle401(); return; }
       if (!response.ok) throw new Error('Could not read agent status.');
-      const { configured, busy } = await response.json();
-      setConnection(Boolean(configured), Boolean(busy));
+      const { configured, attachmentsConfigured, busy } = await response.json();
+      setConnection(Boolean(configured), Boolean(busy), Boolean(attachmentsConfigured));
     } catch {
       setConnection(false);
     }
@@ -452,19 +475,25 @@ function initLocalCodeAgentHandlers() {
     event.preventDefault();
     const prompt = promptInput.value.trim();
     if (!prompt || submissionInProgress || activePoll || currentTaskBusy || submitButton.disabled || !isOnline) return;
+    if (!attachmentInput.reportValidity()) return;
+    const files = Array.from(attachmentInput.files || []);
     submissionInProgress = true;
     submitButton.disabled = true;
     promptInput.disabled = true;
+    attachmentInput.disabled = true;
     submitButton.textContent = 'Sending…';
     taskStatus.hidden = false;
     renderTaskUpdate(prompt, { status: 'running' });
     try {
-      const response = await adminFetch('/api/codex/tasks', {
-        method: 'POST',
-        body: JSON.stringify({ prompt })
-      });
+      const requestBody = new FormData();
+      requestBody.append('prompt', prompt);
+      files.forEach(file => requestBody.append('attachments', file, file.name));
+      const response = await adminFetch('/api/codex/tasks', { method: 'POST', body: requestBody });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Could not send the request.');
+      attachmentInput.value = '';
+      attachmentInput.setCustomValidity('');
+      attachmentHelp.textContent = 'Attachments stay private and are deleted after Luna finishes.';
       const records = readTaskHistory().filter(item => item.taskId !== result.taskId);
       records.unshift({ taskId: result.taskId, prompt, createdAt: new Date().toISOString() });
       if (!saveTaskHistory(records)) {
@@ -478,6 +507,7 @@ function initLocalCodeAgentHandlers() {
       pollTask(result.taskId, prompt);
     } catch (error) {
       submissionInProgress = false;
+      attachmentInput.disabled = false;
       renderTaskUpdate(prompt, { status: 'failed', message: error.message });
       await refreshConnection();
       setControls();
