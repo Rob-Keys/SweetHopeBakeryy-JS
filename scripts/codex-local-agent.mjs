@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { constants } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const relayToken = process.env.CODEX_AGENT_RELAY_TOKEN;
@@ -34,9 +35,37 @@ let activeSocket = null;
 let activeTaskId = null;
 let pendingUpdates = [];
 
+async function resolveCodexExecutable() {
+  const configuredPath = process.env.CODEX_BIN;
+  const executableName = configuredPath || 'codex';
+  const candidates = [];
+
+  if (executableName.includes('/')) {
+    candidates.push(executableName);
+  } else {
+    for (const directory of (process.env.PATH || '').split(delimiter)) {
+      if (directory) candidates.push(join(directory, executableName));
+    }
+    if (!configuredPath && process.platform === 'darwin') {
+      candidates.push('/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex');
+    }
+  }
+
+  for (const candidate of candidates) {
+    try {
+      await access(candidate, constants.X_OK);
+      return candidate;
+    } catch { /* Keep looking through PATH and known install locations. */ }
+  }
+
+  if (configuredPath) {
+    throw new Error(`CODEX_BIN points to an executable that could not be found or run: ${configuredPath}`);
+  }
+  throw new Error('Could not find the Codex CLI. Add it to PATH or set CODEX_BIN to its full executable path.');
+}
+
 function runCodex(prompt, outputPath) {
   return new Promise((resolveRun, rejectRun) => {
-    const codexPath = process.env.CODEX_BIN || 'codex';
     const childEnv = { ...process.env };
     delete childEnv.CODEX_AGENT_RELAY_TOKEN;
     delete childEnv.CODEX_AGENT_RELAY_URL;
@@ -52,27 +81,29 @@ function runCodex(prompt, outputPath) {
       '--output-last-message', outputPath,
       '-'
     ];
-    const child = spawn(codexPath, args, { cwd: repoPath, env: childEnv, stdio: ['pipe', 'pipe', 'pipe'] });
+    void resolveCodexExecutable().then(codexPath => {
+      const child = spawn(codexPath, args, { cwd: repoPath, env: childEnv, stdio: ['pipe', 'pipe', 'pipe'] });
 
-    let stdoutTail = '';
-    let stderrTail = '';
-    const keepTail = (current, chunk) => `${current}${chunk}`.slice(-16000);
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
-    child.stdout.on('data', chunk => { stdoutTail = keepTail(stdoutTail, chunk); });
-    child.stderr.on('data', chunk => { stderrTail = keepTail(stderrTail, chunk); });
-    child.on('error', rejectRun);
-    child.on('close', async (code) => {
-      let summary = '';
-      try { summary = (await readFile(outputPath, 'utf8')).trim(); } catch { /* Codex may fail before creating output. */ }
-      if (code === 0) {
-        resolveRun(summary || 'Codex finished the request. Review the changed files in your working tree.');
-      } else {
-        rejectRun(new Error((summary || stderrTail || stdoutTail || `Codex exited with code ${code}`).slice(-4000)));
-      }
-    });
+      let stdoutTail = '';
+      let stderrTail = '';
+      const keepTail = (current, chunk) => `${current}${chunk}`.slice(-16000);
+      child.stdout.setEncoding('utf8');
+      child.stderr.setEncoding('utf8');
+      child.stdout.on('data', chunk => { stdoutTail = keepTail(stdoutTail, chunk); });
+      child.stderr.on('data', chunk => { stderrTail = keepTail(stderrTail, chunk); });
+      child.on('error', rejectRun);
+      child.on('close', async (code) => {
+        let summary = '';
+        try { summary = (await readFile(outputPath, 'utf8')).trim(); } catch { /* Codex may fail before creating output. */ }
+        if (code === 0) {
+          resolveRun(summary || 'Codex finished the request. Review the changed files in your working tree.');
+        } else {
+          rejectRun(new Error((summary || stderrTail || stdoutTail || `Codex exited with code ${code}`).slice(-4000)));
+        }
+      });
 
-    child.stdin.end(JSON.stringify({ user_request: prompt }));
+      child.stdin.end(JSON.stringify({ user_request: prompt }));
+    }).catch(rejectRun);
   });
 }
 
