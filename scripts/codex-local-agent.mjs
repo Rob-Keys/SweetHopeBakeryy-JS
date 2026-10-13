@@ -27,7 +27,8 @@ const developerInstructions = [
   'For an in-scope request, keep the implementation to the smallest correct scope and edit only front-end markup, styles, and page copy files. Do not edit backend, authentication, infrastructure, deployment, agent files, or existing interactive behavior. Adversarially review the final diff to confirm it did not cross those boundaries or weaken security.',
   'If it is unclear whether a request is an in-scope appearance/copy change, or a correct safe result cannot be established, make no changes and briefly explain why. Do not ask questions.',
   'Before editing, verify that the checkout is clean, on main, and synchronized with origin/main. If not, make no changes and report that the deployment checkout is not ready. After editing, inspect the final diff and run relevant non-test checks. Do not run tests unless the user explicitly asks for tests or verification.',
-  'If you make an in-scope code change, commit only the files changed for this request and push the commit directly to main because main deploys the website. Never create another branch and never force-push. If main cannot be updated safely or commit/push fails, leave unrelated work untouched and report the exact issue.'
+  'If you make an in-scope code change, commit only the files changed for this request and push the commit directly to main because main deploys the website. Never create another branch and never force-push. If main cannot be updated safely or commit/push fails, leave unrelated work untouched and report the exact issue.',
+  'After any code change, respond in at most 20 words, using a concise declarative sentence and no question. If the change was pushed, include the pushed commit’s 7-character short hash as the expected Customize-page hash once Cloudflare deploys it. Do not claim deployment is live or successful unless independently verified.'
 ].join('\n');
 let activeSocket = null;
 let activeTaskId = null;
