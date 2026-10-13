@@ -149,6 +149,8 @@ fadeMotionQuery?.addEventListener?.('change', (event) => {
 });
 
 function canFade(element) {
+  // Product cards intentionally animate as a unit, including their purchase form.
+  if (element.matches('.product-card')) return true;
   return !element.matches(essentialContentSelector) &&
     !element.querySelector(essentialContentSelector);
 }
