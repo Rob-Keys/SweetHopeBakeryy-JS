@@ -48,10 +48,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   let html = `<div class="m-5">
     <h2 class="subtitle">Edit Menu</h2>
     <p class="text-muted small" id="deployment-version">Commit: loading…</p>
+    ${renderLocalCodeAgentPanel()}
     <p>"Prices" will create a dropdown menu of those quantities at those prices. So "6:10, 12:15", would mean 6 for $10, or 12 for $15.</p>
     <p>"Customizations" currently dont do anything and you can just leave that field blank for now.</p>
     <p>I recommend uploading images that are of filetype .avif, as theyre most efficient size-wise and will make your site load faster. To convert a .png or .jpg to .avif you can use a site like: <a href="https://cloudinary.com/tools/jpg-to-avif" target="_blank">JPEG-To-Avif Converter</a></p>
-    ${renderLocalCodeAgentPanel()}
     <div class="row menu-row">
       <div class="col-2"><h5>Product Name</h5></div>
       <div class="col-2"><h5>Description</h5></div>
