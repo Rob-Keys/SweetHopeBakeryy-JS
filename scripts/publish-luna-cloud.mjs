@@ -3,6 +3,7 @@
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { isAutonomousPublishPath } from './luna-publish-policy.mjs';
 
 const relayToken = process.env.CODEX_AGENT_RELAY_TOKEN;
 const relayUrl = process.env.CODEX_AGENT_RELAY_URL;
@@ -83,23 +84,6 @@ async function reportTask(status, message, summary) {
   });
 }
 
-function protectedPath(path) {
-  return path.startsWith('.github/') || path.startsWith('codex-relay/') ||
-    path.startsWith('scripts/codex-') || path === 'scripts/setup-luna-cloud.mjs' ||
-    path === 'scripts/publish-luna-cloud.mjs' || path === 'scripts/report-luna-run.mjs' || path === 'wrangler.toml' ||
-    path === '.env' || path.startsWith('.env.') || path === '.dev.vars' || /\.(?:pem|key|p12|pfx)$/i.test(path) ||
-    path === 'functions/api/_auth.js' || path === 'functions/api/_jwt.js' ||
-    path === 'functions/api/_stripe.js' || path === 'functions/api/_orders.js' || path === 'functions/api/_kv.js' ||
-    path === 'functions/api/_s3.js' || path === 'functions/api/_deploy.js' ||
-    path === 'functions/api/save-data.js' || path === 'functions/api/delete-data.js' ||
-    path === 'functions/api/upload-images.js' || path === 'functions/api/delete-images.js' ||
-    path === 'functions/api/get-inbox.js' || path === 'functions/api/get-outbox.js' ||
-    path === 'functions/api/send-email.js' ||
-    path.startsWith('functions/api/rate/') || path.startsWith('src/js/stripe/') ||
-    path === 'src/js/pages/checkout.js' || path === 'src/js/pages/return.js' ||
-    path === 'src/js/modules/auth.js';
-}
-
 function containsCredential(text) {
   return /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(text) ||
     /\bAKIA[0-9A-Z]{16}\b/.test(text) ||
@@ -120,9 +104,15 @@ async function validatePatch() {
   if (await git(['status', '--porcelain'])) throw new Error('The isolated publisher checkout is not clean.');
   await git(['apply', '--index', '--binary', '--', patchPath]);
   await git(['diff', '--cached', '--check']);
-  const changed = (await git(['diff', '--cached', '--name-only'])).split('\n').filter(Boolean);
-  const protectedFile = changed.find(protectedPath);
-  if (protectedFile) throw new Error(`This change touches a protected publishing or security file (${protectedFile}) and needs human review.`);
+  const changed = (await git(['diff', '--cached', '--name-only', '-z'])).split('\0').filter(Boolean);
+  const stagedModes = new Map((await git(['ls-files', '--stage', '-z'])).split('\0').filter(Boolean).map(entry => {
+    const separator = entry.indexOf('\t');
+    const metadata = entry.slice(0, separator);
+    const path = entry.slice(separator + 1);
+    return [path, metadata.split(' ')[0]];
+  }));
+  const unapprovedFile = changed.find(file => !isAutonomousPublishPath(file, stagedModes.get(file)));
+  if (unapprovedFile) throw new Error(`This change is outside the autonomous presentation allowlist (${unapprovedFile}) and needs human review.`);
   for (const file of changed) {
     const content = await git(['show', `:${file}`]);
     if (containsCredential(content)) throw new Error(`The change appears to contain a credential in ${file}; it was not published.`);
