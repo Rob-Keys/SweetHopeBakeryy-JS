@@ -74,12 +74,12 @@ footer {
 	text-decoration: underline;
 }
 .navbar-brand {
-	width: auto;
+	width: 4rem;
 	height: 4rem;
-	max-width: 6rem;
+	max-width: none;
 	flex: 0 0 auto;
-	object-fit: contain;
-	border-radius: 0;
+	object-fit: cover;
+	border-radius: 50%;
 }
 
 /* Warm bakery button typography and colors. */
