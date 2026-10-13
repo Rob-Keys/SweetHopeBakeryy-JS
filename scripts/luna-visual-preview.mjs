@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 
 import { createServer } from 'node:http';
-import { readFile, mkdir } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
 
 const repoRoot = resolve(import.meta.dirname, '..');
 const siteRoot = resolve(repoRoot, 'src');
-const baselinePath = resolve(repoRoot, '.luna-kv-baseline.json');
 const outputRoot = resolve(process.env.LUNA_PREVIEW_OUTPUT_DIR || resolve(process.env.RUNNER_TEMP || tmpdir(), 'luna-preview'));
 const routes = process.argv.slice(2).filter(argument => !argument.startsWith('--'));
 const renderAll = process.argv.includes('--all');
@@ -33,48 +32,27 @@ const mimeTypes = {
   '.xml': 'application/xml; charset=utf-8'
 };
 
-let baseline;
-try {
-  baseline = JSON.parse(await readFile(baselinePath, 'utf8'));
-} catch {
-  baseline = null;
-}
-
-let proposedChanges;
-try {
-  proposedChanges = JSON.parse(await readFile(resolve(repoRoot, '.luna-kv-changes.json'), 'utf8'));
-} catch {
-  proposedChanges = null;
-}
-
-function applyProposedChanges(tableName, source) {
-  if (!proposedChanges || proposedChanges.version !== 1 || !Array.isArray(proposedChanges.operations)) return source;
-  return proposedChanges.operations.reduce((items, operation) => {
-    if (operation?.tableName !== tableName) return items;
-    const keyField = tableName === 'products' ? 'itemName' : 'sectionIndex';
-    if (operation.action === 'delete') {
-      return items.filter(item => String(item[keyField]) !== String(operation.key));
-    }
-    if (operation.action === 'upsert' && operation.item && typeof operation.item === 'object') {
-      const index = items.findIndex(item => String(item[keyField]) === String(operation.item[keyField]));
-      if (index === -1) return [...items, operation.item];
-      return items.map((item, itemIndex) => itemIndex === index ? operation.item : item);
-    }
-    return items;
-  }, [...source]);
-}
-
 async function readPublicTable(tableName) {
   if (!['products', 'home_page', 'about_page', 'contact_page'].includes(tableName)) return null;
-  if (baseline && Array.isArray(baseline[tableName])) return applyProposedChanges(tableName, baseline[tableName]);
-
-  // Local previews outside the cloud runner can use the site's public, read-only KV endpoint.
   const url = new URL('/api/get-data', 'https://www.sweethopebakeryy.com');
   url.searchParams.set('tableName', tableName);
-  const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) });
-  if (!response.ok) return null;
-  const value = await response.json();
-  return Array.isArray(value) ? applyProposedChanges(tableName, value) : null;
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) });
+      if (response.ok) {
+        const value = await response.json();
+        if (Array.isArray(value)) return value;
+        throw new Error(`The public ${tableName} endpoint returned non-array JSON.`);
+      }
+      lastError = new Error(`The public ${tableName} endpoint returned HTTP ${response.status}.`);
+      if (response.status < 500 && response.status !== 429) break;
+    } catch (error) {
+      lastError = error;
+    }
+    if (attempt < 2) await new Promise(resolveDelay => setTimeout(resolveDelay, 250 * (2 ** attempt)));
+  }
+  throw lastError || new Error(`The public ${tableName} endpoint is unavailable.`);
 }
 
 const server = createServer(async (request, response) => {
@@ -83,16 +61,11 @@ const server = createServer(async (request, response) => {
     if (request.method === 'GET' && requestUrl.pathname === '/api/get-data') {
       try {
         const table = await readPublicTable(requestUrl.searchParams.get('tableName') || '');
-        if (table) {
-          response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-          response.end(JSON.stringify(table));
-          return;
-        }
+        response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+        response.end(JSON.stringify(table));
+      } catch (error) {
         response.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
-        response.end(JSON.stringify({ error: 'Preview data is unavailable.' }));
-      } catch {
-        response.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
-        response.end(JSON.stringify({ error: 'Preview data is unavailable.' }));
+        response.end(JSON.stringify({ error: error?.message || 'Preview data is unavailable.' }));
       }
       return;
     }

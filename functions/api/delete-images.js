@@ -7,7 +7,7 @@ import { checkS3Auth } from './_auth.js';
 import { isSafeKey } from './_s3.js';
 
 export async function onRequestPost(context) {
-  const denied = await checkS3Auth(context, 's3:delete');
+  const denied = await checkS3Auth(context);
   if (denied) return denied;
 
   const { AWS_KEY, AWS_SECRET_KEY, AWS_REGION = 'us-east-1' } = context.env;

@@ -11,7 +11,6 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.0.0",
     "@aws-sdk/client-ses": "^3.0.0",
-    "@aws-sdk/client-sts": "3.1041.0",
     "@aws-sdk/s3-request-presigner": "^3.0.0"
   },
   "devDependencies": {

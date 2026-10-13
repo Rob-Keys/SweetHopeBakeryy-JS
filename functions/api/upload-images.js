@@ -19,7 +19,7 @@ const CONTENT_TYPE_BY_EXTENSION = {
 };
 
 export async function onRequestPost(context) {
-  const denied = await checkS3Auth(context, 's3:put');
+  const denied = await checkS3Auth(context);
   if (denied) return denied;
 
   const { AWS_KEY, AWS_SECRET_KEY, AWS_REGION = 'us-east-1' } = context.env;

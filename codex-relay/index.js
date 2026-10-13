@@ -2,7 +2,6 @@ const MAX_PROMPT_LENGTH = 12000;
 const TASK_RETENTION_MS = 15 * 60 * 1000;
 const TASK_TIMEOUT_MS = 12 * 60 * 1000;
 const TASK_START_TIMEOUT_MS = 5 * 60 * 1000;
-const PUBLISH_LEASE_MS = 90 * 1000;
 const MAX_ATTACHMENT_COUNT = 5;
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 const MAX_ATTACHMENT_TOTAL = 25 * 1024 * 1024;
@@ -47,16 +46,12 @@ export class CodeAgentRelay {
     if (url.pathname === '/internal/tasks' && request.method === 'POST') return this.startTask(request);
     const attachmentListMatch = url.pathname.match(/^\/internal\/tasks\/([0-9a-f-]{36})\/attachments$/i);
     if (attachmentListMatch && request.method === 'GET') return this.readAttachments(attachmentListMatch[1]);
-    const assetTokenMatch = url.pathname.match(/^\/internal\/tasks\/([0-9a-f-]{36})\/asset-token$/i);
-    if (assetTokenMatch && request.method === 'GET') return this.readAssetToken(request, assetTokenMatch[1]);
     const attachmentMatch = url.pathname.match(/^\/internal\/tasks\/([0-9a-f-]{36})\/attachments\/(\d+)$/i);
     if (attachmentMatch && request.method === 'GET') return this.readAttachment(attachmentMatch[1], Number(attachmentMatch[2]));
     const taskMatch = url.pathname.match(/^\/internal\/tasks\/([0-9a-f-]{36})$/i);
     if (taskMatch && request.method === 'GET') return this.readTask(taskMatch[1]);
     const runMatch = url.pathname.match(/^\/internal\/tasks\/([0-9a-f-]{36})\/run$/i);
     if (runMatch && request.method === 'POST') return this.recordWorkflowRun(request, runMatch[1]);
-    const leaseMatch = url.pathname.match(/^\/internal\/tasks\/([0-9a-f-]{36})\/publish-lease$/i);
-    if (leaseMatch && request.method === 'POST') return this.publishLease(request, leaseMatch[1]);
     return new Response('Not found', { status: 404 });
   }
 
@@ -92,7 +87,7 @@ export class CodeAgentRelay {
       this.env.CODEX_AGENT_RELAY_TOKEN &&
       ((await this.ctx.storage.get('codexAuth'))?.tokens?.refresh_token || this.env.CODEX_SIWC_CREDENTIALS)
     );
-    return Response.json({ configured, attachmentsConfigured: Boolean(this.env.LUNA_ATTACHMENTS), busy: ['running', 'publishing', 'reporting'].includes(task?.status), taskId: task?.taskId || null });
+    return Response.json({ configured, attachmentsConfigured: Boolean(this.env.LUNA_ATTACHMENTS), busy: task?.status === 'running', taskId: task?.taskId || null });
   }
 
   async startTask(request) {
@@ -102,10 +97,7 @@ export class CodeAgentRelay {
     if (!prompt) return Response.json({ error: 'Describe the change you want.' }, { status: 400 });
     if (prompt.length > MAX_PROMPT_LENGTH) return Response.json({ error: `Prompt must be ${MAX_PROMPT_LENGTH.toLocaleString()} characters or fewer.` }, { status: 400 });
     const taskId = typeof form.get('taskId') === 'string' ? form.get('taskId') : '';
-    const assetToken = typeof form.get('assetToken') === 'string' ? form.get('assetToken') : '';
-    if (!/^[0-9a-f-]{36}$/i.test(taskId) || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(assetToken) || assetToken.length > 4096) {
-      return Response.json({ error: 'The admin-launched task is missing its temporary media permission.' }, { status: 400 });
-    }
+    if (!/^[0-9a-f-]{36}$/i.test(taskId)) return Response.json({ error: 'Invalid Luna task ID.' }, { status: 400 });
     const files = form.getAll('attachments').filter(value => value instanceof File && value.size > 0);
     if (files.length > MAX_ATTACHMENT_COUNT) return Response.json({ error: `Attach no more than ${MAX_ATTACHMENT_COUNT} files.` }, { status: 400 });
     if (files.some(file => file.size > MAX_ATTACHMENT_SIZE)) return Response.json({ error: 'Each attachment must be 10 MB or smaller.' }, { status: 400 });
@@ -118,13 +110,12 @@ export class CodeAgentRelay {
 
     const previousId = await this.ctx.storage.get('currentTaskId');
     const previous = previousId ? await this.ctx.storage.get(`task:${previousId}`) : null;
-    if (['running', 'publishing', 'reporting'].includes(previous?.status)) return Response.json({ error: 'Luna is already working on a request or checking a push. Wait for it to finish.' }, { status: 409 });
+    if (previous?.status === 'running') return Response.json({ error: 'Luna is already working on a request. Wait for it to finish.' }, { status: 409 });
 
     const task = {
       taskId,
       prompt,
       attachments: [],
-      assetToken,
       status: 'running',
       message: "Creating Luna's environment…",
       createdAt: new Date().toISOString()
@@ -178,30 +169,16 @@ export class CodeAgentRelay {
 
   async readAttachments(taskId) {
     const task = await this.ctx.storage.get(`task:${taskId}`);
-    if (!task || !['running', 'publishing'].includes(task.status)) return Response.json({ error: 'The Luna task is no longer active.' }, { status: 404 });
+    if (!task || task.status !== 'running') return Response.json({ error: 'The Luna task is no longer active.' }, { status: 404 });
     return Response.json({
       attachments: (task.attachments || []).map(({ filename, contentType, size }, index) => ({ index, filename, contentType, size }))
     });
   }
 
-  async readAssetToken(request, taskId) {
-    const task = await this.ctx.storage.get(`task:${taskId}`);
-    const leaseId = request.headers.get('X-Luna-Publish-Lease');
-    if (
-      !task ||
-      task.status !== 'publishing' ||
-      !task.publishLease ||
-      task.publishLease.id !== leaseId ||
-      Date.now() >= task.publishLease.expiresAt ||
-      typeof task.assetToken !== 'string'
-    ) return Response.json({ error: 'The Luna media permission is unavailable.' }, { status: 409 });
-    return Response.json({ assetToken: task.assetToken }, { headers: { 'Cache-Control': 'private, no-store' } });
-  }
-
   async readAttachment(taskId, index) {
     const task = await this.ctx.storage.get(`task:${taskId}`);
     const attachment = task?.attachments?.[index];
-    if (!attachment || !['running', 'publishing'].includes(task.status) || !this.env.LUNA_ATTACHMENTS) return Response.json({ error: 'Attachment not found.' }, { status: 404 });
+    if (!attachment || task.status !== 'running' || !this.env.LUNA_ATTACHMENTS) return Response.json({ error: 'Attachment not found.' }, { status: 404 });
     const object = await this.env.LUNA_ATTACHMENTS.get(attachment.key);
     if (!object) return Response.json({ error: 'Attachment not found.' }, { status: 404 });
     const headers = new Headers({
@@ -219,7 +196,6 @@ export class CodeAgentRelay {
       await Promise.allSettled(task.attachments.map(({ key }) => this.env.LUNA_ATTACHMENTS.delete(key)));
       task.attachments = [];
     }
-    if (Object.hasOwn(task, 'assetToken')) delete task.assetToken;
     await this.saveTask(task);
   }
 
@@ -229,79 +205,8 @@ export class CodeAgentRelay {
       if (task) await this.ctx.storage.delete(`task:${taskId}`);
       return Response.json({ error: 'Task not found.' }, { status: 404 });
     }
-    const { prompt: _prompt, attachments: _attachments, assetToken: _assetToken, ...publicTask } = task;
+    const { prompt: _prompt, attachments: _attachments, ...publicTask } = task;
     return Response.json(publicTask);
-  }
-
-  async publishLease(request, taskId) {
-    let body;
-    try { body = await request.json(); } catch { body = {}; }
-    const currentId = await this.ctx.storage.get('currentTaskId');
-    const task = await this.ctx.storage.get(`task:${taskId}`);
-    if (!task || currentId !== taskId) {
-      return Response.json({ error: 'The Luna task is no longer eligible to publish.' }, { status: 409 });
-    }
-    if (body.action === 'claim') {
-      if (task.status !== 'running' || Date.now() >= task.deadlineAt) return Response.json({ error: 'The Luna task is no longer eligible to publish.' }, { status: 409 });
-      if (task.phase !== 'edited') return Response.json({ error: 'The editing job has not completed.' }, { status: 409 });
-      const lease = { id: crypto.randomUUID(), expiresAt: Date.now() + PUBLISH_LEASE_MS };
-      await this.saveTask({ ...task, status: 'publishing', publishLease: lease, message: 'Luna is publishing the validated change.' });
-      await this.ctx.storage.setAlarm(lease.expiresAt);
-      this.log('publish_lease_issued', { taskId, expiresAt: lease.expiresAt });
-      return Response.json({ leaseId: lease.id, expiresAt: lease.expiresAt });
-    }
-    const leaseId = request.headers.get('X-Luna-Publish-Lease') || body.leaseId;
-    if (body.action === 'complete' && task.status === 'complete' && task.publishLease?.id === leaseId) {
-      return Response.json({ status: 'complete' });
-    }
-    if (!['publishing', 'reporting'].includes(task.status) || !task.publishLease || task.publishLease.id !== leaseId || Date.now() >= task.publishLease.expiresAt) {
-      return Response.json({ error: 'The Luna publish lease is missing or expired.' }, { status: 409 });
-    }
-    if (body.action === 'renew') {
-      const publishLease = { ...task.publishLease, expiresAt: Date.now() + PUBLISH_LEASE_MS };
-      await this.saveTask({ ...task, publishLease });
-      await this.ctx.storage.setAlarm(publishLease.expiresAt);
-      return Response.json({ expiresAt: publishLease.expiresAt });
-    }
-    if (body.action === 'push-started') {
-      if (task.status !== 'publishing' || typeof body.commit !== 'string' || !/^[0-9a-f]{7,40}$/i.test(body.commit)) return Response.json({ error: 'Invalid push start.' }, { status: 400 });
-      await this.saveTask({ ...task, status: 'reporting', commit: body.commit, message: `Push started for commit ${body.commit}.`, updatedAt: new Date().toISOString() });
-      this.log('push_started', { taskId, commit: body.commit });
-      return Response.json({ accepted: true });
-    }
-    if (body.action === 'failed' && task.status === 'publishing') {
-      const failedTask = { ...task, status: 'failed', message: 'Luna could not publish the requested change.', summary: (await this.redactTaskText(body.message || 'Publishing failed.')).slice(0, 4000), updatedAt: new Date().toISOString(), retainUntil: Date.now() + TASK_RETENTION_MS };
-      await this.saveTask(failedTask);
-      await this.deleteTaskAttachments(failedTask);
-      await this.scheduleCleanup();
-      this.log('publish_failed', { taskId });
-      return Response.json({ status: 'failed' });
-    }
-    if (body.action === 'complete' && task.status === 'publishing') {
-      const completedTask = {
-        ...task,
-        status: 'complete',
-        message: 'Luna published the requested site changes.',
-        summary: typeof body.summary === 'string' ? (await this.redactTaskText(body.summary)).slice(0, 12000) : '',
-        updatedAt: new Date().toISOString(),
-        retainUntil: Date.now() + TASK_RETENTION_MS
-      };
-      await this.saveTask(completedTask);
-      await this.deleteTaskAttachments(completedTask);
-      await this.scheduleCleanup();
-      this.log('changes_published', { taskId });
-      return Response.json({ status: 'complete' });
-    }
-    if (body.action === 'pushed') {
-      if (task.status !== 'reporting' || typeof body.commit !== 'string' || !/^[0-9a-f]{7,40}$/i.test(body.commit)) return Response.json({ error: 'Invalid pushed outcome.' }, { status: 400 });
-      const pushedTask = { ...task, status: 'pushed', commit: body.commit, message: `Luna pushed commit ${body.commit}. The Pages deployment has not been verified.`, summary: typeof body.summary === 'string' ? body.summary.slice(0, 12000) : '', updatedAt: new Date().toISOString(), retainUntil: Date.now() + TASK_RETENTION_MS };
-      await this.saveTask(pushedTask);
-      await this.deleteTaskAttachments(pushedTask);
-      await this.scheduleCleanup();
-      this.log('push_recorded', { taskId, commit: body.commit });
-      return Response.json({ status: 'pushed', commit: body.commit });
-    }
-    return Response.json({ valid: true, expiresAt: task.publishLease.expiresAt });
   }
 
   async saveTask(task) {
@@ -340,11 +245,10 @@ export class CodeAgentRelay {
         data?.type !== 'authenticate' ||
         data.token !== this.env.CODEX_AGENT_RELAY_TOKEN ||
         typeof data.taskId !== 'string' ||
-        !['running', 'publishing'].includes(task?.status) ||
+        task?.status !== 'running' ||
         task.taskId !== data.taskId ||
-        !['agent', 'finalize'].includes(data.phase) ||
-        (data.phase === 'agent' && (task.status !== 'running' || !task.prompt)) ||
-        (data.phase === 'finalize' && !(task.status === 'publishing' || (task.status === 'running' && task.phase === 'edited')))
+        data.phase !== 'agent' ||
+        !task.prompt
       ) {
         socket.close(1008, 'Authentication required for an active task');
         return;
@@ -353,31 +257,21 @@ export class CodeAgentRelay {
       const sessionId = crypto.randomUUID();
       socket.serializeAttachment({ authenticated: true, sessionId, taskId: task.taskId, phase: data.phase });
       await this.ctx.storage.put('runnerSessionId', sessionId);
-      const deadlineAt = data.phase === 'agent' ? Date.now() + TASK_TIMEOUT_MS : task.deadlineAt;
-      if (data.phase === 'agent') await this.ctx.storage.setAlarm(deadlineAt);
-      if (data.phase === 'agent') {
-        await this.saveTask({
-          ...task,
-          deadlineAt,
-          message: 'Luna is working in a temporary cloud runner.',
-          updatedAt: new Date().toISOString()
-        });
-      } else if (task.prompt) {
-        const { prompt: _prompt, ...taskWithoutPrompt } = task;
-        await this.saveTask({
-          ...taskWithoutPrompt,
-          deadlineAt,
-          message: 'Luna finished editing and is preparing the update.',
-          updatedAt: new Date().toISOString()
-        });
-      }
+      const deadlineAt = Date.now() + TASK_TIMEOUT_MS;
+      await this.ctx.storage.setAlarm(deadlineAt);
+      await this.saveTask({
+        ...task,
+        deadlineAt,
+        message: 'Luna is working in a temporary cloud runner.',
+        updatedAt: new Date().toISOString()
+      });
       const taskUpdate = await this.ctx.storage.get(`task:${task.taskId}`);
       if (typeof data.runId === 'string' && /^\d{1,20}$/.test(data.runId)) {
         await this.saveTask({ ...taskUpdate, workflowRunUrl: `https://github.com/${GITHUB_REPOSITORY}/actions/runs/${data.runId}` });
         this.log('workflow_run_observed', { taskId: task.taskId, runId: data.runId });
       }
-      socket.send(JSON.stringify({ type: 'authenticated', taskId: task.taskId, phase: data.phase }));
-      if (data.phase === 'agent') socket.send(JSON.stringify({ type: 'task', taskId: task.taskId, prompt: task.prompt }));
+      socket.send(JSON.stringify({ type: 'authenticated', taskId: task.taskId, phase: 'agent' }));
+      socket.send(JSON.stringify({ type: 'task', taskId: task.taskId, prompt: task.prompt }));
       return;
     }
 
@@ -388,8 +282,7 @@ export class CodeAgentRelay {
     }
     const currentId = await this.ctx.storage.get('currentTaskId');
     const task = currentId ? await this.ctx.storage.get(`task:${currentId}`) : null;
-    const finalizing = attachment.phase === 'finalize' && (task?.status === 'publishing' || (task?.status === 'running' && task.phase === 'edited'));
-    if (!task || task.taskId !== attachment.taskId || (task.status !== 'running' && !finalizing)) return;
+    if (!task || task.taskId !== attachment.taskId || task.status !== 'running') return;
 
     if (data?.type === 'credential-request') {
       let auth = await this.ctx.storage.get('codexAuth');
@@ -434,8 +327,6 @@ export class CodeAgentRelay {
         if (typeof data.commit !== 'string' || !/^[0-9a-f]{7,40}$/i.test(data.commit)) return;
         updatedTask.commit = data.commit;
       }
-      if (data.phase === 'edited' && status === 'running' && attachment.phase === 'agent') updatedTask.phase = 'edited';
-      if (attachment.phase === 'finalize' && !['complete', 'pushed', 'failed'].includes(status)) return;
       if (['complete', 'pushed', 'failed'].includes(status)) delete updatedTask.prompt;
       await this.saveTask(updatedTask);
       if (['complete', 'pushed', 'failed'].includes(status)) {
@@ -452,19 +343,7 @@ export class CodeAgentRelay {
     const now = Date.now();
     const currentId = await this.ctx.storage.get('currentTaskId');
     const task = currentId ? await this.ctx.storage.get(`task:${currentId}`) : null;
-    if (['publishing', 'reporting'].includes(task?.status) && task.publishLease?.expiresAt > now) {
-      await this.ctx.storage.setAlarm(task.publishLease.expiresAt);
-      return;
-    }
-    if (task?.status === 'reporting') {
-      const uncertainTask = { ...task, status: 'uncertain', message: `Push started for commit ${task.commit || 'unknown'}, but Luna could not confirm whether it completed. Check GitHub Actions and main before retrying.`, updatedAt: new Date().toISOString(), retainUntil: now + TASK_RETENTION_MS };
-      await this.saveTask(uncertainTask);
-      await this.deleteTaskAttachments(uncertainTask);
-      await this.scheduleCleanup();
-      this.log('push_outcome_uncertain', { taskId: task.taskId, commit: task.commit || null });
-      return;
-    }
-    if (['running', 'publishing'].includes(task?.status)) {
+    if (task?.status === 'running') {
       const { prompt: _prompt, ...expiredTask } = task;
       const failedTask = { ...expiredTask, status: 'failed', message: 'Luna’s temporary runner did not finish before its time limit.', updatedAt: new Date().toISOString(), retainUntil: now + TASK_RETENTION_MS };
       await this.saveTask(failedTask);
@@ -502,8 +381,7 @@ export class CodeAgentRelay {
       const attachment = socket.deserializeAttachment();
       if (attachment?.sessionId !== await this.ctx.storage.get('runnerSessionId')) return;
       const task = await this.ctx.storage.get(`task:${attachment.taskId}`);
-      // KV-content requests close this socket before the separate trusted KV publisher runs.
-      if (['running', 'publishing'].includes(task?.status) && task.taskId === attachment.taskId) return;
+      if (task?.status === 'running' && task.taskId === attachment.taskId) return;
     } catch { /* Ignore a socket that did not authenticate. */ }
   }
 

@@ -1,0 +1,57 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "WriteLunaRunTracesOnly",
+      "Effect": "Allow",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::cf-templates-1id935irfrtba-us-east-1/luna-traces/*"
+    },
+    {
+      "Sid": "ListPublicSiteMediaPrefixes",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket",
+        "s3:ListBucketMultipartUploads"
+      ],
+      "Resource": "arn:aws:s3:::sweethopebakeryy",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "images/",
+            "images/*",
+            "header/",
+            "header/*",
+            "products/",
+            "products/*",
+            "home_page/",
+            "home_page/*",
+            "about_page/",
+            "about_page/*",
+            "contact_page/",
+            "contact_page/*"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "ManageOnlyPublicSiteMediaPrefixes",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:AbortMultipartUpload",
+        "s3:ListMultipartUploadParts"
+      ],
+      "Resource": [
+        "arn:aws:s3:::sweethopebakeryy/images/*",
+        "arn:aws:s3:::sweethopebakeryy/header/*",
+        "arn:aws:s3:::sweethopebakeryy/products/*",
+        "arn:aws:s3:::sweethopebakeryy/home_page/*",
+        "arn:aws:s3:::sweethopebakeryy/about_page/*",
+        "arn:aws:s3:::sweethopebakeryy/contact_page/*"
+      ]
+    }
+  ]
+}
