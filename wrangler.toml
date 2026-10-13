@@ -3,16 +3,6 @@ pages_build_output_dir = "src"
 compatibility_date = "2026-02-04"
 compatibility_flags = ["nodejs_compat"]
 
-[observability]
-enabled = true
-
-[observability.logs]
-head_sampling_rate = 1
-
-[observability.traces]
-enabled = true
-head_sampling_rate = 0.1
-
 [[kv_namespaces]]
 binding = "kv-db"
 id = "484eac01223645b5a7d53de5ae5d2917"
