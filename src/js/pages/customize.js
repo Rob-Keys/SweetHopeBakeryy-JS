@@ -227,14 +227,31 @@ function initLocalCodeAgentHandlers() {
   const connectionLabel = form.parentElement.querySelector('[data-agent-connection]');
   const indicator = form.parentElement.querySelector('.local-agent-indicator');
   const taskStatus = form.querySelector('[data-agent-task]');
+  const taskHistory = form.querySelector('[data-agent-history]');
   const submitButton = form.querySelector('[data-agent-submit]');
   const promptInput = form.querySelector('[name="prompt"]');
   const authToken = getAuthToken();
-  const taskStorageKey = 'luna-active-task';
+  const taskStorageKey = 'luna-task-history';
   let activePoll = null;
   let isOnline = false;
   let submissionInProgress = false;
   let currentTaskBusy = false;
+
+  const readTaskHistory = () => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(taskStorageKey) || '[]');
+      if (Array.isArray(saved)) {
+        const cutoff = Date.now() - 30 * 60 * 1000;
+        return saved.filter(item => item && /^[0-9a-f-]{36}$/i.test(item.taskId || '') && typeof item.prompt === 'string' && (!Number.isFinite(Date.parse(item.createdAt)) || Date.parse(item.createdAt) >= cutoff));
+      }
+      return [];
+    } catch { return []; }
+  };
+
+  const saveTaskHistory = (records) => {
+    try { sessionStorage.setItem(taskStorageKey, JSON.stringify(records)); return true; }
+    catch { return false; }
+  };
 
   const adminFetch = (url, options = {}) => fetch(url, {
     ...options,
@@ -285,7 +302,7 @@ function initLocalCodeAgentHandlers() {
     title.textContent = ({
       complete: 'Luna response',
       pushed: 'Luna pushed a change',
-      reporting: 'Push outcome needs checking',
+      uncertain: 'Push outcome needs checking',
       failed: 'Request failed'
     })[task.status] || 'Luna is working on your request…';
     taskStatus.append(promptLabel, promptEcho, title);
@@ -338,6 +355,44 @@ function initLocalCodeAgentHandlers() {
     void check();
   };
 
+  const renderTaskHistory = () => {
+    if (!taskHistory) return;
+    taskHistory.replaceChildren();
+    const records = readTaskHistory();
+    if (records.length < 2) return;
+    const label = document.createElement('strong');
+    label.textContent = 'Recent Luna requests';
+    taskHistory.appendChild(label);
+    for (const record of records) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = record.prompt.length > 90 ? `${record.prompt.slice(0, 87)}…` : record.prompt;
+      button.addEventListener('click', async () => {
+        taskStatus.hidden = false;
+        taskStatus.dataset.taskId = record.taskId;
+        taskStatus.textContent = 'Loading this Luna result…';
+        try {
+          const response = await adminFetch(`/api/codex/tasks/${encodeURIComponent(record.taskId)}`);
+          if (response.status === 401) { handle401(); return; }
+          if (response.status === 404) {
+            saveTaskHistory(readTaskHistory().filter(item => item.taskId !== record.taskId));
+            renderTaskHistory();
+            taskStatus.textContent = 'This Luna result is no longer available.';
+            return;
+          }
+          if (!response.ok) throw new Error('Could not load this Luna result.');
+          const task = await response.json();
+          if (['running', 'publishing', 'reporting'].includes(task.status)) void pollTask(record.taskId, record.prompt);
+          else {
+            renderTaskUpdate(record.prompt, task);
+            if (task.status === 'pushed') verifyDeployment(task.commit, record.taskId);
+          }
+        } catch (error) { taskStatus.textContent = error.message; }
+      });
+      taskHistory.appendChild(button);
+    }
+  };
+
   const pollTask = async (taskId, prompt) => {
     if (activePoll) window.clearTimeout(activePoll);
     activePoll = true;
@@ -354,7 +409,8 @@ function initLocalCodeAgentHandlers() {
         if (response.status === 404) {
           activePoll = null;
           currentTaskBusy = false;
-          sessionStorage.removeItem(taskStorageKey);
+          saveTaskHistory(readTaskHistory().filter(item => item.taskId !== taskId));
+          renderTaskHistory();
           taskStatus.textContent = 'This Luna result is no longer available. You can send a new request.';
           await refreshConnection();
           setControls();
@@ -365,7 +421,7 @@ function initLocalCodeAgentHandlers() {
         failures = 0;
         renderTaskUpdate(prompt, task);
         if (task.status === 'pushed') verifyDeployment(task.commit, taskId);
-        if (['complete', 'pushed', 'failed', 'reporting'].includes(task.status)) {
+        if (['complete', 'pushed', 'failed', 'uncertain'].includes(task.status)) {
           activePoll = null;
           currentTaskBusy = false;
           setControls();
@@ -406,7 +462,14 @@ function initLocalCodeAgentHandlers() {
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Could not send the request.');
-      sessionStorage.setItem(taskStorageKey, JSON.stringify({ taskId: result.taskId, prompt }));
+      const records = readTaskHistory().filter(item => item.taskId !== result.taskId);
+      records.unshift({ taskId: result.taskId, prompt, createdAt: new Date().toISOString() });
+      if (!saveTaskHistory(records)) {
+        const note = document.createElement('p');
+        note.textContent = 'This browser could not save the request for reload recovery; keep this page open to follow its result.';
+        taskStatus.appendChild(note);
+      }
+      renderTaskHistory();
       submissionInProgress = false;
       submitButton.textContent = 'Working…';
       pollTask(result.taskId, prompt);
@@ -435,12 +498,19 @@ function initLocalCodeAgentHandlers() {
     else startConnectionPolling();
   });
   startConnectionPolling();
-  try {
-    const saved = JSON.parse(sessionStorage.getItem(taskStorageKey) || 'null');
-    if (saved && /^[0-9a-f-]{36}$/i.test(saved.taskId || '') && typeof saved.prompt === 'string') void pollTask(saved.taskId, saved.prompt);
-  } catch {
-    sessionStorage.removeItem(taskStorageKey);
+  let savedTasks = readTaskHistory();
+  if (!savedTasks.length) {
+    try {
+      const legacy = JSON.parse(sessionStorage.getItem('luna-active-task') || 'null');
+      if (legacy && /^[0-9a-f-]{36}$/i.test(legacy.taskId || '') && typeof legacy.prompt === 'string') {
+        savedTasks = [{ taskId: legacy.taskId, prompt: legacy.prompt }];
+        saveTaskHistory(savedTasks);
+        sessionStorage.removeItem('luna-active-task');
+      }
+    } catch { /* Browser storage may be unavailable. */ }
   }
+  renderTaskHistory();
+  if (savedTasks[0]) void pollTask(savedTasks[0].taskId, savedTasks[0].prompt);
 }
 
 function ensureRowStatus(row) {

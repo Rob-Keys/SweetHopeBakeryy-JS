@@ -14,6 +14,9 @@ const repositoryUrl = 'https://github.com/Rob-Keys/SweetHopeBakeryy-JS.git';
 const summaryPath = join(artifactPath, 'summary.txt');
 const patchPath = join(artifactPath, 'change.patch');
 const basePath = join(artifactPath, 'base.txt');
+const relayHttpUrl = relayUrl?.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:').replace(/\/agent\/?$/, '').replace(/\/$/, '');
+let activeLease;
+let pushStarted = false;
 
 function redactSecrets(value) {
   return String(value ?? '')
@@ -46,7 +49,7 @@ function git(args, { timeoutMs = 30000 } = {}) {
 }
 
 async function relayAction(action, data = {}) {
-  const response = await fetch(`${relayUrl.replace(/\/$/, '')}/internal/tasks/${encodeURIComponent(taskId)}/publish-lease`, {
+  const response = await fetch(`${relayHttpUrl}/internal/tasks/${encodeURIComponent(taskId)}/publish-lease`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${relayToken}`, 'Content-Type': 'application/json', ...(data.leaseId ? { 'X-Luna-Publish-Lease': data.leaseId } : {}) },
     body: JSON.stringify({ action, ...data })
@@ -86,8 +89,15 @@ function protectedPath(path) {
     path === 'scripts/publish-luna-cloud.mjs' || path === 'scripts/report-luna-run.mjs' || path === 'wrangler.toml' ||
     path === '.env' || path.startsWith('.env.') || path === '.dev.vars' || /\.(?:pem|key|p12|pfx)$/i.test(path) ||
     path === 'functions/api/_auth.js' || path === 'functions/api/_jwt.js' ||
-    path === 'functions/api/_stripe.js' || path === 'functions/api/_orders.js' || path.startsWith('functions/api/rate/') ||
-    path.startsWith('src/js/stripe/');
+    path === 'functions/api/_stripe.js' || path === 'functions/api/_orders.js' || path === 'functions/api/_kv.js' ||
+    path === 'functions/api/_s3.js' || path === 'functions/api/_deploy.js' ||
+    path === 'functions/api/save-data.js' || path === 'functions/api/delete-data.js' ||
+    path === 'functions/api/upload-images.js' || path === 'functions/api/delete-images.js' ||
+    path === 'functions/api/get-inbox.js' || path === 'functions/api/get-outbox.js' ||
+    path === 'functions/api/send-email.js' ||
+    path.startsWith('functions/api/rate/') || path.startsWith('src/js/stripe/') ||
+    path === 'src/js/pages/checkout.js' || path === 'src/js/pages/return.js' ||
+    path === 'src/js/modules/auth.js';
 }
 
 function containsCredential(text) {
@@ -119,7 +129,8 @@ async function validatePatch() {
   }
   for (const file of changed.filter(file => /\.(?:m?js|cjs)$/.test(file))) await git(['show', `:${file}`]).then(source => {
     return new Promise((resolveCheck, rejectCheck) => {
-      const child = spawn(process.execPath, ['--check', '-'], { cwd: repoPath, stdio: ['pipe', 'ignore', 'pipe'] });
+      const moduleArgs = file.endsWith('.cjs') ? [] : ['--input-type=module'];
+      const child = spawn(process.execPath, [...moduleArgs, '--check', '-'], { cwd: repoPath, stdio: ['pipe', 'ignore', 'pipe'] });
       let stderr = '';
       child.stderr.setEncoding('utf8');
       child.stderr.on('data', chunk => { stderr += chunk; });
@@ -137,10 +148,12 @@ async function publishChanges(changed, summary) {
     return;
   }
   const lease = await relayAction('claim');
+  activeLease = lease;
   await relayAction('validate', { leaseId: lease.leaseId });
   await git(['-c', 'core.hooksPath=/dev/null', '-c', 'user.name=Luna Cloud Agent', '-c', 'user.email=luna-cloud-agent@users.noreply.github.com', 'commit', '-m', 'Apply Luna customization']);
   const commit = await git(['rev-parse', '--short=7', 'HEAD']);
   await relayAction('push-started', { leaseId: lease.leaseId, commit });
+  pushStarted = true;
   await relayAction('validate', { leaseId: lease.leaseId });
   const auth = Buffer.from(`x-access-token:${pushToken}`).toString('base64');
   await git([
@@ -172,7 +185,10 @@ try {
   await publishChanges(changed, summary);
 } catch (error) {
   const message = redactSecrets(error?.message || error).slice(0, 4000);
-  try { await reportTask('failed', 'Luna could not publish the requested change.', message); } catch { /* The relay records an uncertain push separately when a push was started. */ }
+  try {
+    if (activeLease && !pushStarted) await relayAction('failed', { leaseId: activeLease.leaseId, message });
+    else if (!pushStarted) await reportTask('failed', 'Luna could not publish the requested change.', message);
+  } catch { /* The relay expiry preserves an uncertain push separately if publication had started. */ }
   console.error(message);
   process.exitCode = 1;
 }

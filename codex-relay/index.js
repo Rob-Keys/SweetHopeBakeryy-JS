@@ -18,7 +18,7 @@ function validCodexAuth(auth) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname !== '/agent') return new Response('Not found', { status: 404 });
+    if (url.pathname !== '/agent' && !url.pathname.startsWith('/internal/')) return new Response('Not found', { status: 404 });
     const id = env.CODEX_AGENT_RELAY.idFromName('sweet-hope-bakery-codex-agent');
     return env.CODEX_AGENT_RELAY.get(id).fetch(request);
   }
@@ -133,8 +133,7 @@ export class CodeAgentRelay {
         status: 'failed',
         message: 'GitHub could not start Luna’s temporary runner. Check its Actions configuration.',
         summary: String(error?.message || error).slice(0, 300),
-        updatedAt: new Date().toISOString()
-      });
+        updatedAt: new Date().toISOString(),
         retainUntil: Date.now() + TASK_RETENTION_MS
       });
       await this.scheduleCleanup();
@@ -180,6 +179,13 @@ export class CodeAgentRelay {
       await this.saveTask({ ...task, status: 'reporting', commit: body.commit, message: `Push started for commit ${body.commit}.`, updatedAt: new Date().toISOString() });
       this.log('push_started', { taskId, commit: body.commit });
       return Response.json({ accepted: true });
+    }
+    if (body.action === 'failed' && task.status === 'publishing') {
+      const failedTask = { ...task, status: 'failed', message: 'Luna could not publish the requested change.', summary: (await this.redactTaskText(body.message || 'Publishing failed.')).slice(0, 4000), updatedAt: new Date().toISOString(), retainUntil: Date.now() + TASK_RETENTION_MS };
+      await this.saveTask(failedTask);
+      await this.scheduleCleanup();
+      this.log('publish_failed', { taskId });
+      return Response.json({ status: 'failed' });
     }
     if (body.action === 'pushed') {
       if (task.status !== 'reporting' || typeof body.commit !== 'string' || !/^[0-9a-f]{7,40}$/i.test(body.commit)) return Response.json({ error: 'Invalid pushed outcome.' }, { status: 400 });
@@ -339,13 +345,14 @@ export class CodeAgentRelay {
       return;
     }
     if (task?.status === 'reporting') {
-      await this.saveTask({ ...task, message: `Push started for commit ${task.commit || 'unknown'}, but Luna could not confirm whether it completed. Check GitHub Actions and main before retrying.`, updatedAt: new Date().toISOString(), retainUntil: now + TASK_RETENTION_MS });
+      await this.saveTask({ ...task, status: 'uncertain', message: `Push started for commit ${task.commit || 'unknown'}, but Luna could not confirm whether it completed. Check GitHub Actions and main before retrying.`, updatedAt: new Date().toISOString(), retainUntil: now + TASK_RETENTION_MS });
       await this.scheduleCleanup();
       this.log('push_outcome_uncertain', { taskId: task.taskId, commit: task.commit || null });
       return;
     }
     if (['running', 'publishing'].includes(task?.status)) {
-      await this.saveTask({ taskId: task.taskId, status: 'failed', message: 'Luna’s temporary runner did not finish before its time limit.', updatedAt: new Date().toISOString(), retainUntil: now + TASK_RETENTION_MS });
+      const { prompt: _prompt, ...expiredTask } = task;
+      await this.saveTask({ ...expiredTask, status: 'failed', message: 'Luna’s temporary runner did not finish before its time limit.', updatedAt: new Date().toISOString(), retainUntil: now + TASK_RETENTION_MS });
       this.log('task_expired', { taskId: task.taskId, workflowRunUrl: task.workflowRunUrl || null });
       for (const socket of this.ctx.getWebSockets()) {
         try {

@@ -133,6 +133,7 @@ export function renderLocalCodeAgentPanel() {
         <label for="local-code-agent-prompt">Ask Luna a question or describe a change</label>
         <textarea id="local-code-agent-prompt" name="prompt" rows="5" maxlength="12000" placeholder="For example: Add an FAQ accordion to the Contact page with keyboard accessible controls." required disabled></textarea>
         <div class="local-code-agent-actions"><small>Requested changes are autonomously implemented, committed, and deployed.</small><button class="btn btn-cookie" type="submit" data-agent-submit disabled>Send to Luna</button></div>
+        <div class="local-agent-history" data-agent-history aria-label="Recent Luna requests"></div>
         <div class="local-agent-task" data-agent-task aria-live="polite" hidden></div>
       </form>
     </section>`;
