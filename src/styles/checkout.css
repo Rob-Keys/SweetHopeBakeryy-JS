@@ -29,8 +29,32 @@ input:not([type="hidden"]), select, textarea {
 }
 input[type="date"] { min-height: 2.875rem; padding: .45rem .5rem !important; }
 .page-status { min-height: 10rem; padding: 2rem; text-align: center; }
+#checkout-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--section-space);
+    margin: var(--section-space) var(--page-gutter) !important;
+}
+#checkout-content > .col-md-1 { display: none; }
+#checkout-content > .col-md-5 { width: 100%; min-width: 0; padding: 0; }
+#checkout-content .card-header,
+#checkout-content .card-body { padding: 1.25rem; }
+#checkout-content .card h2,
+#checkout-content .card h5,
+#order-summary-list p { margin-bottom: 0; }
+#order-summary-list .list-group-item { padding: 1rem 1.25rem; gap: 1rem; overflow-wrap: anywhere; }
+#order-summary-list .list-group-item > p:last-child { flex-shrink: 0; }
+#checkout-form > label { display: block; margin-bottom: .5rem !important; }
+#checkout-form > input:not([type="hidden"]) { margin-bottom: 1rem !important; }
+#checkout-form > h4 { margin: .5rem 0 .75rem !important; }
+#checkout-form > [role]:not(:empty) { margin-block: .75rem; }
+.pickup-details-container > .row { align-items: center; row-gap: .5rem; margin-bottom: 1rem; }
+.pickup-details-container > .row:last-child { margin-bottom: 0; }
+.pickup-details-container p,
+.pickup-details-container h5 { margin-bottom: 0; }
+#pay-button { padding: .75rem 1.25rem; border-radius: .5rem; }
 @media (max-width: 991px) {
-    .left-side{
-        margin-bottom: 2rem;
-    }
+    #checkout-content { grid-template-columns: minmax(0, 1fr); }
+    .pickup-details-container .row > [class*="col-"] { width: 100%; }
+    .pickup-details-container .row > .col-6:empty { display: none; }
 }

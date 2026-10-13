@@ -1,12 +1,35 @@
-.menu-row{
+#customize-content .menu-row{
     background-color: white;
     border: black 1px solid;
-    padding: 1rem 0;
+    padding: 1.25rem .5rem;
     min-width: 900px;
+    margin: 0 0 1rem;
+    row-gap: 1rem;
 }
 #customize-content { min-width: 0; }
 #customize-content .m-5 { margin: clamp(1rem, 3vw, 3rem) !important; }
 #customize-content > .m-5 { overflow-x: auto; }
+.menu-row > [class*="col-"] { min-width: 0; overflow-wrap: anywhere; }
+.menu-row textarea,
+.menu-row input:not([type="hidden"]) { width: 100%; max-width: 100%; box-sizing: border-box; padding: .5rem; }
+.menu-row h5,
+.menu-row p { margin-bottom: 0; }
+.menu-row .right-align { gap: .75rem; }
+.menu-row .right-align .btn { margin-top: 0 !important; }
+.edit-images-container { padding: .5rem; }
+.menu-row .arrow { padding: .5rem .25rem; }
+.menu-row .arrow.left { left: .25rem; }
+.menu-row .arrow.right { right: .25rem; }
+#mail-content { margin: var(--section-space) var(--page-gutter); min-width: 0; overflow-wrap: anywhere; }
+#mail-content > h2 { margin-bottom: 1.25rem; }
+#mail-content > h2:not(:first-child) { margin-top: 2rem; }
+#mail-content > .bg-light { margin-inline: 0 !important; padding: 1.25rem; border-radius: .5rem; }
+#mail-content > .row { margin: 0; row-gap: 1.5rem; --bs-gutter-x: 0; justify-content: space-between; }
+#compose-form { margin: 0 !important; gap: .75rem; }
+#compose-form input { min-width: 0; min-height: 2.875rem; padding: .55rem .75rem; }
+#body-preview { padding: 1rem; }
+#body-preview:empty { padding: 0; }
+#compose-form .btn { align-self: flex-start; }
 .customize-loading { min-height: 12rem; }
 .btn-danger{
 	color: white !important;

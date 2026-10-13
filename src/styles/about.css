@@ -1,7 +1,15 @@
 .content{
-  margin: 2rem 4rem;
+  margin: var(--section-space) var(--page-gutter);
   color: #3f2a14;
 }
+#about-sections > .row {
+  margin-inline: 0;
+  margin-bottom: var(--section-space) !important;
+  --bs-gutter-x: clamp(1.5rem, 4vw, 3rem);
+}
+#about-sections h5 { line-height: 1.5; }
+.about-us-body .rob-card { margin: 0; row-gap: 1.5rem; }
+.rob-card h4 { line-height: 1.5; margin-bottom: 0; }
 .caroline-image {
   display: block;
   width: 100%;
@@ -74,11 +82,10 @@ div > h5{
 }
 @media (max-width: 991px) {
   .content {
-    margin: 1rem;
+    margin: var(--section-space) var(--page-gutter);
   }
   div > h2{
-    margin-top: 1rem;
-    margin-bottom: 2rem;
+    margin-top: 1.5rem;
   }
   .rob-card {
     text-align: center;
@@ -88,7 +95,11 @@ div > h5{
     justify-content: center;
   }
   .mobile-divider {
-    width: 100vw;
-    display: inline; /* Shown only on mobile. */
+    width: 100%;
+    display: block;
+    margin-bottom: 0;
   }
+  #about-sections > .row > .col-6 { width: 100%; padding-inline: 0; }
+  .rob-card > .col-3, .rob-card > .col-9 { width: 100%; }
+  .rob-image { max-width: 16rem; }
 }

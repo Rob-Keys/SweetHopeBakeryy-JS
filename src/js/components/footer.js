@@ -10,7 +10,7 @@ export function renderFooter() {
 
   el.innerHTML = `
     </main>
-    <footer class="d-flex align-items-center justify-content-between pt-2 ps-5 pe-5">
+    <footer class="d-flex align-items-center justify-content-between">
       <p>&copy; 2026 sweethopebakeryy ALL RIGHTS RESERVED</p>
       <p class="footer-socials"><i class="fa-brands fa-instagram"></i> Instagram: <a href="https://www.instagram.com/sweethopebakeryy/">@sweethopebakeryy </a> </p>
     </footer>`;

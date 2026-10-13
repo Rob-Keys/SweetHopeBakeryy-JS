@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "npx serve src -l 8080",
+    "test:fades": "node --test tests/fades.test.mjs",
     "luna:preview": "node scripts/luna-visual-preview.mjs",
     "cloud-agent": "node scripts/codex-cloud-agent.mjs",
     "setup-cloud-agent": "node scripts/setup-luna-cloud.mjs"

@@ -86,15 +86,22 @@ async function loadProducts() {
         const message = document.createElement('h5');
         message.textContent = 'Added Successfully!';
         message.classList.add('fade-in-out');
+        message.setAttribute('role', 'status');
         form.appendChild(message);
-        requestAnimationFrame(() => {
-          message.classList.add('visible');
-        });
         setTimeout(() => {
-          message.classList.remove('visible');
-          message.addEventListener('transitionend', () => {
-            if (message.parentNode) form.removeChild(message);
-          });
+          let removalTimer;
+          const removeMessage = () => {
+            clearTimeout(removalTimer);
+            message.removeEventListener('transitionend', onTransitionEnd);
+            message.remove();
+          };
+          const onTransitionEnd = (event) => {
+            if (event.target === message && event.propertyName === 'opacity') removeMessage();
+          };
+          message.addEventListener('transitionend', onTransitionEnd);
+          // transitionend is absent when motion is disabled or interrupted.
+          removalTimer = setTimeout(removeMessage, 600);
+          message.classList.add('fade-out');
         }, 1000);
       } catch (error) {
         console.error('Error adding to cart:', error);

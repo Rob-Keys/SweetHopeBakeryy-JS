@@ -2,13 +2,19 @@
 	display: flex;
 	flex-direction: column;
 }
+.wrapper > #contact-content { margin-inline: auto !important; }
 .content {
-    padding: 1.25rem;
+    padding: clamp(1.5rem, 4vw, 2.5rem);
+    width: calc(100% - 2 * var(--page-gutter));
     max-width: 800px;
-    margin: 0 auto;
+    margin-inline: auto !important;
     background-color: #fff;
     border-radius: 8px;
 }
+.contact-info { overflow-wrap: anywhere; }
+.contact-info p + p { margin-top: 1rem; }
+.contact-extra-section { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #eadfce; }
+.contact-extra-section p:last-child { margin-bottom: 0; }
 
 .subtitle {
     font-size: 2.5rem;

@@ -133,41 +133,64 @@ export function initImageSliders() {
   });
 }
 
+const fadeSelector = '.fade-in-up, .fade-in-right, .fade-in-left';
+const essentialContentSelector = 'h1, h2, h3, nav, form, button, .btn, a[href]';
+const initializedFades = new WeakSet();
+const pendingFades = new Set();
+const fadeMotionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+let fadeObserver;
+
+fadeMotionQuery?.addEventListener?.('change', (event) => {
+  if (!event.matches) return;
+  // Cancel current entrances without replaying them when motion is re-enabled.
+  document.querySelectorAll(fadeSelector).forEach((element) => {
+    element.classList.remove('fade-visible');
+  });
+});
+
+function canFade(element) {
+  return !element.matches(essentialContentSelector) &&
+    !element.querySelector(essentialContentSelector);
+}
+
 export function initFadeEffects() {
-  const elements = [...document.querySelectorAll('.fade-in-up, .fade-in-right, .fade-in-left')]
-    .filter((el) => !el.matches('h1, h2, h3, nav, form, button, .btn, a[href]') &&
-      !el.querySelector('h1, h2, h3, nav, form, button, .btn, a[href]'));
+  // A rerender can detach targets before they ever intersect.
+  pendingFades.forEach((element) => {
+    if (!element.isConnected) {
+      fadeObserver.unobserve(element);
+      pendingFades.delete(element);
+    }
+  });
+  const elements = [...document.querySelectorAll(fadeSelector)]
+    .filter((element) => !initializedFades.has(element) && canFade(element));
   if (!elements.length) return;
 
-  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    elements.forEach((el) => el.classList.add('fade-visible'));
-    return;
+  // Fades enhance visible content; unavailable observers must never hide it.
+  if (typeof IntersectionObserver !== 'function') return;
+
+  if (!fadeObserver) {
+    fadeObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.target.isConnected || entry.isIntersecting) {
+          fadeObserver.unobserve(entry.target);
+          pendingFades.delete(entry.target);
+          // Async rendering may have added controls since registration.
+          if (entry.target.isConnected && canFade(entry.target) && !fadeMotionQuery?.matches) {
+            entry.target.classList.add('fade-visible');
+          }
+        }
+      });
+    }, {
+      threshold: 0,
+      rootMargin: '80px 0px'
+    });
   }
 
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('fade-visible');
-        observer.unobserve(entry.target);
-      }
-    });
-  }, {
-    threshold: 0.05,
-    rootMargin: '80px 0px'
+  elements.forEach((element) => {
+    initializedFades.add(element);
+    pendingFades.add(element);
+    fadeObserver.observe(element);
   });
-
-  const startObserving = () => {
-    elements.forEach((el) => {
-      el.classList.add('fade-ready');
-      observer.observe(el);
-    });
-  };
-
-  if (typeof requestAnimationFrame === 'function') {
-    requestAnimationFrame(() => requestAnimationFrame(startObserving));
-  } else {
-    startObserving();
-  }
 }
 
 export function initShared() {
