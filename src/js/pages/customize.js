@@ -296,6 +296,7 @@ function initLocalCodeAgentHandlers() {
   const renderTaskUpdate = (prompt, task) => {
     taskStatus.replaceChildren();
     const isCreatingEnvironment = task.status === 'running' && task.message === "Creating Luna's environment…";
+    const isFinal = ['complete', 'pushed', 'uncertain', 'failed'].includes(task.status);
     const promptLabel = document.createElement('strong');
     promptLabel.textContent = 'Your request to Luna';
     const promptEcho = document.createElement('pre');
@@ -308,12 +309,12 @@ function initLocalCodeAgentHandlers() {
       failed: 'Request failed'
     })[task.status] || 'Luna is working on your request…';
     taskStatus.append(promptLabel, promptEcho, title);
-    if (task.summary) {
+    if (isFinal && task.summary) {
       const summary = document.createElement('pre');
       summary.textContent = task.summary;
       taskStatus.appendChild(summary);
     }
-    if (task.message && !isCreatingEnvironment) {
+    if (task.message && (isFinal || isCreatingEnvironment)) {
       const message = document.createElement('p');
       message.textContent = task.message;
       taskStatus.appendChild(message);
