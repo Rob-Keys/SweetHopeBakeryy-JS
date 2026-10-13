@@ -54,6 +54,8 @@
 
 /* Read-only public-site preview at the top of the Customize page. */
 .site-preview {
+    /* Keep the preview hidden while its render call is parked for later recovery. */
+    display: none;
     --preview-brown: #3f2a14;
     --preview-cream: #fdf5e6;
     --preview-paper: #fffdf7;
