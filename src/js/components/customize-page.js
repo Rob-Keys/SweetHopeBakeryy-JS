@@ -124,8 +124,8 @@ export function renderLocalCodeAgentPanel() {
   return `
     <section class="local-code-agent" aria-labelledby="local-code-agent-title">
       <div class="local-code-agent-copy">
-        <h2 id="local-code-agent-title">Ask Luna</h2>
-        <p>Ask a question or describe a change.</p>
+        <h2 id="local-code-agent-title">Agentic Customization</h2>
+        <p>Ask questions about the site or describe a change you’d like. Luna can take it from there and handle your request autonomously.</p>
         <p class="local-agent-connection"><span class="local-agent-indicator" aria-hidden="true"></span><span data-agent-connection>Checking Luna's availability…</span></p>
       </div>
       <form class="local-code-agent-form" id="local-code-agent-form">
