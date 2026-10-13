@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { isAutonomousPublishPath } from './luna-publish-policy.mjs';
+import { validateKvChanges, hashJson } from './luna-kv-data.mjs';
 
 const relayToken = process.env.CODEX_AGENT_RELAY_TOKEN;
 const relayUrl = process.env.CODEX_AGENT_RELAY_URL;
@@ -15,7 +16,13 @@ const repositoryUrl = 'https://github.com/Rob-Keys/SweetHopeBakeryy-JS.git';
 const summaryPath = join(artifactPath, 'summary.txt');
 const patchPath = join(artifactPath, 'change.patch');
 const basePath = join(artifactPath, 'base.txt');
+const kvChangesPath = join(artifactPath, 'kv-changes.json');
+const kvBaselinePath = join(artifactPath, 'kv-baseline.json');
 const relayHttpUrl = relayUrl?.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:').replace(/\/agent\/?$/, '').replace(/\/$/, '');
+const cloudflareToken = process.env.LUNA_CLOUDFLARE_API_TOKEN;
+const cloudflareAccountId = process.env.LUNA_CLOUDFLARE_ACCOUNT_ID;
+const cloudflareNamespaceId = process.env.LUNA_CLOUDFLARE_KV_NAMESPACE_ID;
+const cloudflareZoneId = process.env.LUNA_CLOUDFLARE_ZONE_ID;
 let activeLease;
 let pushStarted = false;
 
@@ -32,7 +39,9 @@ if (!relayToken || !relayUrl || !pushToken || !/^[0-9a-f-]{36}$/i.test(taskId ||
 
 function git(args, { timeoutMs = 30000 } = {}) {
   return new Promise((resolveGit, rejectGit) => {
-    const child = spawn('git', args, { cwd: repoPath, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const childEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
+    delete childEnv.LUNA_CLOUDFLARE_API_TOKEN;
+    const child = spawn('git', args, { cwd: repoPath, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     const timer = setTimeout(() => child.kill('SIGTERM'), timeoutMs);
@@ -102,7 +111,7 @@ async function validatePatch() {
     throw new Error('main changed while Luna was working. No changes were published; please submit the request again.');
   }
   if (await git(['status', '--porcelain'])) throw new Error('The isolated publisher checkout is not clean.');
-  await git(['apply', '--index', '--binary', '--', patchPath]);
+  if (patch.length) await git(['apply', '--index', '--binary', '--', patchPath]);
   await git(['diff', '--cached', '--check']);
   const changed = (await git(['diff', '--cached', '--name-only', '-z'])).split('\0').filter(Boolean);
   const stagedModes = new Map((await git(['ls-files', '--stage', '-z'])).split('\0').filter(Boolean).map(entry => {
@@ -129,17 +138,114 @@ async function validatePatch() {
       child.stdin.end(source);
     });
   });
-  return changed;
+  let kvOperations = [];
+  let kvBaseline = {};
+  const kvArtifact = await readFile(kvChangesPath, 'utf8').catch(() => null);
+  const baselineArtifact = await readFile(kvBaselinePath, 'utf8').catch(() => null);
+  if ((kvArtifact === null) !== (baselineArtifact === null)) throw new Error('The KV change artifact is incomplete.');
+  if (kvArtifact !== null) {
+    if (changed.length) throw new Error('Submit KV content edits and source code edits as separate Luna requests.');
+    if (Buffer.byteLength(kvArtifact) > 1024 * 1024) throw new Error('The KV change artifact exceeds the 1 MB limit.');
+    if (containsCredential(kvArtifact)) throw new Error('The KV change artifact appears to contain a credential; it was not applied.');
+    kvOperations = validateKvChanges(JSON.parse(kvArtifact));
+    kvBaseline = JSON.parse(baselineArtifact);
+    for (const operation of kvOperations) {
+      if (!/^[0-9a-f]{64}$/i.test(kvBaseline[operation.tableName] || '')) throw new Error(`The baseline hash for ${operation.tableName} is missing.`);
+    }
+  }
+  return { changed, kvOperations, kvBaseline };
 }
 
-async function publishChanges(changed, summary) {
-  if (!changed.length) {
+async function cloudflareApi(path, init = {}) {
+  const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
+    ...init,
+    headers: { Authorization: `Bearer ${cloudflareToken}`, ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...init.headers }
+  });
+  if (!response.ok) throw new Error(`Cloudflare rejected a KV operation (${response.status}).`);
+  return response;
+}
+
+async function applyKvChanges(operations, baselineHashes) {
+  if (!cloudflareToken || !cloudflareAccountId || !cloudflareNamespaceId || !cloudflareZoneId) {
+    throw new Error('The trusted publisher is missing its scoped Cloudflare KV settings.');
+  }
+  const valueUrl = table => `/accounts/${encodeURIComponent(cloudflareAccountId)}/storage/kv/namespaces/${encodeURIComponent(cloudflareNamespaceId)}/values/${encodeURIComponent(`data/${table}.json`)}`;
+  const originals = new Map();
+  const tables = new Map();
+  for (const table of new Set(operations.map(operation => operation.tableName))) {
+    const response = await cloudflareApi(valueUrl(table));
+    let value;
+    try { value = await response.json(); } catch { throw new Error(`The live ${table} KV value is not valid JSON.`); }
+    if (!Array.isArray(value)) throw new Error(`The live ${table} KV value is not a JSON array.`);
+    if (hashJson(value) !== baselineHashes[table]) throw new Error(`The live ${table} table changed while Luna was working. No KV changes were applied; please submit the request again.`);
+    originals.set(table, value);
+    tables.set(table, structuredClone(value));
+  }
+  for (const operation of operations) {
+    const table = tables.get(operation.tableName);
+    const partitionKey = operation.tableName === 'products' ? 'itemName' : 'sectionIndex';
+    const index = table.findIndex(item => String(item?.[partitionKey]) === operation.key);
+    if (operation.action === 'delete') {
+      if (index < 0) throw new Error(`The requested ${operation.tableName} item ${operation.key} no longer exists.`);
+      table.splice(index, 1);
+    } else if (index < 0) table.push(operation.item);
+    else table[index] = operation.item;
+  }
+  const written = [];
+  let attempting;
+  try {
+    for (const [table, value] of tables) {
+      attempting = table;
+      const response = await cloudflareApi(valueUrl(table), { method: 'PUT', body: JSON.stringify(value) });
+      const result = await response.json().catch(() => ({}));
+      if (result.success !== true) throw new Error(`Cloudflare could not update the ${table} table.`);
+      written.push(table);
+      attempting = undefined;
+    }
+  } catch (error) {
+    const rollbackTables = [...new Set([...written, ...(attempting ? [attempting] : [])])].reverse();
+    for (const table of rollbackTables) {
+      await cloudflareApi(valueUrl(table), { method: 'PUT', body: JSON.stringify(originals.get(table)) }).catch(() => {});
+    }
+    await cloudflareApi(`/zones/${encodeURIComponent(cloudflareZoneId)}/purge_cache`, { method: 'POST', body: JSON.stringify({ purge_everything: true }) }).catch(() => {});
+    throw error;
+  }
+  try {
+    const purgeResponse = await cloudflareApi(`/zones/${encodeURIComponent(cloudflareZoneId)}/purge_cache`, { method: 'POST', body: JSON.stringify({ purge_everything: true }) });
+    const purgeResult = await purgeResponse.json().catch(() => ({}));
+    return purgeResult.success !== true ? 'KV values were updated, but the CDN cache purge did not succeed.' : '';
+  } catch {
+    return 'KV values were updated, but the CDN cache purge did not succeed.';
+  }
+}
+
+async function publishChanges({ changed, kvOperations, kvBaseline }, summary) {
+  if (!changed.length && !kvOperations.length) {
     await reportTask('complete', 'Luna finished without source changes.', redactSecrets(summary || 'No source changes were needed.'));
     return;
   }
   const lease = await relayAction('claim');
   activeLease = lease;
   await relayAction('validate', { leaseId: lease.leaseId });
+  if (kvOperations.length) {
+    const warning = await applyKvChanges(kvOperations, kvBaseline);
+    const details = `Updated ${kvOperations.length} requested KV change${kvOperations.length === 1 ? '' : 's'}.${warning ? ` ${warning}` : ''}`;
+    let reportError;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await relayAction('complete', { leaseId: lease.leaseId, summary: `${redactSecrets(summary)}\n\n${details}` });
+        reportError = null;
+        break;
+      } catch (error) {
+        reportError = error;
+        await new Promise(resolveWait => setTimeout(resolveWait, 1000 * (attempt + 1)));
+      }
+    }
+    if (reportError) throw new Error(`KV updates were applied, but the relay could not record completion: ${reportError.message}`);
+    activeLease = null;
+    console.log(details);
+    return;
+  }
   await git(['-c', 'core.hooksPath=/dev/null', '-c', 'user.name=Luna Cloud Agent', '-c', 'user.email=luna-cloud-agent@users.noreply.github.com', 'commit', '-m', 'Apply Luna customization']);
   const commit = await git(['rev-parse', '--short=7', 'HEAD']);
   await relayAction('push-started', { leaseId: lease.leaseId, commit });
@@ -168,11 +274,11 @@ async function publishChanges(changed, summary) {
 }
 
 try {
-  const [summary, changed] = await Promise.all([
+  const [summary, result] = await Promise.all([
     readFile(summaryPath, 'utf8').catch(() => 'Luna finished the request.'),
     validatePatch()
   ]);
-  await publishChanges(changed, summary);
+  await publishChanges(result, summary);
 } catch (error) {
   const message = redactSecrets(error?.message || error).slice(0, 4000);
   try {

@@ -82,6 +82,10 @@ jobs:
           CODEX_AGENT_RELAY_TOKEN: ${{ secrets.CODEX_AGENT_RELAY_TOKEN }}
           CODEX_AGENT_RELAY_URL: ${{ vars.CODEX_AGENT_RELAY_URL }}
           LUNA_GITHUB_PUSH_TOKEN: ${{ secrets.LUNA_GITHUB_PUSH_TOKEN }}
+          LUNA_CLOUDFLARE_API_TOKEN: ${{ secrets.LUNA_CLOUDFLARE_API_TOKEN }}
+          LUNA_CLOUDFLARE_ACCOUNT_ID: ${{ vars.LUNA_CLOUDFLARE_ACCOUNT_ID }}
+          LUNA_CLOUDFLARE_KV_NAMESPACE_ID: ${{ vars.LUNA_CLOUDFLARE_KV_NAMESPACE_ID }}
+          LUNA_CLOUDFLARE_ZONE_ID: ${{ vars.LUNA_CLOUDFLARE_ZONE_ID }}
           INPUT_TASK_ID: ${{ inputs.taskId }}
           LUNA_ARTIFACT_DIR: ${{ runner.temp }}/luna-artifact
         run: node scripts/publish-luna-cloud.mjs

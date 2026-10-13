@@ -171,6 +171,9 @@ export class CodeAgentRelay {
       return Response.json({ leaseId: lease.id, expiresAt: lease.expiresAt });
     }
     const leaseId = request.headers.get('X-Luna-Publish-Lease') || body.leaseId;
+    if (body.action === 'complete' && task.status === 'complete' && task.publishLease?.id === leaseId) {
+      return Response.json({ status: 'complete' });
+    }
     if (!['publishing', 'reporting'].includes(task.status) || !task.publishLease || task.publishLease.id !== leaseId || Date.now() >= task.publishLease.expiresAt) {
       return Response.json({ error: 'The Luna publish lease is missing or expired.' }, { status: 409 });
     }
@@ -186,6 +189,20 @@ export class CodeAgentRelay {
       await this.scheduleCleanup();
       this.log('publish_failed', { taskId });
       return Response.json({ status: 'failed' });
+    }
+    if (body.action === 'complete' && task.status === 'publishing') {
+      const completedTask = {
+        ...task,
+        status: 'complete',
+        message: 'Luna updated the requested content in KV.',
+        summary: typeof body.summary === 'string' ? (await this.redactTaskText(body.summary)).slice(0, 12000) : '',
+        updatedAt: new Date().toISOString(),
+        retainUntil: Date.now() + TASK_RETENTION_MS
+      };
+      await this.saveTask(completedTask);
+      await this.scheduleCleanup();
+      this.log('kv_update_recorded', { taskId });
+      return Response.json({ status: 'complete' });
     }
     if (body.action === 'pushed') {
       if (task.status !== 'reporting' || typeof body.commit !== 'string' || !/^[0-9a-f]{7,40}$/i.test(body.commit)) return Response.json({ error: 'Invalid pushed outcome.' }, { status: 400 });
@@ -261,7 +278,7 @@ export class CodeAgentRelay {
         await this.saveTask({
           ...taskWithoutPrompt,
           deadlineAt,
-          message: 'Luna finished editing and is preparing the push.',
+          message: 'Luna finished editing and is preparing the update.',
           updatedAt: new Date().toISOString()
         });
       }
@@ -325,7 +342,7 @@ export class CodeAgentRelay {
       };
       if (typeof data.summary === 'string') updatedTask.summary = (await this.redactTaskText(data.summary)).slice(0, 12000);
       if (data.phase === 'edited' && status === 'running' && attachment.phase === 'agent') updatedTask.phase = 'edited';
-      if (attachment.phase === 'finalize' && !['pushed', 'failed'].includes(status)) return;
+      if (attachment.phase === 'finalize' && !['complete', 'pushed', 'failed'].includes(status)) return;
       await this.saveTask(updatedTask);
       if (['complete', 'pushed', 'failed'].includes(status)) {
         updatedTask.retainUntil = Date.now() + TASK_RETENTION_MS;
