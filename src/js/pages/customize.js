@@ -81,7 +81,7 @@ async function loadCustomize() {
     <h2 class="subtitle">Edit Menu</h2>
     <p>"Prices" will create a dropdown menu of those quantities at those prices. So "6:10, 12:15", would mean 6 for $10, or 12 for $15.</p>
     <p>"Customizations" currently dont do anything and you can just leave that field blank for now.</p>
-    <p>I recommend uploading images that are of filetype .avif, as theyre most efficient size-wise and will make your site load faster. To convert a .png or .jpg to .avif you can use a site like: <a href="https://cloudinary.com/tools/jpg-to-avif" target="_blank">JPEG-To-Avif Converter</a></p>
+    <p>AVIF is preferred for still images because it keeps files small and pages fast. Attach an image, GIF, or video to Luna and describe where you want it used; she can convert still images to AVIF, animated GIFs to WebP, and videos to WebM when appropriate. Luna keeps attachments private and removes them after the request.</p>
     <div class="row menu-row">
       <div class="col-2"><h5>Product Name</h5></div>
       <div class="col-2"><h5>Description</h5></div>
