@@ -1,0 +1,87 @@
+name: Luna temporary cloud runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      taskId:
+        description: Active Luna relay task ID
+        required: true
+        type: string
+
+concurrency:
+  group: luna-cloud-runner
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  edit:
+    if: github.repository == 'Rob-Keys/SweetHopeBakeryy-JS' && inputs.taskId != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out the dispatched main revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Record workflow run for task diagnostics
+        env:
+          CODEX_AGENT_RELAY_TOKEN: ${{ secrets.CODEX_AGENT_RELAY_TOKEN }}
+          CODEX_AGENT_RELAY_URL: ${{ vars.CODEX_AGENT_RELAY_URL }}
+          INPUT_TASK_ID: ${{ inputs.taskId }}
+        run: node scripts/report-luna-run.mjs
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+
+      - name: Install pinned Codex CLI
+        run: npm install --global @openai/codex@0.162.1
+
+      - name: Run Luna
+        env:
+          CODEX_AGENT_RELAY_TOKEN: ${{ secrets.CODEX_AGENT_RELAY_TOKEN }}
+          CODEX_AGENT_RELAY_URL: ${{ vars.CODEX_AGENT_RELAY_URL }}
+          INPUT_TASK_ID: ${{ inputs.taskId }}
+        run: node scripts/codex-cloud-agent.mjs
+
+      - name: Upload constrained change artifact
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08
+        with:
+          name: luna-${{ inputs.taskId }}
+          path: ${{ runner.temp }}/luna-${{ inputs.taskId }}/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: edit
+    if: needs.edit.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out trusted publisher code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Download edit artifact
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
+        with:
+          name: luna-${{ inputs.taskId }}
+          path: ${{ runner.temp }}/luna-artifact
+
+      - name: Validate and publish
+        env:
+          CODEX_AGENT_RELAY_TOKEN: ${{ secrets.CODEX_AGENT_RELAY_TOKEN }}
+          CODEX_AGENT_RELAY_URL: ${{ vars.CODEX_AGENT_RELAY_URL }}
+          LUNA_GITHUB_PUSH_TOKEN: ${{ secrets.LUNA_GITHUB_PUSH_TOKEN }}
+          INPUT_TASK_ID: ${{ inputs.taskId }}
+          LUNA_ARTIFACT_DIR: ${{ runner.temp }}/luna-artifact
+        run: node scripts/publish-luna-cloud.mjs

@@ -3,14 +3,16 @@
 import { renderHeader } from '../components/header.js';
 import { renderFooter } from '../components/footer.js';
 import { initShared, ImageSlider } from '../shared.js';
-import { isAuthenticated, setDesiredPage, getAuthToken } from '../modules/auth.js';
+import { isAuthenticated, setDesiredPage, getAuthToken, handle401 } from '../modules/auth.js';
 import { getTable, putItem, removeItem } from '../modules/database.js';
 import { uploadImages, deleteImages } from '../aws/s3.js';
 import { renderPageSectionEditor, renderLocalCodeAgentPanel } from '../components/customize-page.js';
 import { escapeHtml } from '../modules/escape.js';
+import { showError } from '../modules/page-state.js';
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
   renderHeader();
+  renderFooter();
 
   // Auth guard: redirect to login if session is missing.
   if (!isAuthenticated()) {
@@ -19,16 +21,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  const container = document.getElementById('customize-content');
-  if (!container) { renderFooter(); return; }
+  loadCustomize();
+});
 
+let lunaPanel;
+
+async function loadCustomize() {
+  const container = document.getElementById('customize-content');
+  if (!container) return;
+  if (!lunaPanel) {
+    container.innerHTML = renderLocalCodeAgentPanel();
+    lunaPanel = container.firstElementChild;
+    initLocalCodeAgentHandlers();
+  } else {
+    container.replaceChildren(lunaPanel);
+  }
+  const loadingStatus = document.createElement('p');
+  loadingStatus.className = 'page-status';
+  loadingStatus.setAttribute('role', 'status');
+  loadingStatus.textContent = 'Loading editor data…';
+  container.setAttribute('aria-busy', 'true');
+  container.append(loadingStatus);
+  try {
   // Fetch all editable data.
-  const [products, homeSections, aboutSections, contactSections] = await Promise.all([
+  const tableNames = ['products', 'home_page', 'about_page', 'contact_page'];
+  const tableResults = await Promise.allSettled([
     getTable('products'),
     getTable('home_page'),
     getTable('about_page'),
     getTable('contact_page')
   ]);
+  const tableData = Object.fromEntries(tableNames.map((name, index) => [
+    name,
+    tableResults[index].status === 'fulfilled' && Array.isArray(tableResults[index].value) ? tableResults[index].value : []
+  ]));
+  const tableErrors = Object.fromEntries(tableNames.map((name, index) => [name, tableResults[index].status === 'rejected' ? tableResults[index].reason : null]));
+  const { products, home_page: homeSections, about_page: aboutSections, contact_page: contactSections } = tableData;
 
   // Sort sections by index.
   homeSections.sort((a, b) => Number(a.sectionIndex) - Number(b.sectionIndex));
@@ -48,7 +76,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   let html = `<div class="m-5">
     <h2 class="subtitle">Edit Menu</h2>
     <p class="text-muted small" id="deployment-version">Commit: loading…</p>
-    ${renderLocalCodeAgentPanel()}
+    <div id="luna-panel-mount"></div>
+    ${tableErrors.products ? '<div class="alert alert-danger">Could not load menu data. The menu editor is unavailable until the data service responds. <button type="button" class="btn btn-sm btn-cookie" data-retry-editor>Retry</button></div>' : ''}
     <p>"Prices" will create a dropdown menu of those quantities at those prices. So "6:10, 12:15", would mean 6 for $10, or 12 for $15.</p>
     <p>"Customizations" currently dont do anything and you can just leave that field blank for now.</p>
     <p>I recommend uploading images that are of filetype .avif, as theyre most efficient size-wise and will make your site load faster. To convert a .png or .jpg to .avif you can use a site like: <a href="https://cloudinary.com/tools/jpg-to-avif" target="_blank">JPEG-To-Avif Converter</a></p>
@@ -132,7 +161,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Add new product form.
-  html += `
+  if (!tableErrors.products) html += `
     <form class="row menu-row add-product-form">
       <div class="col-2"><textarea rows="4" name="partitionKeyValue" placeholder="Product Name" required></textarea></div>
       <div class="col-2"><textarea rows="4" name="description" placeholder="Product description"></textarea></div>
@@ -144,19 +173,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         <input type="hidden" name="partitionKey" value="itemName">
         <button type="submit" class="btn btn-cookie button-2 mt-2">Add Item</button>
       </div>
-    </form>
-  </div>`;
+    </form>`;
+  html += '</div>';
 
   // Temporarily disabled at the user's request; restore this line to show the live site preview:
   // import { renderSitePreview } from '../components/customize-page.js';
   // ${renderSitePreview(products, homeSections, aboutSections, contactSections)}
 
   // Page section editors.
-  html += renderPageSectionEditor(formatSections(homeSections), 'home_page');
-  html += renderPageSectionEditor(formatSections(aboutSections), 'about_page');
-  html += renderPageSectionEditor(formatSections(contactSections), 'contact_page');
+  for (const [tableName, sections] of [['home_page', homeSections], ['about_page', aboutSections], ['contact_page', contactSections]]) {
+    html += tableErrors[tableName]
+      ? `<div class="alert alert-danger">Could not load ${escapeHtml(tableName)} content. Its editor is unavailable until the data service responds. <button type="button" class="btn btn-sm btn-cookie" data-retry-editor>Retry</button></div>`
+      : renderPageSectionEditor(formatSections(sections), tableName);
+  }
 
   container.innerHTML = html;
+  container.removeAttribute('aria-busy');
+  container.querySelector('#luna-panel-mount')?.replaceWith(lunaPanel);
+  container.querySelectorAll('[data-retry-editor]').forEach((button) => {
+    button.addEventListener('click', loadCustomize, { once: true });
+  });
 
   const deploymentVersion = container.querySelector('#deployment-version');
   if (deploymentVersion) {
@@ -178,11 +214,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   initSectionEditHandlers();
   initRemoveHandlers();
   initAddHandlers();
-  initLocalCodeAgentHandlers();
-
-  renderFooter();
   initShared();
-});
+  } catch {
+    showError(container, 'We could not load the editor data. Please try again.', loadCustomize);
+    container.append(lunaPanel);
+  }
+}
 
 function initLocalCodeAgentHandlers() {
   const form = document.getElementById('local-code-agent-form');
@@ -193,8 +230,11 @@ function initLocalCodeAgentHandlers() {
   const submitButton = form.querySelector('[data-agent-submit]');
   const promptInput = form.querySelector('[name="prompt"]');
   const authToken = getAuthToken();
+  const taskStorageKey = 'luna-active-task';
   let activePoll = null;
   let isOnline = false;
+  let submissionInProgress = false;
+  let currentTaskBusy = false;
 
   const adminFetch = (url, options = {}) => fetch(url, {
     ...options,
@@ -205,24 +245,31 @@ function initLocalCodeAgentHandlers() {
     }
   });
 
+  const setControls = () => {
+    const blocked = !isOnline || submissionInProgress || Boolean(activePoll) || currentTaskBusy;
+    promptInput.disabled = blocked;
+    submitButton.disabled = blocked;
+  };
+
   const setConnection = (online, busy = false) => {
     isOnline = online;
+    currentTaskBusy = busy && !activePoll;
     connectionLabel.textContent = online
-      ? busy ? 'Luna is working on a request.' : 'Luna is ready.'
+      ? busy ? 'Luna is working on a request or checking a push.' : 'Luna is configured. ChatGPT sign-in is checked when a request starts.'
       : 'Luna is unavailable right now. Please try again later.';
     indicator.classList.toggle('is-online', online);
     indicator.classList.toggle('is-offline', !online);
-    promptInput.disabled = !online || busy || Boolean(activePoll);
-    submitButton.disabled = !online || busy || Boolean(activePoll);
-    if (!activePoll) submitButton.textContent = busy ? 'Luna is busy' : 'Send to Luna';
+    setControls();
+    if (!submissionInProgress && !activePoll) submitButton.textContent = currentTaskBusy ? 'Luna is busy' : 'Send to Luna';
   };
 
   const refreshConnection = async () => {
     try {
       const response = await adminFetch('/api/codex/agent/status');
+      if (response.status === 401) { handle401(); return; }
       if (!response.ok) throw new Error('Could not read agent status.');
-      const { online, busy } = await response.json();
-      setConnection(Boolean(online), Boolean(busy));
+      const { configured, busy } = await response.json();
+      setConnection(Boolean(configured), Boolean(busy));
     } catch {
       setConnection(false);
     }
@@ -235,43 +282,118 @@ function initLocalCodeAgentHandlers() {
     const promptEcho = document.createElement('pre');
     promptEcho.textContent = prompt;
     const title = document.createElement('strong');
-    title.textContent = task.status === 'complete' ? 'Luna response' : task.status === 'failed' ? 'Request failed' : 'Luna is working on your request…';
+    title.textContent = ({
+      complete: 'Luna response',
+      pushed: 'Luna pushed a change',
+      reporting: 'Push outcome needs checking',
+      failed: 'Request failed'
+    })[task.status] || 'Luna is working on your request…';
     taskStatus.append(promptLabel, promptEcho, title);
     if (task.summary) {
       const summary = document.createElement('pre');
       summary.textContent = task.summary;
       taskStatus.appendChild(summary);
     }
+    if (task.message) {
+      const message = document.createElement('p');
+      message.textContent = task.message;
+      taskStatus.appendChild(message);
+    }
+    if (task.workflowRunUrl) {
+      const runLink = document.createElement('a');
+      runLink.href = task.workflowRunUrl;
+      runLink.target = '_blank';
+      runLink.rel = 'noopener noreferrer';
+      runLink.textContent = 'View GitHub Actions run';
+      taskStatus.appendChild(runLink);
+    }
+  };
+
+  const verifyDeployment = (commit, taskId) => {
+    if (!/^[0-9a-f]{7,40}$/i.test(commit || '')) return;
+    let attempts = 0;
+    const check = async () => {
+      attempts += 1;
+      try {
+        const response = await fetch('/api/deployment-version', { cache: 'no-store' });
+        if (!response.ok) throw new Error('Deployment status is unavailable.');
+        const { commit: deployedCommit } = await response.json();
+        if ((deployedCommit && commit.startsWith(deployedCommit)) || (deployedCommit && deployedCommit.startsWith(commit))) {
+          if (taskStatus.dataset.taskId !== taskId) return;
+          const confirmation = document.createElement('p');
+          confirmation.textContent = `Cloudflare Pages is serving commit ${deployedCommit}.`;
+          taskStatus.appendChild(confirmation);
+          return;
+        }
+      } catch { /* Continue with bounded deployment checks. */ }
+      if (attempts >= 30) {
+        if (taskStatus.dataset.taskId !== taskId) return;
+        const pending = document.createElement('p');
+        pending.textContent = 'The live Pages commit has not been confirmed yet. Check the deployment before retrying this request.';
+        taskStatus.appendChild(pending);
+        return;
+      }
+      window.setTimeout(check, 10000);
+    };
+    void check();
   };
 
   const pollTask = async (taskId, prompt) => {
+    if (activePoll) window.clearTimeout(activePoll);
+    activePoll = true;
+    currentTaskBusy = true;
+    taskStatus.dataset.taskId = taskId;
     taskStatus.hidden = false;
     renderTaskUpdate(prompt, { status: 'running' });
-    activePoll = window.setInterval(async () => {
+    setControls();
+    let failures = 0;
+    const poll = async () => {
       try {
         const response = await adminFetch(`/api/codex/tasks/${encodeURIComponent(taskId)}`);
-        if (!response.ok) throw new Error('Could not get the latest task status.');
-        const task = await response.json();
-        renderTaskUpdate(prompt, task);
-        if (task.status === 'complete' || task.status === 'failed') {
-          window.clearInterval(activePoll);
+        if (response.status === 401) { activePoll = null; handle401(); return; }
+        if (response.status === 404) {
           activePoll = null;
-          submitButton.textContent = 'Send another request to Luna';
+          currentTaskBusy = false;
+          sessionStorage.removeItem(taskStorageKey);
+          taskStatus.textContent = 'This Luna result is no longer available. You can send a new request.';
+          await refreshConnection();
+          setControls();
+          return;
+        }
+        if (!response.ok) throw new Error(`Could not get the latest task status (HTTP ${response.status}).`);
+        const task = await response.json();
+        failures = 0;
+        renderTaskUpdate(prompt, task);
+        if (task.status === 'pushed') verifyDeployment(task.commit, taskId);
+        if (['complete', 'pushed', 'failed', 'reporting'].includes(task.status)) {
+          activePoll = null;
+          currentTaskBusy = false;
+          setControls();
           refreshConnection();
         } else {
-          submitButton.disabled = !isOnline;
-          promptInput.disabled = !isOnline;
+          activePoll = window.setTimeout(poll, 2500);
         }
       } catch (error) {
-        taskStatus.textContent = error.message;
+        failures += 1;
+        if (failures >= 5) {
+          activePoll = null;
+          taskStatus.textContent = `${error.message} Automatic retries stopped. Reload this page to resume checking the saved request.`;
+          setControls();
+          return;
+        }
+        const retryDelay = Math.min(2500 * (2 ** (failures - 1)), 30000);
+        taskStatus.textContent = `${error.message} Retrying in ${Math.ceil(retryDelay / 1000)} seconds…`;
+        activePoll = window.setTimeout(poll, retryDelay);
       }
-    }, 2500);
+    };
+    await poll();
   };
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const prompt = promptInput.value.trim();
-    if (!prompt || submitButton.disabled || !isOnline) return;
+    if (!prompt || submissionInProgress || activePoll || currentTaskBusy || submitButton.disabled || !isOnline) return;
+    submissionInProgress = true;
     submitButton.disabled = true;
     promptInput.disabled = true;
     submitButton.textContent = 'Sending…';
@@ -284,14 +406,16 @@ function initLocalCodeAgentHandlers() {
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Could not send the request.');
+      sessionStorage.setItem(taskStorageKey, JSON.stringify({ taskId: result.taskId, prompt }));
+      submissionInProgress = false;
       submitButton.textContent = 'Working…';
       pollTask(result.taskId, prompt);
     } catch (error) {
+      submissionInProgress = false;
       renderTaskUpdate(prompt, { status: 'failed', message: error.message });
       await refreshConnection();
-      promptInput.disabled = !isOnline;
-      submitButton.disabled = !isOnline;
-      submitButton.textContent = 'Try again';
+      setControls();
+      if (!submitButton.disabled) submitButton.textContent = 'Try again';
     }
   });
 
@@ -311,6 +435,12 @@ function initLocalCodeAgentHandlers() {
     else startConnectionPolling();
   });
   startConnectionPolling();
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(taskStorageKey) || 'null');
+    if (saved && /^[0-9a-f-]{36}$/i.test(saved.taskId || '') && typeof saved.prompt === 'string') void pollTask(saved.taskId, saved.prompt);
+  } catch {
+    sessionStorage.removeItem(taskStorageKey);
+  }
 }
 
 function ensureRowStatus(row) {

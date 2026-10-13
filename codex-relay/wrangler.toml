@@ -2,6 +2,16 @@ name = "sweet-hope-codex-relay"
 main = "index.js"
 compatibility_date = "2026-10-12"
 
+[observability]
+enabled = true
+
+[observability.logs]
+head_sampling_rate = 1
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 0.1
+
 [[durable_objects.bindings]]
 name = "CODEX_AGENT_RELAY"
 class_name = "CodeAgentRelay"

@@ -17,5 +17,5 @@ export function relayRequest(secret, path, init = {}) {
 }
 
 export function relayUnavailable() {
-  return Response.json({ error: 'The local Mac relay is not configured.' }, { status: 503 });
+  return Response.json({ error: 'The Luna cloud relay is not configured.' }, { status: 503 });
 }

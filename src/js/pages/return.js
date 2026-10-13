@@ -52,6 +52,7 @@ function renderReference(sessionId) {
 
 document.addEventListener('DOMContentLoaded', () => {
   renderHeader();
+  finalizeContent();
 
   const container = document.getElementById('return-content');
   if (!container) {

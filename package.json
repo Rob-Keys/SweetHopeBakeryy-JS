@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "npx serve src -l 8080",
-    "local-agent": "node --env-file-if-exists=.env scripts/codex-local-agent.mjs"
+    "cloud-agent": "node scripts/codex-cloud-agent.mjs",
+    "setup-cloud-agent": "node scripts/setup-luna-cloud.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.0.0",
