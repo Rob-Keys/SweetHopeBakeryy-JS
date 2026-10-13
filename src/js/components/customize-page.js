@@ -77,7 +77,7 @@ export function renderSitePreview(products, homeSections, aboutSections, contact
       <section class="site-preview-page">
         <div class="site-preview-label"><span>Shared site header</span><a href="/" target="_blank" rel="noopener">Open Home ↗</a></div>
         <div class="site-preview-nav"><nav aria-label="Preview navigation"><a href="/">Home</a><a href="/about">About Us</a><a href="/menu">Menu</a><a href="/contact">Contact</a></nav><img src="https://sweethopebakeryy.s3.us-east-1.amazonaws.com/header/sweethopebakeryy.avif" alt="Sweet Hope Bakery Logo" loading="lazy"></div>
-        <div class="site-preview-hero"><div class="site-preview-hero-images" aria-hidden="true"><img src="/images/left.avif" alt=""><img src="/images/middle.avif" alt=""><img src="/images/right.avif" alt=""></div><p class="site-preview-kicker">Made-To-Order Baking in Arlington, VA</p><h1>Sweet Hope Bakery</h1><a href="/menu" class="btn btn-invert-cookie desktop-button">Order Now</a></div>
+        <div class="site-preview-hero"><div class="site-preview-hero-images" aria-hidden="true"><img src="/images/left.avif" alt=""><img src="/images/middle.avif" alt=""><img src="/images/right.avif" alt=""></div><p class="site-preview-kicker">Made-To-Order Baking in Fairfax, VA</p><h1>Sweet Hope Bakery</h1><a href="/menu" class="btn btn-invert-cookie desktop-button">Order Now</a></div>
         <div class="site-preview-home-tagline">World Class Baking Since 2002</div>
         <div class="site-preview-mobile-cta"><a href="/menu" class="btn btn-cookie mobile-button">Order Now</a></div>
         <div class="site-preview-section-head"><span>Home page sections</span><small>Current content · editable below</small></div>
