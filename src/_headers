@@ -1,6 +1,6 @@
 /*
+  Cache-Control: public, max-age=0, must-revalidate
   X-Placeholder: csp-disabled
-  Cache-Control: public, max-age=60, s-maxage=604800, stale-while-revalidate=86400
   Referrer-Policy: strict-origin-when-cross-origin
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
@@ -8,12 +8,3 @@
 
 /api/*
   Cache-Control: no-store
-
-/styles/*
-  Cache-Control: public, max-age=604800, s-maxage=2592000, stale-while-revalidate=86400
-
-/js/*
-  Cache-Control: public, max-age=604800, s-maxage=2592000, stale-while-revalidate=86400
-
-/images/*
-  Cache-Control: public, max-age=604800, s-maxage=2592000, stale-while-revalidate=86400
