@@ -273,12 +273,12 @@ function initLocalCodeAgentHandlers() {
     isOnline = online;
     currentTaskBusy = busy && !activePoll;
     connectionLabel.textContent = online
-      ? busy ? 'Luna is working on a request or checking a push.' : 'Luna is configured. ChatGPT sign-in is checked when a request starts.'
-      : 'Luna is unavailable right now. Please try again later.';
+      ? busy ? 'Busy' : 'Ready'
+      : 'Unavailable';
     indicator.classList.toggle('is-online', online);
     indicator.classList.toggle('is-offline', !online);
     setControls();
-    if (!submissionInProgress && !activePoll) submitButton.textContent = currentTaskBusy ? 'Luna is busy' : 'Send to Luna';
+    if (!submissionInProgress && !activePoll) submitButton.textContent = 'Send to Luna';
   };
 
   const refreshConnection = async () => {

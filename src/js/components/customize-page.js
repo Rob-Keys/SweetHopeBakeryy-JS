@@ -124,15 +124,14 @@ export function renderLocalCodeAgentPanel() {
   return `
     <section class="local-code-agent" aria-labelledby="local-code-agent-title">
       <div class="local-code-agent-copy">
-        <p class="site-preview-kicker">Luna coding assistant</p>
-        <h2 id="local-code-agent-title">Ask Luna or request a change</h2>
-        <p>Ask Luna a question about the site, or describe a change you want. Luna will answer questions and autonomously implement and deploy requested changes.</p>
+        <h2 id="local-code-agent-title">Ask Luna</h2>
+        <p>Ask a question or describe a change.</p>
         <p class="local-agent-connection"><span class="local-agent-indicator" aria-hidden="true"></span><span data-agent-connection>Checking Luna's availability…</span></p>
       </div>
       <form class="local-code-agent-form" id="local-code-agent-form">
-        <label for="local-code-agent-prompt">Ask Luna a question or describe a change</label>
+        <label for="local-code-agent-prompt">Your message</label>
         <textarea id="local-code-agent-prompt" name="prompt" rows="5" maxlength="12000" placeholder="For example: Add an FAQ accordion to the Contact page with keyboard accessible controls." required disabled></textarea>
-        <div class="local-code-agent-actions"><small>Requested changes are autonomously implemented, committed, and deployed.</small><button class="btn btn-cookie" type="submit" data-agent-submit disabled>Send to Luna</button></div>
+        <div class="local-code-agent-actions"><button class="btn btn-cookie" type="submit" data-agent-submit disabled>Send to Luna</button></div>
         <div class="local-agent-history" data-agent-history aria-label="Recent Luna requests"></div>
         <div class="local-agent-task" data-agent-task aria-live="polite" hidden></div>
       </form>

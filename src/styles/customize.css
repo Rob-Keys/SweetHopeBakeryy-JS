@@ -183,7 +183,7 @@
 
 .local-code-agent { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 2rem; margin: 0 0 3rem; padding: 1.5rem; border: 1px solid rgba(63, 42, 20, .2); border-radius: 1.25rem; background: linear-gradient(135deg, #fffdf7, #f3e4ce); box-shadow: 0 .75rem 2rem rgba(63, 42, 20, .08); }
 .local-code-agent h2 { margin: 0 0 .75rem; }
-.local-code-agent-copy > p:not(.site-preview-kicker) { max-width: 34rem; }
+.local-code-agent-copy > p { max-width: 34rem; }
 .local-agent-connection { display: flex; align-items: center; gap: .6rem; margin-top: 1rem; font-size: .95rem !important; font-weight: 700; }
 .local-agent-indicator { width: .75rem; height: .75rem; border-radius: 50%; background: #8a8177; box-shadow: 0 0 0 .25rem rgba(138, 129, 119, .16); }
 .local-agent-indicator.is-online { background: #25834a; box-shadow: 0 0 0 .25rem rgba(37, 131, 74, .15); }
