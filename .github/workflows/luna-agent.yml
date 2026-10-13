@@ -18,7 +18,7 @@ permissions:
 jobs:
   edit:
     if: github.repository == 'Rob-Keys/SweetHopeBakeryy-JS' && inputs.taskId != ''
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: luna-cli
     permissions:
@@ -39,11 +39,6 @@ jobs:
           CODEX_AGENT_RELAY_URL: ${{ vars.CODEX_AGENT_RELAY_URL }}
           INPUT_TASK_ID: ${{ inputs.taskId }}
         run: node scripts/report-luna-run.mjs
-
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: 22
 
       - name: Install FFmpeg media tools
         run: |
