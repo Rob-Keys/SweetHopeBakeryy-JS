@@ -82,6 +82,24 @@ footer {
 	border-radius: 50%;
 }
 
+/* Separate the header navigation links with a subtle white rule. */
+header .navbar-nav > li {
+	position: relative;
+	display: flex;
+	flex: 1;
+	align-items: center;
+	justify-content: center;
+}
+header .navbar-nav > li + li::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 50%;
+	height: 1rem;
+	border-left: 1px solid rgba(255, 255, 255, 0.8);
+	transform: translateY(-50%);
+}
+
 /* Warm bakery button typography and colors. */
 .btn-cookie,
 .btn-invert-cookie {
@@ -224,6 +242,12 @@ p {
   transform: translate3d(0, 0, 0);
 }
 .page-status { min-height: 12rem; display: grid; place-items: center; padding: 2rem; text-align: center; color: #5a3d22; }
+
+@media (max-width: 767px) {
+	header .navbar .container-fluid > a:last-child {
+		display: none !important;
+	}
+}
 
 @media (max-width: 575px) {
 	.btn-lg{

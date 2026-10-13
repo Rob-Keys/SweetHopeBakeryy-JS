@@ -125,7 +125,7 @@ export function renderLocalCodeAgentPanel() {
     <section class="local-code-agent" aria-labelledby="local-code-agent-title">
       <div class="local-code-agent-copy">
         <h2 id="local-code-agent-title">Agentic Customization</h2>
-        <p>Luna can work for up to 12 minutes per request. Each request starts fresh: Luna can see the current code, but not your previous requests.</p>
+        <p>Luna can work for up to 12 minutes per request. She’ll make your requested change and handle deployment automatically, from start to finish. Each request starts fresh: Luna can see the current code, but not your previous requests.</p>
         <p class="local-agent-connection"><span class="local-agent-indicator" aria-hidden="true"></span><span data-agent-connection>Checking Luna's availability…</span></p>
       </div>
       <form class="local-code-agent-form" id="local-code-agent-form">
@@ -135,7 +135,6 @@ export function renderLocalCodeAgentPanel() {
         <input id="local-code-agent-files" class="form-control" name="attachments" type="file" multiple disabled>
         <small class="local-agent-file-help" data-agent-files-help>Attachments stay private and are deleted after Luna finishes.</small>
         <div class="local-code-agent-actions"><button class="btn btn-cookie" type="submit" data-agent-submit disabled>Send to Luna</button></div>
-        <div class="local-agent-history" data-agent-history aria-label="Recent Luna requests"></div>
         <div class="local-agent-task" data-agent-task aria-live="polite" hidden></div>
       </form>
     </section>`;

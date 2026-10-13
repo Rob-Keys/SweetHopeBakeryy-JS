@@ -196,9 +196,10 @@
 .local-code-agent-actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: .75rem; }
 .local-code-agent-actions small { max-width: 22rem; color: #755b3f; }
 .local-code-agent-actions button:disabled { opacity: .55; cursor: not-allowed; }
+.local-agent-task { margin-top: 1.2rem; padding: .8rem; border-left: 4px solid var(--accent); border-radius: .4rem; background: #fbf2df; overflow-wrap: anywhere; }
 .local-code-agent-form > label[for="local-code-agent-files"] { display: block; margin-top: 1rem; }
 .local-agent-file-help { display: block; margin-top: .4rem; color: #755b3f; }
-.local-agent-task { margin-top: .9rem; padding: .8rem; border-left: 4px solid var(--accent); border-radius: .4rem; background: #fbf2df; overflow-wrap: anywhere; }
+.local-agent-task > pre + strong { display: block; margin-top: .9rem; }
 .local-agent-task pre { max-height: 18rem; margin: .6rem 0 0; padding: .65rem; overflow: auto; white-space: pre-wrap; border-radius: .35rem; color: #342719; background: rgba(63, 42, 20, .07); font: .88rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 
 @media (max-width: 700px) {
