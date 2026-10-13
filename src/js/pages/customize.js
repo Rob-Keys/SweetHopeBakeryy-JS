@@ -208,13 +208,13 @@ function initLocalCodeAgentHandlers() {
   const setConnection = (online, busy = false) => {
     isOnline = online;
     connectionLabel.textContent = online
-      ? busy ? 'Your Mac is working on a request.' : 'Your Mac is on and connected.'
-      : 'Your Mac is off or disconnected. Start the local agent on your Mac to send a request.';
+      ? busy ? 'Luna is working on a request.' : 'Luna is ready.'
+      : 'Luna is unavailable right now. Please try again later.';
     indicator.classList.toggle('is-online', online);
     indicator.classList.toggle('is-offline', !online);
     promptInput.disabled = !online || busy || Boolean(activePoll);
     submitButton.disabled = !online || busy || Boolean(activePoll);
-    if (!activePoll) submitButton.textContent = busy ? 'Mac is busy' : 'Send to Mac';
+    if (!activePoll) submitButton.textContent = busy ? 'Luna is busy' : 'Send to Luna';
   };
 
   const refreshConnection = async () => {
@@ -231,11 +231,11 @@ function initLocalCodeAgentHandlers() {
   const renderTaskUpdate = (prompt, task) => {
     taskStatus.replaceChildren();
     const promptLabel = document.createElement('strong');
-    promptLabel.textContent = 'Exact prompt sent to Luna';
+    promptLabel.textContent = 'Your request to Luna';
     const promptEcho = document.createElement('pre');
     promptEcho.textContent = prompt;
     const title = document.createElement('strong');
-    title.textContent = task.status === 'complete' ? 'Luna response' : task.status === 'failed' ? 'Request failed' : task.message || 'Your Mac is working…';
+    title.textContent = task.status === 'complete' ? 'Luna response' : task.status === 'failed' ? 'Request failed' : 'Luna is working on your request…';
     taskStatus.append(promptLabel, promptEcho, title);
     if (task.summary) {
       const summary = document.createElement('pre');
@@ -246,7 +246,7 @@ function initLocalCodeAgentHandlers() {
 
   const pollTask = async (taskId, prompt) => {
     taskStatus.hidden = false;
-    renderTaskUpdate(prompt, { status: 'running', message: 'Request sent directly to your Mac.' });
+    renderTaskUpdate(prompt, { status: 'running' });
     activePoll = window.setInterval(async () => {
       try {
         const response = await adminFetch(`/api/codex/tasks/${encodeURIComponent(taskId)}`);
@@ -256,7 +256,7 @@ function initLocalCodeAgentHandlers() {
         if (task.status === 'complete' || task.status === 'failed') {
           window.clearInterval(activePoll);
           activePoll = null;
-          submitButton.textContent = 'Send another request';
+          submitButton.textContent = 'Send another request to Luna';
           refreshConnection();
         } else {
           submitButton.disabled = !isOnline;
@@ -276,7 +276,7 @@ function initLocalCodeAgentHandlers() {
     promptInput.disabled = true;
     submitButton.textContent = 'Sending…';
     taskStatus.hidden = false;
-    renderTaskUpdate(prompt, { status: 'running', message: 'Sending directly to your Mac…' });
+    renderTaskUpdate(prompt, { status: 'running' });
     try {
       const response = await adminFetch('/api/codex/tasks', {
         method: 'POST',

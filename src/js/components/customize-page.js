@@ -124,15 +124,15 @@ export function renderLocalCodeAgentPanel() {
   return `
     <section class="local-code-agent" aria-labelledby="local-code-agent-title">
       <div class="local-code-agent-copy">
-        <p class="site-preview-kicker">Local coding assistant</p>
-        <h2 id="local-code-agent-title">Ask Luna about the site</h2>
-        <p>Send a question or change request from this device to your Mac. Its signed-in Codex agent will use <strong>GPT-6 Luna</strong> with this local repository. Requests go straight to your Mac and are never stored for later.</p>
-        <p class="local-agent-connection"><span class="local-agent-indicator" aria-hidden="true"></span><span data-agent-connection>Checking your Mac…</span></p>
+        <p class="site-preview-kicker">Luna coding assistant</p>
+        <h2 id="local-code-agent-title">Ask Luna or request a change</h2>
+        <p>Ask Luna a question about the site, or describe a change you want. Luna will answer questions and autonomously implement and deploy requested changes.</p>
+        <p class="local-agent-connection"><span class="local-agent-indicator" aria-hidden="true"></span><span data-agent-connection>Checking Luna's availability…</span></p>
       </div>
       <form class="local-code-agent-form" id="local-code-agent-form">
-        <label for="local-code-agent-prompt">Ask a question or describe a change</label>
+        <label for="local-code-agent-prompt">Ask Luna a question or describe a change</label>
         <textarea id="local-code-agent-prompt" name="prompt" rows="5" maxlength="12000" placeholder="For example: Add an FAQ accordion to the Contact page with keyboard accessible controls." required disabled></textarea>
-        <div class="local-code-agent-actions"><small>Ask Luna about the site or request a visual/content change. Changes are committed and pushed to the deployment branch.</small><button class="btn btn-cookie" type="submit" data-agent-submit disabled>Send to Mac</button></div>
+        <div class="local-code-agent-actions"><small>Requested changes are autonomously implemented, committed, and deployed.</small><button class="btn btn-cookie" type="submit" data-agent-submit disabled>Send to Luna</button></div>
         <div class="local-agent-task" data-agent-task aria-live="polite" hidden></div>
       </form>
     </section>`;
