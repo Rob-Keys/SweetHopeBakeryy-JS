@@ -6,7 +6,7 @@ import { initShared, ImageSlider } from '../shared.js';
 import { isAuthenticated, setDesiredPage, getAuthToken } from '../modules/auth.js';
 import { getTable, putItem, removeItem } from '../modules/database.js';
 import { uploadImages, deleteImages } from '../aws/s3.js';
-import { renderPageSectionEditor, renderSitePreview, renderLocalCodeAgentPanel } from '../components/customize-page.js';
+import { renderPageSectionEditor, renderLocalCodeAgentPanel } from '../components/customize-page.js';
 import { escapeHtml } from '../modules/escape.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -51,7 +51,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     <p>"Prices" will create a dropdown menu of those quantities at those prices. So "6:10, 12:15", would mean 6 for $10, or 12 for $15.</p>
     <p>"Customizations" currently dont do anything and you can just leave that field blank for now.</p>
     <p>I recommend uploading images that are of filetype .avif, as theyre most efficient size-wise and will make your site load faster. To convert a .png or .jpg to .avif you can use a site like: <a href="https://cloudinary.com/tools/jpg-to-avif" target="_blank">JPEG-To-Avif Converter</a></p>
-    ${renderSitePreview(products, homeSections, aboutSections, contactSections)}
     ${renderLocalCodeAgentPanel()}
     <div class="row menu-row">
       <div class="col-2"><h5>Product Name</h5></div>
@@ -147,6 +146,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
     </form>
   </div>`;
+
+  // Temporarily disabled at the user's request; restore this line to show the live site preview:
+  // import { renderSitePreview } from '../components/customize-page.js';
+  // ${renderSitePreview(products, homeSections, aboutSections, contactSections)}
 
   // Page section editors.
   html += renderPageSectionEditor(formatSections(homeSections), 'home_page');
