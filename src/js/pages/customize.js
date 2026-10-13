@@ -74,10 +74,11 @@ async function loadCustomize() {
 
   // ── Render product editor ──
   let html = `<div class="m-5">
-    <h2 class="subtitle">Edit Menu</h2>
+    <h1 class="subtitle">Customize Site</h1>
     <p class="text-muted small" id="deployment-version">Commit: loading…</p>
     <div id="luna-panel-mount"></div>
     ${tableErrors.products ? '<div class="alert alert-danger">Could not load menu data. The menu editor is unavailable until the data service responds. <button type="button" class="btn btn-sm btn-cookie" data-retry-editor>Retry</button></div>' : ''}
+    <h2 class="subtitle">Edit Menu</h2>
     <p>"Prices" will create a dropdown menu of those quantities at those prices. So "6:10, 12:15", would mean 6 for $10, or 12 for $15.</p>
     <p>"Customizations" currently dont do anything and you can just leave that field blank for now.</p>
     <p>I recommend uploading images that are of filetype .avif, as theyre most efficient size-wise and will make your site load faster. To convert a .png or .jpg to .avif you can use a site like: <a href="https://cloudinary.com/tools/jpg-to-avif" target="_blank">JPEG-To-Avif Converter</a></p>
