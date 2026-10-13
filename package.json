@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "npx serve src -l 8080",
+    "luna:preview": "node scripts/luna-visual-preview.mjs",
     "cloud-agent": "node scripts/codex-cloud-agent.mjs",
     "setup-cloud-agent": "node scripts/setup-luna-cloud.mjs"
   },
@@ -12,5 +13,8 @@
     "@aws-sdk/client-ses": "^3.0.0",
     "@aws-sdk/client-sts": "3.1041.0",
     "@aws-sdk/s3-request-presigner": "^3.0.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.0"
   }
 }

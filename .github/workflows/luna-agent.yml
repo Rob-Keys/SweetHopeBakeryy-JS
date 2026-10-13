@@ -18,8 +18,8 @@ permissions:
 jobs:
   edit:
     if: github.repository == 'Rob-Keys/SweetHopeBakeryy-JS' && inputs.taskId != ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
     outputs:
       kv_changes: ${{ steps.run-luna.outputs.kv_changes }}
     environment: luna-trace
@@ -48,7 +48,10 @@ jobs:
           node-version: 22
 
       - name: Install locked private trace uploader dependency
-        run: npm ci --ignore-scripts --omit=dev --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Install headless Chromium for Luna visual previews
+        run: npx playwright install --with-deps --only-shell chromium
 
       - name: Install pinned Codex CLI
         run: npm install --global @openai/codex@0.162.1
@@ -75,7 +78,7 @@ jobs:
   publish:
     needs: edit
     if: needs.edit.result == 'success' && needs.edit.outputs.kv_changes == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 5
     permissions:
       contents: read
