@@ -4,13 +4,22 @@
 
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { checkAuth } from './_auth.js';
+import { checkS3Auth } from './_auth.js';
 import { isSafeKey } from './_s3.js';
 
-const ALLOWED_EXTENSIONS = new Set(['avif', 'jpg', 'jpeg', 'png', 'webp', 'gif', 'ico']);
+const CONTENT_TYPE_BY_EXTENSION = {
+  avif: 'image/avif',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  ico: 'image/x-icon',
+  webm: 'video/webm'
+};
 
 export async function onRequestPost(context) {
-  const denied = await checkAuth(context);
+  const denied = await checkS3Auth(context, 's3:put');
   if (denied) return denied;
 
   const { AWS_KEY, AWS_SECRET_KEY, AWS_REGION = 'us-east-1' } = context.env;
@@ -26,7 +35,7 @@ export async function onRequestPost(context) {
 
     for (const filename of filenames) {
       const ext = String(filename).split('.').pop().toLowerCase();
-      if (!isSafeKey(filename) || !ALLOWED_EXTENSIONS.has(ext)) {
+      if (!isSafeKey(filename) || !CONTENT_TYPE_BY_EXTENSION[ext]) {
         return Response.json({ error: 'Invalid filename' }, { status: 400 });
       }
     }
@@ -36,11 +45,11 @@ export async function onRequestPost(context) {
 
     const uploads = await Promise.all(filenames.map(async (filename) => {
       const ext = filename.split('.').pop().toLowerCase();
-      const contentType = ext === 'jpg' ? 'jpeg' : ext;
+      const contentType = CONTENT_TYPE_BY_EXTENSION[ext];
       const command = new PutObjectCommand({
         Bucket: 'sweethopebakeryy',
         Key: filename,
-        ContentType: 'image/' + (contentType || 'avif')
+        ContentType: contentType
       });
       const presignedUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
       const publicUrl = `https://sweethopebakeryy.s3.us-east-1.amazonaws.com/${filename}`;

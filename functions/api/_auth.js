@@ -22,3 +22,31 @@ export async function checkAuth(context) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 }
+
+export async function checkS3Auth(context, operation) {
+  const { JWT_SECRET } = context.env;
+  if (!JWT_SECRET) return Response.json({ error: 'JWT_SECRET not configured' }, { status: 500 });
+
+  const token = context.request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
+  if (!token) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+  try {
+    const claims = await verifyJWT(token, JWT_SECRET);
+    if (claims.sub === 'admin') return null;
+
+    const taskId = context.request.headers.get('X-Luna-Task-ID');
+    const scopes = claims.scope;
+    if (
+      claims.sub === 'luna-asset' &&
+      typeof claims.taskId === 'string' &&
+      claims.taskId === taskId &&
+      /^[0-9a-f-]{36}$/i.test(claims.taskId) &&
+      Number.isInteger(claims.exp) &&
+      claims.exp <= Math.floor(Date.now() / 1000) + 60 * 60 &&
+      Array.isArray(scopes) &&
+      scopes.includes(operation)
+    ) return null;
+  } catch { /* Invalid or expired tokens are unauthorized. */ }
+
+  return Response.json({ error: 'Unauthorized' }, { status: 401 });
+}

@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-slim
     timeout-minutes: 15
     outputs:
-      kv_changes: ${{ steps.run-luna.outputs.kv_changes }}
+      publish_changes: ${{ steps.run-luna.outputs.publish_changes }}
     environment: luna-trace
     permissions:
       contents: read
@@ -72,20 +72,21 @@ jobs:
           LUNA_TRACE_AWS_ROLE_ARN: ${{ vars.LUNA_TRACE_AWS_ROLE_ARN }}
         run: node scripts/codex-cloud-agent.mjs
 
-      - name: Upload KV change artifact
-        if: steps.run-luna.outputs.kv_changes == 'true'
+      - name: Upload validated change artifact
+        if: steps.run-luna.outputs.publish_changes == 'true'
         uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08
         with:
           name: luna-${{ inputs.taskId }}
           path: ${{ runner.temp }}/luna-${{ inputs.taskId }}/
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 1
 
   publish:
     needs: edit
-    if: needs.edit.result == 'success' && needs.edit.outputs.kv_changes == 'true'
+    if: needs.edit.result == 'success' && needs.edit.outputs.publish_changes == 'true'
     runs-on: ubuntu-slim
-    timeout-minutes: 5
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:

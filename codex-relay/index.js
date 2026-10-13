@@ -47,6 +47,8 @@ export class CodeAgentRelay {
     if (url.pathname === '/internal/tasks' && request.method === 'POST') return this.startTask(request);
     const attachmentListMatch = url.pathname.match(/^\/internal\/tasks\/([0-9a-f-]{36})\/attachments$/i);
     if (attachmentListMatch && request.method === 'GET') return this.readAttachments(attachmentListMatch[1]);
+    const assetTokenMatch = url.pathname.match(/^\/internal\/tasks\/([0-9a-f-]{36})\/asset-token$/i);
+    if (assetTokenMatch && request.method === 'GET') return this.readAssetToken(request, assetTokenMatch[1]);
     const attachmentMatch = url.pathname.match(/^\/internal\/tasks\/([0-9a-f-]{36})\/attachments\/(\d+)$/i);
     if (attachmentMatch && request.method === 'GET') return this.readAttachment(attachmentMatch[1], Number(attachmentMatch[2]));
     const taskMatch = url.pathname.match(/^\/internal\/tasks\/([0-9a-f-]{36})$/i);
@@ -99,6 +101,11 @@ export class CodeAgentRelay {
     const prompt = typeof form.get('prompt') === 'string' ? form.get('prompt').trim() : '';
     if (!prompt) return Response.json({ error: 'Describe the change you want.' }, { status: 400 });
     if (prompt.length > MAX_PROMPT_LENGTH) return Response.json({ error: `Prompt must be ${MAX_PROMPT_LENGTH.toLocaleString()} characters or fewer.` }, { status: 400 });
+    const taskId = typeof form.get('taskId') === 'string' ? form.get('taskId') : '';
+    const assetToken = typeof form.get('assetToken') === 'string' ? form.get('assetToken') : '';
+    if (!/^[0-9a-f-]{36}$/i.test(taskId) || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(assetToken) || assetToken.length > 4096) {
+      return Response.json({ error: 'The admin-launched task is missing its temporary media permission.' }, { status: 400 });
+    }
     const files = form.getAll('attachments').filter(value => value instanceof File && value.size > 0);
     if (files.length > MAX_ATTACHMENT_COUNT) return Response.json({ error: `Attach no more than ${MAX_ATTACHMENT_COUNT} files.` }, { status: 400 });
     if (files.some(file => file.size > MAX_ATTACHMENT_SIZE)) return Response.json({ error: 'Each attachment must be 10 MB or smaller.' }, { status: 400 });
@@ -114,9 +121,10 @@ export class CodeAgentRelay {
     if (['running', 'publishing', 'reporting'].includes(previous?.status)) return Response.json({ error: 'Luna is already working on a request or checking a push. Wait for it to finish.' }, { status: 409 });
 
     const task = {
-      taskId: crypto.randomUUID(),
+      taskId,
       prompt,
       attachments: [],
+      assetToken,
       status: 'running',
       message: "Creating Luna's environment…",
       createdAt: new Date().toISOString()
@@ -171,7 +179,23 @@ export class CodeAgentRelay {
   async readAttachments(taskId) {
     const task = await this.ctx.storage.get(`task:${taskId}`);
     if (!task || !['running', 'publishing'].includes(task.status)) return Response.json({ error: 'The Luna task is no longer active.' }, { status: 404 });
-    return Response.json({ attachments: (task.attachments || []).map(({ filename, contentType, size }, index) => ({ index, filename, contentType, size })) });
+    return Response.json({
+      attachments: (task.attachments || []).map(({ filename, contentType, size }, index) => ({ index, filename, contentType, size }))
+    });
+  }
+
+  async readAssetToken(request, taskId) {
+    const task = await this.ctx.storage.get(`task:${taskId}`);
+    const leaseId = request.headers.get('X-Luna-Publish-Lease');
+    if (
+      !task ||
+      task.status !== 'publishing' ||
+      !task.publishLease ||
+      task.publishLease.id !== leaseId ||
+      Date.now() >= task.publishLease.expiresAt ||
+      typeof task.assetToken !== 'string'
+    ) return Response.json({ error: 'The Luna media permission is unavailable.' }, { status: 409 });
+    return Response.json({ assetToken: task.assetToken }, { headers: { 'Cache-Control': 'private, no-store' } });
   }
 
   async readAttachment(taskId, index) {
@@ -190,9 +214,12 @@ export class CodeAgentRelay {
   }
 
   async deleteTaskAttachments(task) {
-    if (!this.env.LUNA_ATTACHMENTS || !task?.attachments?.length) return;
-    await Promise.allSettled(task.attachments.map(({ key }) => this.env.LUNA_ATTACHMENTS.delete(key)));
-    task.attachments = [];
+    if (!task) return;
+    if (this.env.LUNA_ATTACHMENTS && task.attachments?.length) {
+      await Promise.allSettled(task.attachments.map(({ key }) => this.env.LUNA_ATTACHMENTS.delete(key)));
+      task.attachments = [];
+    }
+    if (Object.hasOwn(task, 'assetToken')) delete task.assetToken;
     await this.saveTask(task);
   }
 
@@ -202,7 +229,7 @@ export class CodeAgentRelay {
       if (task) await this.ctx.storage.delete(`task:${taskId}`);
       return Response.json({ error: 'Task not found.' }, { status: 404 });
     }
-    const { prompt: _prompt, attachments: _attachments, ...publicTask } = task;
+    const { prompt: _prompt, attachments: _attachments, assetToken: _assetToken, ...publicTask } = task;
     return Response.json(publicTask);
   }
 
@@ -230,6 +257,12 @@ export class CodeAgentRelay {
     if (!['publishing', 'reporting'].includes(task.status) || !task.publishLease || task.publishLease.id !== leaseId || Date.now() >= task.publishLease.expiresAt) {
       return Response.json({ error: 'The Luna publish lease is missing or expired.' }, { status: 409 });
     }
+    if (body.action === 'renew') {
+      const publishLease = { ...task.publishLease, expiresAt: Date.now() + PUBLISH_LEASE_MS };
+      await this.saveTask({ ...task, publishLease });
+      await this.ctx.storage.setAlarm(publishLease.expiresAt);
+      return Response.json({ expiresAt: publishLease.expiresAt });
+    }
     if (body.action === 'push-started') {
       if (task.status !== 'publishing' || typeof body.commit !== 'string' || !/^[0-9a-f]{7,40}$/i.test(body.commit)) return Response.json({ error: 'Invalid push start.' }, { status: 400 });
       await this.saveTask({ ...task, status: 'reporting', commit: body.commit, message: `Push started for commit ${body.commit}.`, updatedAt: new Date().toISOString() });
@@ -248,7 +281,7 @@ export class CodeAgentRelay {
       const completedTask = {
         ...task,
         status: 'complete',
-        message: 'Luna updated the requested content in KV.',
+        message: 'Luna published the requested site changes.',
         summary: typeof body.summary === 'string' ? (await this.redactTaskText(body.summary)).slice(0, 12000) : '',
         updatedAt: new Date().toISOString(),
         retainUntil: Date.now() + TASK_RETENTION_MS
@@ -256,7 +289,7 @@ export class CodeAgentRelay {
       await this.saveTask(completedTask);
       await this.deleteTaskAttachments(completedTask);
       await this.scheduleCleanup();
-      this.log('kv_update_recorded', { taskId });
+      this.log('changes_published', { taskId });
       return Response.json({ status: 'complete' });
     }
     if (body.action === 'pushed') {

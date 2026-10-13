@@ -1,4 +1,5 @@
 import { checkAuth } from '../_auth.js';
+import { signJWT } from '../_jwt.js';
 import { getRelayStub, relayRequest, relayUnavailable } from './_agent.js';
 
 const MAX_PROMPT_LENGTH = 12000;
@@ -23,6 +24,14 @@ export async function onRequestPost(context) {
   }
 
   const relayBody = new FormData();
+  const taskId = crypto.randomUUID();
+  const assetToken = await signJWT({
+    sub: 'luna-asset',
+    taskId,
+    scope: ['s3:put', 's3:delete']
+  }, context.env.JWT_SECRET, 60 * 60);
+  relayBody.set('taskId', taskId);
+  relayBody.set('assetToken', assetToken);
   relayBody.set('prompt', prompt);
   for (const attachment of form.getAll('attachments')) {
     if (attachment instanceof File) relayBody.append('attachments', attachment, attachment.name);

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
-import { readFile } from 'node:fs/promises';
+import { lstat, readFile, realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { validateKvChanges, hashJson } from './luna-kv-data.mjs';
+import { MAX_S3_ASSET_BYTES, MAX_S3_ASSET_TOTAL_BYTES, S3_MEDIA_TYPES, validateS3Changes } from './luna-s3-data.mjs';
 
 const relayToken = process.env.CODEX_AGENT_RELAY_TOKEN;
 const relayUrl = process.env.CODEX_AGENT_RELAY_URL;
@@ -11,12 +12,16 @@ const artifactPath = resolve(process.env.LUNA_ARTIFACT_DIR || '');
 const summaryPath = join(artifactPath, 'summary.txt');
 const kvChangesPath = join(artifactPath, 'kv-changes.json');
 const kvBaselinePath = join(artifactPath, 'kv-baseline.json');
+const s3ChangesPath = join(artifactPath, 's3-changes.json');
+const s3AssetsPath = join(artifactPath, '.luna-s3-assets');
 const relayHttpUrl = relayUrl?.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:').replace(/\/agent\/?$/, '').replace(/\/$/, '');
 const cloudflareToken = process.env.LUNA_CLOUDFLARE_API_TOKEN;
 const cloudflareAccountId = process.env.LUNA_CLOUDFLARE_ACCOUNT_ID;
 const cloudflareNamespaceId = process.env.LUNA_CLOUDFLARE_KV_NAMESPACE_ID;
 const cloudflareZoneId = process.env.LUNA_CLOUDFLARE_ZONE_ID;
 let activeLease;
+let leaseRenewalTimer;
+let leaseRenewalError;
 
 function redactSecrets(value) {
   return String(value ?? '')
@@ -26,7 +31,7 @@ function redactSecrets(value) {
 }
 
 if (!relayToken || !relayUrl || !/^[0-9a-f-]{36}$/i.test(taskId || '') || !process.env.LUNA_ARTIFACT_DIR) {
-  throw new Error('The trusted KV publisher is missing its task, artifact, or relay configuration.');
+  throw new Error('The trusted change publisher is missing its task, artifact, or relay configuration.');
 }
 
 async function relayAction(action, data = {}) {
@@ -87,8 +92,37 @@ async function validateKvArtifact() {
       if (!/^[0-9a-f]{64}$/i.test(kvBaseline[operation.tableName] || '')) throw new Error(`The baseline hash for ${operation.tableName} is missing.`);
     }
   }
-  if (!kvOperations.length) throw new Error('The KV publisher was started without a KV change artifact.');
-  return { kvOperations, kvBaseline };
+  return kvArtifact === null ? null : { kvOperations, kvBaseline };
+}
+
+async function validateS3Artifact() {
+  const artifact = await readFile(s3ChangesPath, 'utf8').catch(() => null);
+  if (artifact === null) return null;
+  if (Buffer.byteLength(artifact) > 64 * 1024) throw new Error('The S3 change artifact exceeds the 64 KB limit.');
+  if (containsCredential(artifact)) throw new Error('The S3 change artifact appears to contain a credential; it was not applied.');
+  const operations = validateS3Changes(JSON.parse(artifact));
+  const root = resolve(s3AssetsPath);
+  const rootRealPath = await realpath(root).catch(() => null);
+  const rootInfo = await lstat(root).catch(() => null);
+  if (rootRealPath && (!rootInfo?.isDirectory() || rootInfo.isSymbolicLink())) throw new Error('The artifact S3 asset directory is invalid.');
+  const separator = process.platform === 'win32' ? '\\' : '/';
+  let totalBytes = 0;
+  const assets = new Map();
+  for (const operation of operations) {
+    if (operation.action !== 'put') continue;
+    const path = resolve(artifactPath, operation.file);
+    if (!path.startsWith(`${root}${separator}`)) throw new Error('An S3 upload path escaped the artifact asset directory.');
+    const info = await lstat(path).catch(() => null);
+    if (!rootRealPath || !info?.isFile() || info.isSymbolicLink() || info.size < 1 || info.size > MAX_S3_ASSET_BYTES) {
+      throw new Error(`S3 asset ${operation.file} must be a regular file between 1 byte and 25 MB.`);
+    }
+    const actualPath = await realpath(path);
+    if (!actualPath.startsWith(`${rootRealPath}${separator}`)) throw new Error('An S3 upload path escaped the artifact asset directory.');
+    totalBytes += info.size;
+    if (totalBytes > MAX_S3_ASSET_TOTAL_BYTES) throw new Error('Luna’s S3 uploads must total 100 MB or less.');
+    assets.set(operation.key, { path: actualPath, contentType: S3_MEDIA_TYPES[operation.key.split('.').pop().toLowerCase()] });
+  }
+  return { operations, assets };
 }
 
 async function cloudflareApi(path, init = {}) {
@@ -166,12 +200,114 @@ async function applyKvChanges(operations, baselineHashes) {
   }
 }
 
-async function publishKvChanges({ kvOperations, kvBaseline }, summary) {
+async function readTaskAssetToken(leaseId) {
+  const response = await fetch(`${relayHttpUrl}/internal/tasks/${encodeURIComponent(taskId)}/asset-token`, {
+    headers: { Authorization: `Bearer ${relayToken}`, 'X-Luna-Publish-Lease': leaseId },
+    signal: AbortSignal.timeout(15000)
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || typeof result.assetToken !== 'string' || !result.assetToken) {
+    throw new Error('The relay did not provide the task-scoped S3 permission to the trusted publisher.');
+  }
+  return result.assetToken;
+}
+
+async function s3Api(path, assetToken, body) {
+  const response = await fetch(`https://www.sweethopebakeryy.com/api/${path}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${assetToken}`,
+      'X-Luna-Task-ID': taskId,
+      'Content-Type': 'application/json',
+      Accept: 'application/json'
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30000),
+    redirect: 'error'
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(`The site rejected a trusted S3 operation (${response.status}).`);
+  return result;
+}
+
+async function uploadS3Assets(s3Artifact, assetToken) {
+  const puts = s3Artifact.operations.filter(operation => operation.action === 'put');
+  if (!puts.length) return 0;
+  const keys = puts.map(operation => operation.key);
+  const result = await s3Api('upload-images', assetToken, { filenames: keys });
+  if (!Array.isArray(result.uploads) || result.uploads.length !== puts.length) throw new Error('The site returned an incomplete set of S3 upload permissions.');
+  const uploads = new Map();
+  for (const upload of result.uploads) {
+    if (!keys.includes(upload?.filename) || typeof upload.presignedUrl !== 'string' || uploads.has(upload.filename)) {
+      throw new Error('The site returned invalid S3 upload details.');
+    }
+    const url = new URL(upload.presignedUrl);
+    if (url.protocol !== 'https:' || !/^sweethopebakeryy\.s3(?:\.[a-z0-9-]+)?\.amazonaws\.com$/i.test(url.hostname)) {
+      throw new Error('The site returned an unexpected S3 upload destination.');
+    }
+    uploads.set(upload.filename, url);
+  }
+  for (let index = 0; index < puts.length; index += 4) {
+    await Promise.all(puts.slice(index, index + 4).map(async operation => {
+      const asset = s3Artifact.assets.get(operation.key);
+      const uploadUrl = uploads.get(operation.key);
+      if (!asset || !uploadUrl) throw new Error('The site did not authorize every requested S3 asset.');
+      const bytes = await readFile(asset.path);
+      const response = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': asset.contentType },
+        body: bytes,
+        signal: AbortSignal.timeout(180000),
+        redirect: 'error'
+      });
+      if (!response.ok) throw new Error(`S3 could not store replacement asset ${operation.key} (${response.status}).`);
+    }));
+  }
+  return puts.length;
+}
+
+async function deleteS3Assets(s3Artifact, assetToken) {
+  const keys = s3Artifact.operations.filter(operation => operation.action === 'delete').map(operation => operation.key);
+  if (!keys.length) return 0;
+  const result = await s3Api('delete-images', assetToken, { s3Keys: keys });
+  if (result.success !== true) throw new Error('The site did not confirm deleting the requested S3 objects.');
+  return keys.length;
+}
+
+async function publishChanges({ kvArtifact, s3Artifact }, summary) {
   const lease = await relayAction('claim');
   activeLease = lease;
   await relayAction('validate', { leaseId: lease.leaseId });
-  const warning = await applyKvChanges(kvOperations, kvBaseline);
-  const details = `Updated ${kvOperations.length} requested KV change${kvOperations.length === 1 ? '' : 's'}.${warning ? ` ${warning}` : ''}`;
+  leaseRenewalError = null;
+  leaseRenewalTimer = setInterval(() => {
+    void relayAction('renew', { leaseId: lease.leaseId }).catch(error => { leaseRenewalError = error; });
+  }, 25000);
+  let assetToken;
+  let uploadedCount = 0;
+  let deletedCount = 0;
+  let kvWarning = '';
+  if (s3Artifact) {
+    assetToken = await readTaskAssetToken(lease.leaseId);
+    uploadedCount = await uploadS3Assets(s3Artifact, assetToken);
+  }
+  if (leaseRenewalError) throw new Error(`The publish lease could not be renewed: ${leaseRenewalError.message}`);
+  if (kvArtifact) kvWarning = await applyKvChanges(kvArtifact.kvOperations, kvArtifact.kvBaseline);
+  if (leaseRenewalError) throw new Error(`The publish lease could not be renewed: ${leaseRenewalError.message}`);
+  let deleteWarning = '';
+  try {
+    if (s3Artifact) deletedCount = await deleteS3Assets(s3Artifact, assetToken);
+  } catch {
+    deleteWarning = 'Some old S3 objects could not be deleted after publishing the replacement content.';
+  }
+  const details = [
+    kvArtifact ? `Updated ${kvArtifact.kvOperations.length} requested KV change${kvArtifact.kvOperations.length === 1 ? '' : 's'}.` : '',
+    uploadedCount ? `Uploaded ${uploadedCount} S3 asset${uploadedCount === 1 ? '' : 's'}.` : '',
+    deletedCount ? `Deleted ${deletedCount} old S3 object${deletedCount === 1 ? '' : 's'}.` : '',
+    kvWarning,
+    deleteWarning
+  ].filter(Boolean).join(' ');
+  clearInterval(leaseRenewalTimer);
+  leaseRenewalTimer = undefined;
   let reportError;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
@@ -183,22 +319,26 @@ async function publishKvChanges({ kvOperations, kvBaseline }, summary) {
       await new Promise(resolveWait => setTimeout(resolveWait, 1000 * (attempt + 1)));
     }
   }
-  if (reportError) throw new Error(`KV updates were applied, but the relay could not record completion: ${reportError.message}`);
+  if (reportError) throw new Error(`The requested changes were applied, but the relay could not record completion: ${reportError.message}`);
   activeLease = null;
   console.log(details);
 }
 
 try {
-  const [summary, result] = await Promise.all([
+  const [summary, kvArtifact, s3Artifact] = await Promise.all([
     readFile(summaryPath, 'utf8').catch(() => 'Luna finished the request.'),
-    validateKvArtifact()
+    validateKvArtifact(),
+    validateS3Artifact()
   ]);
-  await publishKvChanges(result, summary);
+  if (!kvArtifact && !s3Artifact) throw new Error('The publisher was started without a KV or S3 change artifact.');
+  await publishChanges({ kvArtifact, s3Artifact }, summary);
 } catch (error) {
+  clearInterval(leaseRenewalTimer);
+  leaseRenewalTimer = undefined;
   const message = redactSecrets(error?.message || error).slice(0, 4000);
   try {
     if (activeLease) await relayAction('failed', { leaseId: activeLease.leaseId, message });
-    else await reportTask('failed', 'Luna could not publish the requested KV change.', message);
+    else await reportTask('failed', 'Luna could not publish the requested site change.', message);
   } catch { /* The relay expiry will preserve the pending task outcome. */ }
   console.error(message);
   process.exitCode = 1;

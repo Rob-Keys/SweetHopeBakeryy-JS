@@ -3,11 +3,11 @@
 // Requires env: AWS_KEY, AWS_SECRET_KEY, AWS_REGION (optional, defaults to us-east-1)
 
 import { S3Client, DeleteObjectsCommand } from '@aws-sdk/client-s3';
-import { checkAuth } from './_auth.js';
+import { checkS3Auth } from './_auth.js';
 import { isSafeKey } from './_s3.js';
 
 export async function onRequestPost(context) {
-  const denied = await checkAuth(context);
+  const denied = await checkS3Auth(context, 's3:delete');
   if (denied) return denied;
 
   const { AWS_KEY, AWS_SECRET_KEY, AWS_REGION = 'us-east-1' } = context.env;
@@ -30,12 +30,16 @@ export async function onRequestPost(context) {
     const credentials = { accessKeyId: AWS_KEY, secretAccessKey: AWS_SECRET_KEY };
     const s3 = new S3Client({ region: AWS_REGION, credentials });
 
-    await s3.send(new DeleteObjectsCommand({
+    const result = await s3.send(new DeleteObjectsCommand({
       Bucket: 'sweethopebakeryy',
       Delete: {
         Objects: s3Keys.map(Key => ({ Key }))
       }
     }));
+    if (result.Errors?.length) {
+      console.error('delete-images partial failure:', result.Errors.length);
+      return Response.json({ error: 'Some images could not be deleted' }, { status: 502 });
+    }
 
     return Response.json({ success: true });
   } catch (err) {
