@@ -919,7 +919,16 @@ function initRemoveHandlers() {
       e.preventDefault();
       const tableName = form.querySelector('[name="tableName"]').value;
       const key = form.querySelector('[name="partitionKeyValue"]').value;
-      await removeItem(tableName, key);
+      const submitButton = form.querySelector('[type="submit"]');
+      setRowStatus(form, 'Removing item...', 'info');
+      setButtonBusy(submitButton, true, 'Removing...');
+      const result = await removeItem(tableName, key);
+      if (result.success) {
+        form.closest('.menu-row')?.remove();
+      } else {
+        setRowStatus(form, result.error || 'Could not remove item.', 'danger');
+        setButtonBusy(submitButton, false);
+      }
     });
   });
 
@@ -929,7 +938,16 @@ function initRemoveHandlers() {
       e.preventDefault();
       const tableName = form.querySelector('[name="tableName"]').value;
       const key = form.querySelector('[name="partitionKeyValue"]').value;
-      await removeItem(tableName, key);
+      const submitButton = form.querySelector('[type="submit"]');
+      setRowStatus(form, 'Removing section...', 'info');
+      setButtonBusy(submitButton, true, 'Removing...');
+      const result = await removeItem(tableName, key);
+      if (result.success) {
+        form.closest('.menu-row')?.remove();
+      } else {
+        setRowStatus(form, result.error || 'Could not remove section.', 'danger');
+        setButtonBusy(submitButton, false);
+      }
     });
   });
 }
