@@ -35,8 +35,10 @@ async function loadHomeSections() {
       const imgFade = index % 2 === 0 ? 'fade-in-right' : 'fade-in-left';
       const txtFade = index % 2 === 0 ? 'fade-in-left' : 'fade-in-right';
 
+      const sectionClass = index === 0 ? 'home-first-section' : '';
+
       html += `
-        <div class="${rowClass} cv-auto">
+        <div class="${rowClass} cv-auto ${sectionClass}">
           <div class="col-5 ${imgFade}">
             <img class="home-story-image" src="${safeImageUrl}" alt="" loading="lazy" decoding="async">
           </div>
