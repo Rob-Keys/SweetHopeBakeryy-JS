@@ -33,7 +33,16 @@ async function uploadImages(filenames, files) {
       body: formData
     });
     if (response.status === 401) { handle401(); return { success: false, error: 'Unauthorized' }; }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) {
+      let message = `HTTP ${response.status}`;
+      try {
+        const body = await response.json();
+        if (body?.error) message = body.error;
+      } catch {
+        // Keep the HTTP status when the response has no JSON error message.
+      }
+      throw new Error(message);
+    }
     const { uploads } = await response.json();
 
     return { success: true, urls: uploads.map(upload => upload.publicUrl) };
