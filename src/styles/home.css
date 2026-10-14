@@ -137,5 +137,5 @@
 	}
 	#home-sections > .row > .col-5,
 	#home-sections > .row > .col-6 { width: 100%; padding-inline: 0; }
-	#home-sections > .home-first-section > .col-5 { padding-inline: clamp(1rem, 5vw, 1.5rem); }
+	#home-sections > .home-first-section > .col-5 { padding-inline: clamp(2rem, 8vw, 3rem); }
 }
