@@ -636,6 +636,17 @@ function rebuildEditImages(row, imageURLs, onRemove) {
   });
 }
 
+function getImageUploadKeys(directory, files) {
+  const supportedExtensions = new Set(['avif', 'jpg', 'jpeg', 'png', 'webp', 'gif', 'ico']);
+  return files.map(file => {
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    if (!extension || !supportedExtensions.has(extension)) {
+      throw new Error(`Unsupported image format for “${file.name}”. Use AVIF, JPG, PNG, WebP, or GIF.`);
+    }
+    return `${directory}/${crypto.randomUUID()}.${extension}`;
+  });
+}
+
 // ── Product edit/save handlers ──
 function initProductEditHandlers() {
   const menuRows = document.querySelectorAll('.menu-row[data-item-index]');
@@ -704,7 +715,7 @@ function initProductEditHandlers() {
         const newImagesInput = row.querySelector('.add-images-input');
         if (newImagesInput?.files?.length > 0) {
           const files = Array.from(newImagesInput.files);
-          const filenames = files.map(f => `products/${Date.now()}-${f.name}`);
+          const filenames = getImageUploadKeys('products', files);
           const result = await uploadImages(filenames, files);
           if (!result.success) {
             throw new Error(result.error || 'Failed to upload images.');
@@ -828,7 +839,7 @@ function initSectionEditHandlers() {
         const newImageInput = row.querySelector('.add-images-input');
         if (newImageInput?.files?.length > 0) {
           const files = Array.from(newImageInput.files);
-          const filenames = files.map(f => `${pageName}/${Date.now()}-${f.name}`);
+          const filenames = getImageUploadKeys(pageName, files);
           const result = await uploadImages(filenames, files);
           if (!result.success) {
             throw new Error(result.error || 'Failed to upload image.');
@@ -984,7 +995,7 @@ function initAddHandlers() {
       const imageInput = form.querySelector('[name="images[]"]');
       if (imageInput?.files?.length > 0) {
         const files = Array.from(imageInput.files);
-        const filenames = files.map(f => `products/${Date.now()}-${f.name}`);
+        const filenames = getImageUploadKeys('products', files);
         const result = await uploadImages(filenames, files);
         if (!result.success || !result.urls) {
           throw new Error(result.error || 'Image upload failed.');
@@ -1029,7 +1040,7 @@ function initAddHandlers() {
         const imageInput = form.querySelector('[name="images[]"]');
         if (imageInput?.files?.length > 0) {
           const files = Array.from(imageInput.files);
-          const filenames = files.map(f => `${pageName}/${Date.now()}-${f.name}`);
+          const filenames = getImageUploadKeys(pageName, files);
           const result = await uploadImages(filenames, files);
           if (!result.success || !result.urls) {
             throw new Error(result.error || 'Image upload failed.');
