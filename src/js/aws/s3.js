@@ -14,37 +14,29 @@ function authHeaders() {
 }
 
 /**
- * Upload images via presigned URLs. Requires admin auth.
- * Flow: request presigned URLs from the server, then PUT directly to S3.
+ * Upload images through the authenticated server endpoint. Requires admin auth.
  * @param {string[]} filenames - S3 object keys (e.g., 'products/image.avif')
  * @param {File[]} files - File objects to upload
  * @returns {Promise<{success: boolean, urls?: string[], error?: string}>}
  */
 async function uploadImages(filenames, files) {
   try {
+    const formData = new FormData();
+    formData.append('filenames', JSON.stringify(filenames));
+    files.forEach((file, index) => formData.append(`file-${index}`, file));
+    const headers = {};
+    const token = getAuthToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
     const response = await fetch('/api/upload-images', {
       method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify({ filenames })
+      headers,
+      body: formData
     });
     if (response.status === 401) { handle401(); return { success: false, error: 'Unauthorized' }; }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const { uploads } = await response.json();
 
-    // Upload each file directly to S3 using the presigned URL.
-    const urls = [];
-    for (let i = 0; i < uploads.length; i++) {
-      const { presignedUrl, publicUrl } = uploads[i];
-      const uploadResponse = await fetch(presignedUrl, {
-        method: 'PUT',
-        body: files[i],
-        headers: { 'Content-Type': files[i].type }
-      });
-      if (!uploadResponse.ok) throw new Error(`Image upload failed: HTTP ${uploadResponse.status}`);
-      urls.push(publicUrl);
-    }
-
-    return { success: true, urls };
+    return { success: true, urls: uploads.map(upload => upload.publicUrl) };
   } catch (err) {
     console.error('uploadImages failed:', err);
     return { success: false, error: err.message };
