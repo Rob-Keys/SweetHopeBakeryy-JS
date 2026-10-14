@@ -147,6 +147,10 @@ export function renderPageSectionEditor(sections, pageName) {
   const showImage = pageName !== 'contact_page';
   const bodyColClass = pageName === 'about_page' ? 'col-4' : 'col-6';
   const editBodyColClass = pageName === 'home_page' ? 'col-4' : 'col-6';
+  const minimumSectionIndex = pageName === 'contact_page' ? 3 : 0;
+  const usedSectionIndexes = new Set(sections.map(section => Number(section.sectionIndex)));
+  let nextSectionIndex = minimumSectionIndex;
+  while (usedSectionIndexes.has(nextSectionIndex)) nextSectionIndex += 1;
 
   // Table header.
   let html = `
@@ -241,7 +245,7 @@ export function renderPageSectionEditor(sections, pageName) {
   html += `
     <form class="row menu-row add-section-form" data-page-name="${pageName}">
       <div class="col-2">
-        <input type="number" name="partitionKeyValue" placeholder="Section Index" min="${pageName === 'contact_page' ? '3' : '0'}" step="1" required>
+        <input type="number" name="partitionKeyValue" placeholder="Section Index" min="${minimumSectionIndex}" step="1" value="${nextSectionIndex}" required>
       </div>`;
 
   if (showHeader) {
