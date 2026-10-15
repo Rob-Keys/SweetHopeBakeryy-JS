@@ -212,6 +212,9 @@
 .local-agent-indicator.is-online { background: #25834a; box-shadow: 0 0 0 .25rem rgba(37, 131, 74, .15); }
 .local-agent-indicator.is-offline { background: #a33f35; box-shadow: 0 0 0 .25rem rgba(163, 63, 53, .15); }
 .local-code-agent-form { padding: 1rem; border-radius: 1rem; background: white; box-shadow: 0 .25rem 1rem rgba(63, 42, 20, .06); }
+.local-code-agent-form,
+.local-code-agent-form * { box-sizing: border-box; min-width: 0; }
+.local-code-agent-form input[type="file"] { max-width: 100%; }
 .local-code-agent-form > label { display: block; margin-bottom: .4rem; font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; }
 .local-code-agent-form textarea { display: block; width: 100%; min-height: 8rem; padding: .75rem; resize: vertical; border: 1px solid #c8b9a4; border-radius: .6rem; color: var(--brown); background: #fffefa; }
 .local-code-agent-form textarea:disabled { color: #766f66; background: #eeece8; border-color: #d6d0c8; cursor: not-allowed; opacity: .78; }

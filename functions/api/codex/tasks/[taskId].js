@@ -1,5 +1,5 @@
 import { checkAuth } from '../../_auth.js';
-import { getRelayStub, relayRequest, relayUnavailable } from '../_agent.js';
+import { getRelayStub, relayRequest, relayUnavailable, privateRelayResponse } from '../_agent.js';
 
 export async function onRequestGet(context) {
   const denied = await checkAuth(context);
@@ -11,5 +11,5 @@ export async function onRequestGet(context) {
   }
   const relay = getRelayStub(context);
   if (!relay) return relayUnavailable();
-  return relay.stub.fetch(relayRequest(relay.secret, `/internal/tasks/${encodeURIComponent(taskId)}`));
+  return privateRelayResponse(await relay.stub.fetch(relayRequest(relay.secret, `/internal/tasks/${encodeURIComponent(taskId)}`)));
 }

@@ -5,6 +5,7 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
+import { preparePreviewPage } from './lib/preview-page.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '..');
 const siteRoot = resolve(repoRoot, 'src');
@@ -29,6 +30,8 @@ const mimeTypes = {
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
   '.webp': 'image/webp',
+  '.webm': 'video/webm',
+  '.mp4': 'video/mp4',
   '.xml': 'application/xml; charset=utf-8'
 };
 
@@ -132,13 +135,13 @@ try {
       if (!route.startsWith('/') || route.startsWith('//')) throw new Error(`Use a site path starting with one slash: ${route}`);
       const response = await page.goto(new URL(route, origin).toString(), { waitUntil: 'domcontentloaded' });
       if (!response?.ok()) throw new Error(`Could not load ${route} (${response?.status() || 'no response'}).`);
-      await page.waitForTimeout(700);
+      await preparePreviewPage(page);
 
       const routeName = route === '/' ? 'home' : route.replace(/^\/+|\/+$/g, '').replace(/[^a-zA-Z0-9_-]+/g, '-') || 'home';
       const imagePath = resolve(outputRoot, `${routeName}-${viewport.name}.png`);
       await page.screenshot({ path: imagePath, fullPage: true, animations: 'disabled' });
       console.log(`Screenshot: ${imagePath}`);
-      if (errors.length) console.log(`Page errors on ${route} (${viewport.name}): ${errors.join(' | ')}`);
+      if (errors.length) throw new Error(`Page errors on ${route} (${viewport.name}): ${errors.join(' | ')}`);
       await page.close();
     }
   }

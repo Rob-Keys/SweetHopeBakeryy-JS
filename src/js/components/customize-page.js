@@ -125,7 +125,7 @@ export function renderLocalCodeAgentPanel() {
     <section class="local-code-agent" aria-labelledby="local-code-agent-title">
       <div class="local-code-agent-copy">
         <h2 id="local-code-agent-title">Agentic Customization</h2>
-        <p>Luna can work for up to 12 minutes per request. She’ll make your requested change and handle deployment automatically, from start to finish. Each request starts fresh: Luna can see the current code, but not your previous requests.</p>
+        <p>Luna can work for up to 12 minutes per request after her environment starts. She can update content or push code changes, which start a website deployment. The result shows whether the live deployment has been confirmed. Each request starts fresh: Luna can see the current code, but not your previous requests.</p>
         <p>Attach images, GIFs, or videos and tell Luna where to use them. She converts media to efficient formats before adding it to the site: AVIF for still images, animated WebP for GIFs, and WebM for video.</p>
         <p class="local-agent-connection"><span class="local-agent-indicator" aria-hidden="true"></span><span data-agent-connection>Checking Luna's availability…</span></p>
       </div>

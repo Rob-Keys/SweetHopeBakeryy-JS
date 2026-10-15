@@ -33,6 +33,11 @@ jobs:
           persist-credentials: true
           token: ${{ secrets.LUNA_GITHUB_PUSH_TOKEN }}
 
+      - name: Set up Node.js for the native WebSocket runner
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+
       - name: Record workflow run for task diagnostics
         env:
           CODEX_AGENT_RELAY_TOKEN: ${{ secrets.CODEX_AGENT_RELAY_TOKEN }}
@@ -81,3 +86,11 @@ jobs:
           CLOUDFLARE_KV_NAMESPACE_ID: ${{ vars.LUNA_CLOUDFLARE_KV_NAMESPACE_ID }}
           CLOUDFLARE_ZONE_ID: ${{ vars.LUNA_CLOUDFLARE_ZONE_ID }}
         run: node scripts/codex-cloud-agent.mjs
+
+      - name: Report workflow setup failure or interruption
+        if: failure() || cancelled()
+        env:
+          CODEX_AGENT_RELAY_TOKEN: ${{ secrets.CODEX_AGENT_RELAY_TOKEN }}
+          CODEX_AGENT_RELAY_URL: ${{ vars.CODEX_AGENT_RELAY_URL }}
+          INPUT_TASK_ID: ${{ inputs.taskId }}
+        run: node scripts/report-luna-run.mjs --failed

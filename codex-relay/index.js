@@ -1,7 +1,11 @@
+import { readTaskForm } from './task-request.js';
+
 const MAX_PROMPT_LENGTH = 12000;
 const TASK_RETENTION_MS = 15 * 60 * 1000;
 const TASK_TIMEOUT_MS = 12 * 60 * 1000;
-const TASK_START_TIMEOUT_MS = 5 * 60 * 1000;
+const TASK_START_TIMEOUT_MS = 10 * 60 * 1000;
+const TERMINAL_STATUSES = ['complete', 'pushed', 'uncertain', 'failed'];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_ATTACHMENT_COUNT = 5;
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 const MAX_ATTACHMENT_TOTAL = 25 * 1024 * 1024;
@@ -11,10 +15,19 @@ const GITHUB_WORKFLOW = 'luna-agent.yml';
 function validCodexAuth(auth) {
   const tokens = auth?.tokens;
   return auth?.auth_mode === 'chatgpt' &&
-    typeof tokens?.access_token === 'string' && tokens.access_token.length <= 12000 &&
-    typeof tokens?.refresh_token === 'string' && tokens.refresh_token.length <= 12000 &&
-    typeof tokens?.account_id === 'string' && tokens.account_id.length <= 200 &&
+    typeof tokens?.access_token === 'string' && tokens.access_token.length > 0 && tokens.access_token.length <= 12000 &&
+    typeof tokens?.refresh_token === 'string' && tokens.refresh_token.length > 0 && tokens.refresh_token.length <= 12000 &&
+    typeof tokens?.account_id === 'string' && tokens.account_id.length > 0 && tokens.account_id.length <= 200 &&
     (!tokens.id_token || (typeof tokens.id_token === 'string' && tokens.id_token.length <= 12000));
+}
+
+async function sameSecret(provided, expected) {
+  const encoder = new TextEncoder();
+  const [left, right] = await Promise.all([
+    crypto.subtle.digest('SHA-256', encoder.encode(provided || '')),
+    crypto.subtle.digest('SHA-256', encoder.encode(expected || ''))
+  ]);
+  return crypto.subtle.timingSafeEqual(left, right);
 }
 
 export default {
@@ -35,12 +48,18 @@ export class CodeAgentRelay {
   async fetch(request) {
     const url = new URL(request.url);
     if (url.pathname === '/agent' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
+      // Authenticate the upgrade too, rather than retaining arbitrary public sockets.
+      const protocols = (request.headers.get('Sec-WebSocket-Protocol') || '').split(',').map(value => value.trim());
+      const expected = `auth.${btoa(this.env.CODEX_AGENT_RELAY_TOKEN || '').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
+      if (!this.env.CODEX_AGENT_RELAY_TOKEN || !protocols.includes('luna') || !await sameSecret(protocols.find(value => value.startsWith('auth.')), expected)) {
+        return new Response('Unauthorized', { status: 401 });
+      }
       const pair = new WebSocketPair();
       this.ctx.acceptWebSocket(pair[1], ['agent']);
-      return new Response(null, { status: 101, webSocket: pair[0] });
+      return new Response(null, { status: 101, webSocket: pair[0], headers: { 'Sec-WebSocket-Protocol': 'luna' } });
     }
 
-    const denied = this.authorize(request);
+    const denied = await this.authorize(request);
     if (denied) return denied;
     if (url.pathname === '/internal/status' && request.method === 'GET') return this.status();
     if (url.pathname === '/internal/tasks' && request.method === 'POST') return this.startTask(request);
@@ -55,11 +74,11 @@ export class CodeAgentRelay {
     return new Response('Not found', { status: 404 });
   }
 
-  authorize(request) {
+  async authorize(request) {
     const expected = this.env.CODEX_AGENT_RELAY_TOKEN;
     const provided = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
     if (!expected) return Response.json({ error: 'Luna cloud runner is not configured.' }, { status: 503 });
-    if (provided !== expected) return Response.json({ error: 'Unauthorized.' }, { status: 401 });
+    if (!await sameSecret(provided, expected)) return Response.json({ error: 'Unauthorized.' }, { status: 401 });
     return null;
   }
 
@@ -70,7 +89,7 @@ export class CodeAgentRelay {
   async redactTaskText(value) {
     let text = String(value ?? '');
     const auth = await this.ctx.storage.get('codexAuth');
-    for (const secret of [auth?.tokens?.access_token, auth?.tokens?.refresh_token, auth?.tokens?.id_token]) {
+    for (const secret of [this.env.CODEX_AGENT_RELAY_TOKEN, this.env.LUNA_GITHUB_ACTIONS_TOKEN, auth?.tokens?.access_token, auth?.tokens?.refresh_token, auth?.tokens?.id_token]) {
       if (typeof secret === 'string' && secret.length >= 16) text = text.replaceAll(secret, '[redacted]');
     }
     return text
@@ -85,59 +104,87 @@ export class CodeAgentRelay {
     const configured = Boolean(
       this.env.LUNA_GITHUB_ACTIONS_TOKEN &&
       this.env.CODEX_AGENT_RELAY_TOKEN &&
-      ((await this.ctx.storage.get('codexAuth'))?.tokens?.refresh_token || this.env.CODEX_SIWC_CREDENTIALS)
+      await this.getCodexAuth()
     );
     return Response.json({ configured, attachmentsConfigured: Boolean(this.env.LUNA_ATTACHMENTS), busy: task?.status === 'running', taskId: task?.taskId || null });
   }
 
+  async getCodexAuth() {
+    let auth = await this.ctx.storage.get('codexAuth');
+    if (validCodexAuth(auth)) return auth;
+    try { auth = JSON.parse(this.env.CODEX_SIWC_CREDENTIALS || 'null'); } catch { return null; }
+    return validCodexAuth(auth) ? auth : null;
+  }
+
   async startTask(request) {
     let form;
-    try { form = await request.formData(); } catch { return Response.json({ error: 'Invalid request body.' }, { status: 400 }); }
+    try { form = await readTaskForm(request); } catch (error) { return Response.json({ error: error.message }, { status: error.status || 400 }); }
     const prompt = typeof form.get('prompt') === 'string' ? form.get('prompt').trim() : '';
     if (!prompt) return Response.json({ error: 'Describe the change you want.' }, { status: 400 });
     if (prompt.length > MAX_PROMPT_LENGTH) return Response.json({ error: `Prompt must be ${MAX_PROMPT_LENGTH.toLocaleString()} characters or fewer.` }, { status: 400 });
     const taskId = typeof form.get('taskId') === 'string' ? form.get('taskId') : '';
-    if (!/^[0-9a-f-]{36}$/i.test(taskId)) return Response.json({ error: 'Invalid Luna task ID.' }, { status: 400 });
-    const files = form.getAll('attachments').filter(value => value instanceof File && value.size > 0);
+    if (!UUID.test(taskId)) return Response.json({ error: 'Invalid Luna task ID.' }, { status: 400 });
+    const files = form.getAll('attachments');
+    if (files.some(file => !(file instanceof File) || file.size === 0)) return Response.json({ error: 'Attachments must be non-empty files.' }, { status: 400 });
     if (files.length > MAX_ATTACHMENT_COUNT) return Response.json({ error: `Attach no more than ${MAX_ATTACHMENT_COUNT} files.` }, { status: 400 });
     if (files.some(file => file.size > MAX_ATTACHMENT_SIZE)) return Response.json({ error: 'Each attachment must be 10 MB or smaller.' }, { status: 400 });
     if (files.reduce((total, file) => total + file.size, 0) > MAX_ATTACHMENT_TOTAL) return Response.json({ error: 'Attachments must total 25 MB or less.' }, { status: 400 });
     if (files.length && !this.env.LUNA_ATTACHMENTS) return Response.json({ error: 'Private attachment storage is not configured yet.' }, { status: 503 });
     if (!this.env.LUNA_GITHUB_ACTIONS_TOKEN) return Response.json({ error: 'Luna cloud runner is not configured.' }, { status: 503 });
-    if (!(await this.ctx.storage.get('codexAuth')) && !this.env.CODEX_SIWC_CREDENTIALS) {
+    if (!await this.getCodexAuth()) {
       return Response.json({ error: 'Luna ChatGPT sign-in is not configured.' }, { status: 503 });
     }
 
-    const previousId = await this.ctx.storage.get('currentTaskId');
-    const previous = previousId ? await this.ctx.storage.get(`task:${previousId}`) : null;
-    if (previous?.status === 'running') return Response.json({ error: 'Luna is already working on a request. Wait for it to finish.' }, { status: 409 });
-
+    const attachments = files.map((file, index) => ({
+      key: `tasks/${taskId}/${index}`,
+      filename: file.name.replaceAll('\\', '/').split('/').pop().replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 180) || `attachment-${index + 1}`,
+      contentType: /^[\w.+-]+\/[\w.+-]+$/.test(file.type) ? file.type : 'application/octet-stream',
+      size: file.size
+    }));
+    const fingerprint = JSON.stringify({ prompt, files: await Promise.all(files.map(async (file) => ({
+      name: file.name, type: file.type, size: file.size,
+      hash: Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await file.arrayBuffer())), byte => byte.toString(16).padStart(2, '0')).join('')
+    }))) });
+    const requestHash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(fingerprint))), byte => byte.toString(16).padStart(2, '0')).join('');
     const task = {
-      taskId,
-      prompt,
-      attachments: [],
-      status: 'running',
+      taskId, prompt, requestHash, attachments, status: 'running',
       message: "Creating Luna's environment…",
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      deadlineAt: Date.now() + TASK_START_TIMEOUT_MS
     };
-    await this.ctx.storage.put('currentTaskId', task.taskId);
-    await this.ctx.storage.put(`task:${task.taskId}`, task);
-    await this.ctx.storage.setAlarm(Date.now() + TASK_START_TIMEOUT_MS);
+    // Reserve the task before any R2 or GitHub I/O can yield to another request.
+    const existing = await this.ctx.storage.transaction(async storage => {
+      const saved = await storage.get(`task:${taskId}`);
+      if (saved) return saved;
+      const previousId = await storage.get('currentTaskId');
+      const previous = previousId ? await storage.get(`task:${previousId}`) : null;
+      if (previous?.status === 'running') return { busy: true };
+      await storage.put({ currentTaskId: taskId, [`task:${taskId}`]: task });
+      return null;
+    });
+    if (existing?.busy) return Response.json({ error: 'Luna is already working on a request. Wait for it to finish.' }, { status: 409 });
+    if (existing) {
+      if (existing.requestHash !== requestHash) return Response.json({ error: 'This task ID was already used for a different request.' }, { status: 409 });
+      return Response.json({ taskId, status: existing.status }, { status: 202 });
+    }
+    await this.scheduleCleanup();
 
     try {
       for (const [index, file] of files.entries()) {
-        const filename = file.name.replaceAll('\\', '/').split('/').pop().replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 180) || `attachment-${index + 1}`;
-        const key = `tasks/${task.taskId}/${index}`;
-        const contentType = /^[\w.+-]+\/[\w.+-]+$/.test(file.type) ? file.type : 'application/octet-stream';
+        const { key, filename, contentType } = attachments[index];
         await this.env.LUNA_ATTACHMENTS.put(key, file.stream(), {
-          httpMetadata: { contentType },
-          customMetadata: { filename, size: String(file.size) }
+          httpMetadata: { contentType }, customMetadata: { filename, size: String(file.size) }
         });
-        task.attachments.push({ key, filename, contentType, size: file.size });
       }
-      await this.saveTask(task);
-      const response = await fetch(`https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/${GITHUB_WORKFLOW}/dispatches`, {
+      const latest = await this.ctx.storage.get(`task:${taskId}`);
+      if (latest?.status !== 'running') {
+        await this.deleteTaskAttachments({ ...task, attachments });
+        return Response.json({ taskId, status: latest?.status || 'failed' }, { status: 202 });
+      }
+      let response;
+      try { response = await fetch(`https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/${GITHUB_WORKFLOW}/dispatches`, {
         method: 'POST',
+        signal: AbortSignal.timeout(30000),
         headers: {
           Accept: 'application/vnd.github+json',
           Authorization: `Bearer ${this.env.LUNA_GITHUB_ACTIONS_TOKEN}`,
@@ -146,25 +193,28 @@ export class CodeAgentRelay {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ ref: 'main', inputs: { taskId: task.taskId } })
-      });
+      }); } catch {
+        this.log('workflow_dispatch_unconfirmed', { taskId });
+        return Response.json({ taskId, status: 'running' }, { status: 202 });
+      }
       if (!response.ok) throw new Error(`GitHub returned ${response.status}`);
       this.log('workflow_dispatched', { taskId: task.taskId });
     } catch (error) {
+      this.log('workflow_dispatch_failed', { taskId });
+      const latest = await this.ctx.storage.get(`task:${taskId}`);
+      if (latest?.status === 'running' && !latest.runnerSessionId) {
+        delete latest.prompt;
+        await this.saveTask({ ...latest, status: 'failed',
+          message: 'Luna could not prepare or start its temporary runner. Please try a new request.',
+          summary: (await this.redactTaskText(error?.message || error)).slice(0, 300),
+          updatedAt: new Date().toISOString(), retainUntil: Date.now() + TASK_RETENTION_MS });
+      }
       await this.deleteTaskAttachments(task);
-      this.log('workflow_dispatch_failed', { taskId: task.taskId });
-      await this.saveTask({
-        taskId: task.taskId,
-        status: 'failed',
-        message: 'GitHub could not start Luna’s temporary runner. Check its Actions configuration.',
-        summary: String(error?.message || error).slice(0, 300),
-        updatedAt: new Date().toISOString(),
-        retainUntil: Date.now() + TASK_RETENTION_MS
-      });
       await this.scheduleCleanup();
-      return Response.json({ error: 'Luna could not start the cloud runner. Check GitHub Actions configuration and try again.' }, { status: 503 });
     }
 
-    return Response.json({ taskId: task.taskId, status: task.status }, { status: 202 });
+    const saved = await this.ctx.storage.get(`task:${taskId}`);
+    return Response.json({ taskId, status: saved?.status || 'running' }, { status: 202 });
   }
 
   async readAttachments(taskId) {
@@ -192,26 +242,32 @@ export class CodeAgentRelay {
 
   async deleteTaskAttachments(task) {
     if (!task) return;
-    if (this.env.LUNA_ATTACHMENTS && task.attachments?.length) {
-      await Promise.allSettled(task.attachments.map(({ key }) => this.env.LUNA_ATTACHMENTS.delete(key)));
-      task.attachments = [];
+    const failed = [];
+    for (const attachment of task.attachments || []) {
+      try {
+        if (!this.env.LUNA_ATTACHMENTS) throw new Error('Attachment binding unavailable');
+        await this.env.LUNA_ATTACHMENTS.delete(attachment.key);
+      } catch { failed.push(attachment); }
     }
-    await this.saveTask(task);
+    // Never overwrite newer task state after an external storage operation.
+    const latest = await this.ctx.storage.get(`task:${task.taskId}`);
+    if (!latest) return;
+    await this.saveTask({ ...latest, attachments: failed,
+      attachmentCleanupAt: failed.length ? Date.now() + 60000 : null });
   }
 
   async readTask(taskId) {
     const task = await this.ctx.storage.get(`task:${taskId}`);
     if (!task || (task.retainUntil && Date.now() >= task.retainUntil)) {
-      if (task) await this.ctx.storage.delete(`task:${taskId}`);
+      if (task) await this.scheduleCleanup();
       return Response.json({ error: 'Task not found.' }, { status: 404 });
     }
-    const { prompt: _prompt, attachments: _attachments, ...publicTask } = task;
+    const { prompt: _prompt, attachments: _attachments, requestHash: _hash, runnerSessionId: _session, ...publicTask } = task;
     return Response.json(publicTask);
   }
 
   async saveTask(task) {
     await this.ctx.storage.put(`task:${task.taskId}`, task);
-    if (await this.ctx.storage.get('currentTaskId') === task.taskId) await this.ctx.storage.put('currentTaskId', task.taskId);
   }
 
   async recordWorkflowRun(request, taskId) {
@@ -219,10 +275,23 @@ export class CodeAgentRelay {
     try { body = await request.json(); } catch { body = {}; }
     const currentId = await this.ctx.storage.get('currentTaskId');
     const task = await this.ctx.storage.get(`task:${taskId}`);
-    if (currentId !== taskId || task?.status !== 'running' || !/^\d{1,20}$/.test(body.runId || '')) {
+    if (currentId !== taskId || !task || !/^\d{1,20}$/.test(body?.runId || '')) {
       return Response.json({ error: 'The workflow run is not attached to an active Luna task.' }, { status: 409 });
     }
-    await this.saveTask({ ...task, workflowRunUrl: `https://github.com/${GITHUB_REPOSITORY}/actions/runs/${body.runId}` });
+    const workflowRunUrl = `https://github.com/${GITHUB_REPOSITORY}/actions/runs/${body.runId}`;
+    if (task.workflowRunUrl && task.workflowRunUrl !== workflowRunUrl) return Response.json({ error: 'A different workflow already owns this task.' }, { status: 409 });
+    if (task.status !== 'running') return Response.json({ recorded: true });
+    if (body.status === 'failed') {
+      delete task.prompt;
+      await this.saveTask({ ...task, workflowRunUrl, status: task.runnerSessionId ? 'uncertain' : 'failed',
+        message: task.runnerSessionId ? 'The workflow stopped before its result was confirmed. Check the run before retrying; changes may have been applied.' : 'Luna’s environment setup failed. Check the GitHub Actions run for details.',
+        updatedAt: new Date().toISOString(), retainUntil: Date.now() + TASK_RETENTION_MS });
+      await this.deleteTaskAttachments(task);
+    } else {
+      await this.saveTask({ ...task, workflowRunUrl,
+        workflowDeadlineAt: task.workflowDeadlineAt || Date.now() + 14 * 60 * 1000 });
+    }
+    await this.scheduleCleanup();
     this.log('workflow_run_observed', { taskId, runId: body.runId });
     return Response.json({ recorded: true });
   }
@@ -236,19 +305,27 @@ export class CodeAgentRelay {
       return;
     }
 
+    if (!data || typeof data !== 'object' || Array.isArray(data)) { socket.close(1008, 'Invalid message'); return; }
+
     let attachment;
     try { attachment = socket.deserializeAttachment() || {}; } catch { attachment = {}; }
     if (!attachment.authenticated) {
+      // Finish crypto before reading the task; only storage operations may yield
+      // while checking and claiming its single runner session.
+      const tokenMatches = await sameSecret(data.token, this.env.CODEX_AGENT_RELAY_TOKEN);
       const currentId = await this.ctx.storage.get('currentTaskId');
       const task = currentId ? await this.ctx.storage.get(`task:${currentId}`) : null;
       if (
         data?.type !== 'authenticate' ||
-        data.token !== this.env.CODEX_AGENT_RELAY_TOKEN ||
+        !tokenMatches ||
         typeof data.taskId !== 'string' ||
         task?.status !== 'running' ||
         task.taskId !== data.taskId ||
         data.phase !== 'agent' ||
-        !task.prompt
+        !task.prompt ||
+        task.runnerSessionId ||
+        task.deadlineAt <= Date.now() ||
+        (task.workflowRunUrl && task.workflowRunUrl !== `https://github.com/${GITHUB_REPOSITORY}/actions/runs/${data.runId}`)
       ) {
         socket.close(1008, 'Authentication required for an active task');
         return;
@@ -257,10 +334,10 @@ export class CodeAgentRelay {
       const sessionId = crypto.randomUUID();
       socket.serializeAttachment({ authenticated: true, sessionId, taskId: task.taskId, phase: data.phase });
       await this.ctx.storage.put('runnerSessionId', sessionId);
-      const deadlineAt = Date.now() + TASK_TIMEOUT_MS;
-      await this.ctx.storage.setAlarm(deadlineAt);
+      const deadlineAt = Math.min(Date.now() + TASK_TIMEOUT_MS, task.workflowDeadlineAt || Infinity);
       await this.saveTask({
         ...task,
+        runnerSessionId: sessionId,
         deadlineAt,
         message: 'Luna is working in a temporary cloud runner.',
         updatedAt: new Date().toISOString()
@@ -270,8 +347,9 @@ export class CodeAgentRelay {
         await this.saveTask({ ...taskUpdate, workflowRunUrl: `https://github.com/${GITHUB_REPOSITORY}/actions/runs/${data.runId}` });
         this.log('workflow_run_observed', { taskId: task.taskId, runId: data.runId });
       }
+      await this.scheduleCleanup();
       socket.send(JSON.stringify({ type: 'authenticated', taskId: task.taskId, phase: 'agent' }));
-      socket.send(JSON.stringify({ type: 'task', taskId: task.taskId, prompt: task.prompt }));
+      socket.send(JSON.stringify({ type: 'task', taskId: task.taskId, prompt: task.prompt, deadlineAt }));
       return;
     }
 
@@ -282,13 +360,14 @@ export class CodeAgentRelay {
     }
     const currentId = await this.ctx.storage.get('currentTaskId');
     const task = currentId ? await this.ctx.storage.get(`task:${currentId}`) : null;
-    if (!task || task.taskId !== attachment.taskId || task.status !== 'running') return;
+    if (!task || task.taskId !== attachment.taskId || data.taskId !== task.taskId) return;
+    if (task.status !== 'running') {
+      if (data.type === 'task-update' && data.updateId === task.resultUpdateId) socket.send(JSON.stringify({ type: 'task-update-ack', taskId: task.taskId, updateId: data.updateId }));
+      return;
+    }
 
     if (data?.type === 'credential-request') {
-      let auth = await this.ctx.storage.get('codexAuth');
-      if (!auth && this.env.CODEX_SIWC_CREDENTIALS) {
-        try { auth = JSON.parse(this.env.CODEX_SIWC_CREDENTIALS); } catch { /* Invalid bootstrap data is reported to the runner. */ }
-      }
+      let auth = await this.getCodexAuth();
       if (!validCodexAuth(auth)) {
         socket.send(JSON.stringify({ type: 'credential-error', taskId: task.taskId }));
       } else {
@@ -315,7 +394,7 @@ export class CodeAgentRelay {
     }
 
     if (data?.type === 'task-update') {
-      const status = ['complete', 'pushed', 'failed'].includes(data.status) ? data.status : 'running';
+      const status = TERMINAL_STATUSES.includes(data.status) ? data.status : 'running';
       const updatedTask = {
         ...task,
         status,
@@ -327,11 +406,14 @@ export class CodeAgentRelay {
         if (typeof data.commit !== 'string' || !/^[0-9a-f]{7,40}$/i.test(data.commit)) return;
         updatedTask.commit = data.commit;
       }
-      if (['complete', 'pushed', 'failed'].includes(status)) delete updatedTask.prompt;
-      await this.saveTask(updatedTask);
-      if (['complete', 'pushed', 'failed'].includes(status)) {
+      if (TERMINAL_STATUSES.includes(status)) {
+        delete updatedTask.prompt;
         updatedTask.retainUntil = Date.now() + TASK_RETENTION_MS;
-        await this.saveTask(updatedTask);
+        if (typeof data.updateId === 'string') updatedTask.resultUpdateId = data.updateId;
+      }
+      await this.saveTask(updatedTask);
+      if (TERMINAL_STATUSES.includes(status)) {
+        if (typeof data.updateId === 'string') socket.send(JSON.stringify({ type: 'task-update-ack', taskId: task.taskId, updateId: data.updateId }));
         await this.deleteTaskAttachments(updatedTask);
         await this.scheduleCleanup();
         this.log('task_terminal', { taskId: task.taskId, status });
@@ -343,9 +425,9 @@ export class CodeAgentRelay {
     const now = Date.now();
     const currentId = await this.ctx.storage.get('currentTaskId');
     const task = currentId ? await this.ctx.storage.get(`task:${currentId}`) : null;
-    if (task?.status === 'running') {
+    if (task?.status === 'running' && (task.deadlineAt || Date.parse(task.createdAt) + TASK_START_TIMEOUT_MS) <= now) {
       const { prompt: _prompt, ...expiredTask } = task;
-      const failedTask = { ...expiredTask, status: 'failed', message: 'Luna’s temporary runner did not finish before its time limit.', updatedAt: new Date().toISOString(), retainUntil: now + TASK_RETENTION_MS };
+      const failedTask = { ...expiredTask, status: task.runnerSessionId ? 'uncertain' : 'failed', message: task.runnerSessionId ? 'Luna’s runner exceeded its time limit. Check the workflow before retrying; changes may have been applied.' : 'Luna’s environment did not start before its time limit.', updatedAt: new Date().toISOString(), retainUntil: now + TASK_RETENTION_MS };
       await this.saveTask(failedTask);
       await this.deleteTaskAttachments(failedTask);
       this.log('task_expired', { taskId: task.taskId, workflowRunUrl: task.workflowRunUrl || null });
@@ -358,7 +440,7 @@ export class CodeAgentRelay {
       if (task.workflowRunUrl && this.env.LUNA_GITHUB_ACTIONS_TOKEN) {
         const runId = task.workflowRunUrl.split('/').pop();
         await fetch(`https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${runId}/cancel`, {
-          method: 'POST', headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${this.env.LUNA_GITHUB_ACTIONS_TOKEN}`, 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'SweetHopeBakery-Luna-Relay' }
+          method: 'POST', signal: AbortSignal.timeout(15000), headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${this.env.LUNA_GITHUB_ACTIONS_TOKEN}`, 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'SweetHopeBakery-Luna-Relay' }
         }).catch(() => {});
       }
     }
@@ -370,10 +452,20 @@ export class CodeAgentRelay {
     const now = Date.now();
     let next = Infinity;
     for (const [key, task] of tasks) {
-      if (task.retainUntil && task.retainUntil <= now) await this.ctx.storage.delete(key);
-      else if (task.retainUntil) next = Math.min(next, task.retainUntil);
+      if (task.status === 'running') {
+        next = Math.min(next, task.deadlineAt || Date.parse(task.createdAt) + TASK_START_TIMEOUT_MS);
+        continue;
+      }
+      if (task.attachments?.length && (!task.attachmentCleanupAt || task.attachmentCleanupAt <= now)) await this.deleteTaskAttachments(task);
+      const latest = await this.ctx.storage.get(key);
+      if (latest?.attachments?.length) next = Math.min(next, latest.attachmentCleanupAt);
+      else if (latest?.retainUntil && latest.retainUntil <= now) {
+        await this.ctx.storage.delete(key);
+        if (await this.ctx.storage.get('currentTaskId') === task.taskId) await this.ctx.storage.delete('currentTaskId');
+      } else if (latest?.retainUntil) next = Math.min(next, latest.retainUntil);
     }
-    if (Number.isFinite(next)) await this.ctx.storage.setAlarm(next);
+    if (Number.isFinite(next)) await this.ctx.storage.setAlarm(Math.max(now + 1, next));
+    else await this.ctx.storage.deleteAlarm();
   }
 
   async webSocketClose(socket) {

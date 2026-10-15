@@ -13,6 +13,7 @@ if (!relayToken || !relayUrl || !/^[0-9a-f-]{36}$/i.test(taskId || '') || !/^\d{
 const response = await fetch(`${relayHttpUrl}/internal/tasks/${encodeURIComponent(taskId)}/run`, {
   method: 'POST',
   headers: { Authorization: `Bearer ${relayToken}`, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ runId })
+  body: JSON.stringify({ runId, ...(process.argv.includes('--failed') ? { status: 'failed' } : {}) }),
+  signal: AbortSignal.timeout(15000)
 });
 if (!response.ok) throw new Error(`The Luna relay rejected this workflow run (${response.status}).`);

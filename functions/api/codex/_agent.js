@@ -19,3 +19,10 @@ export function relayRequest(secret, path, init = {}) {
 export function relayUnavailable() {
   return Response.json({ error: 'The Luna cloud relay is not configured.' }, { status: 503 });
 }
+
+export function privateRelayResponse(response) {
+  const result = new Response(response.body, response);
+  result.headers.set('Cache-Control', 'private, no-store');
+  result.headers.set('CDN-Cache-Control', 'no-store');
+  return result;
+}

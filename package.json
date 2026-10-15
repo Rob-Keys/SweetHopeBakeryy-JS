@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "npx serve src -l 8080",
+    "test": "node --test tests/*.test.mjs",
+    "test:luna": "node --test tests/luna-*.test.mjs",
     "test:fades": "node --test tests/fades.test.mjs",
     "luna:preview": "node scripts/luna-visual-preview.mjs",
     "cloud-agent": "node scripts/codex-cloud-agent.mjs",
@@ -15,6 +17,8 @@
     "@aws-sdk/s3-request-presigner": "^3.0.0"
   },
   "devDependencies": {
-    "playwright": "^1.64.0"
+    "miniflare": "4.20260730.0",
+    "playwright": "^1.64.0",
+    "wrangler": "4.151.0"
   }
 }
