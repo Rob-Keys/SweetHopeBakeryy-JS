@@ -1,50 +1,25 @@
 // POST /api/delete-data
-// Removes an item from a JSON table stored in Cloudflare KV.
+// Authenticated deterministic content edit committed through the Cloudflare relay.
 
 import { checkAuth } from './_auth.js';
-import { getKv, isValidTableName, readTable } from './_kv.js';
-import { queueCachePurge } from './_deploy.js';
+import { getRelayStub, relayRequest, relayUnavailable, privateRelayResponse } from './codex/_agent.js';
 
 export async function onRequestPost(context) {
   const denied = await checkAuth(context);
   if (denied) return denied;
 
-  const kv = getKv(context);
-  if (!kv) {
-    return Response.json({ error: 'KV binding not configured' }, { status: 500 });
-  }
+  const relay = getRelayStub(context);
+  if (!relay) return relayUnavailable();
 
+  let body;
   try {
-    const { tableName, key: partitionValue } = await context.request.json();
-    if (!isValidTableName(tableName)) {
-      return Response.json({ error: 'Invalid table name' }, { status: 400 });
-    }
-
-    const kvKey = `data/${tableName}.json`;
-
-    // Stop on read errors or corrupt table data; filtering an empty fallback
-    // and persisting it could erase every record in the table.
-    let data = await readTable(kv, tableName);
-
-    // Select the partition key and filter out the target item.
-    const partitionKey = tableName === 'products' ? 'itemName' : 'sectionIndex';
-    if (tableName === 'contact_page') {
-      const sortedSections = [...data].sort((a, b) => Number(a.sectionIndex) - Number(b.sectionIndex));
-      const targetIndex = sortedSections.findIndex(section => String(section[partitionKey]) === String(partitionValue));
-      if (targetIndex >= 0 && targetIndex < 3) {
-        return Response.json({ error: 'The first three contact sections are required and cannot be removed.' }, { status: 409 });
-      }
-    }
-    data = data.filter(d => String(d[partitionKey]) !== String(partitionValue));
-
-    // Persist the updated table.
-    await kv.put(kvKey, JSON.stringify(data));
-
-    queueCachePurge(context);
-
-    return Response.json({ success: true });
-  } catch (err) {
-    console.error('delete-data error:', err);
-    return Response.json({ error: 'Internal error' }, { status: 500 });
+    body = await context.request.json();
+  } catch {
+    return Response.json({ error: 'Invalid request body.' }, { status: 400 });
   }
+  return privateRelayResponse(await relay.stub.fetch(relayRequest(relay.secret, '/internal/content', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...body, operation: 'delete' })
+  })));
 }

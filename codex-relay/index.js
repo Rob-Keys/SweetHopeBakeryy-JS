@@ -1,4 +1,5 @@
 import { readTaskForm } from './task-request.js';
+import { commitContentChange } from './content-commit.js';
 
 const MAX_PROMPT_LENGTH = 12000;
 const TASK_RETENTION_MS = 15 * 60 * 1000;
@@ -43,6 +44,7 @@ export class CodeAgentRelay {
   constructor(ctx, env) {
     this.ctx = ctx;
     this.env = env;
+    this.contentQueue = Promise.resolve();
   }
 
   async fetch(request) {
@@ -62,6 +64,7 @@ export class CodeAgentRelay {
     const denied = await this.authorize(request);
     if (denied) return denied;
     if (url.pathname === '/internal/status' && request.method === 'GET') return this.status();
+    if (url.pathname === '/internal/content' && request.method === 'POST') return this.contentChange(request);
     if (url.pathname === '/internal/tasks' && request.method === 'POST') return this.startTask(request);
     const attachmentListMatch = url.pathname.match(/^\/internal\/tasks\/([0-9a-f-]{36})\/attachments$/i);
     if (attachmentListMatch && request.method === 'GET') return this.readAttachments(attachmentListMatch[1]);
@@ -80,6 +83,27 @@ export class CodeAgentRelay {
     if (!expected) return Response.json({ error: 'Luna cloud runner is not configured.' }, { status: 503 });
     if (!await sameSecret(provided, expected)) return Response.json({ error: 'Unauthorized.' }, { status: 401 });
     return null;
+  }
+
+  async contentChange(request) {
+    let change;
+    try {
+      change = await request.json();
+    } catch {
+      return Response.json({ success: false, error: 'Invalid request body.' }, { status: 400 });
+    }
+    if (!this.env.LUNA_GITHUB_ACTIONS_TOKEN) {
+      return Response.json({ success: false, error: 'GitHub content access is not configured.' }, { status: 503 });
+    }
+
+    const task = this.contentQueue.then(() => commitContentChange(this.env.LUNA_GITHUB_ACTIONS_TOKEN, change));
+    this.contentQueue = task.then(() => undefined, () => undefined);
+    try {
+      return await task;
+    } catch (error) {
+      this.log('content_commit_failed', { status: error?.status || 502 });
+      return Response.json({ success: false, error: 'GitHub could not commit the content change. Please retry.' }, { status: 502 });
+    }
   }
 
   log(event, fields = {}) {

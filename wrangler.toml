@@ -1,5 +1,5 @@
 name = "sweethopebakeryy-js"
-pages_build_output_dir = "src"
+pages_build_output_dir = "dist"
 compatibility_date = "2026-02-04"
 compatibility_flags = ["nodejs_compat"]
 
@@ -14,4 +14,3 @@ script_name = "sweet-hope-codex-relay"
 
 [vars]
 DEBUG_ERRORS = "false"
-CLOUDFLARE_ZONE_ID = "dcb06d98570b7699bebf9bab3fc876fb"

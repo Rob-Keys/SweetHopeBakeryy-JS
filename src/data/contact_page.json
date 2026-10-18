@@ -1,0 +1,26 @@
+[
+  {
+    "sectionIndex": "0",
+    "headerText": "Get in Touch",
+    "bodyText": "For custom orders, email or Instagram DM us with your request, desired date, and preferred payment method (PayPal, Venmo, Zelle, or cash). ",
+    "imageURLs": [
+      "https://sweethopebakeryy.s3.us-east-1.amazonaws.com/sweethopebakeryy_contact/0.jpg"
+    ]
+  },
+  {
+    "sectionIndex": "1",
+    "headerText": "Email",
+    "bodyText": "support@sweethopebakeryy.com",
+    "imageURLs": [
+      "https://sweethopebakeryy.s3.us-east-1.amazonaws.com/contact_page/1.jpg"
+    ]
+  },
+  {
+    "sectionIndex": "2",
+    "headerText": "Instagram",
+    "bodyText": " Follow us on Instagram (@sweethopebakeryy)!",
+    "imageURLs": [
+      "https://sweethopebakeryy.s3.us-east-1.amazonaws.com/contact_page/2.jpg"
+    ]
+  }
+]

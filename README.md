@@ -8,45 +8,46 @@ https://www.sweethopebakeryy.com
 
 The original was a LAMP stack: server-rendered PHP, Apache routing, direct MySQL/S3/SES calls. The rewrite eliminates the server. Static HTML + ES6 modules handle rendering. Server-side work (Stripe, AWS, auth) runs as Cloudflare Pages Functions — small serverless endpoints that only exist where secrets or trust are required.
 
-No framework, no bundler, no build step. The browser loads ES6 modules directly.
+The browser receives page bundles built with Bun. Menu and page content is imported from the repository JSON files and bundled into those assets.
 
 ## How It Fits Together
 
 Each page has a script in `src/js/pages/` that runs on `DOMContentLoaded`:
 1. Inject header/footer from `src/js/components/`
-2. Fetch data from `/api/get-data` (Cloudflare KV)
+2. Render the bundled repository data
 3. Render page content
 4. `initShared()` runs last — attaches scroll animations and image sliders to the now-present DOM
 
-Core modules (`src/js/modules/`) handle cart state, auth tokens, and data fetching. Stripe and AWS client wrappers call `/api/*` endpoints. Reusable UI components live in `src/js/components/`.
+Core modules (`src/js/modules/`) handle cart state, auth tokens, and bundled data access. Stripe and AWS client wrappers call `/api/*` endpoints. Reusable UI components live in `src/js/components/`.
 
-## Data + Caching
+## Content and build
 
-All content lives in Cloudflare KV. No static JSON files, no database server.
+Editable content lives in `src/data/products.json`, `src/data/home_page.json`, `src/data/about_page.json`, and `src/data/contact_page.json`. Browser bundles import these files, so page views make no separate content request. Checkout imports the same product catalog to validate prices. Customize keeps its JWT login check and asks the Cloudflare relay to apply a fixed save/delete operation as a GitHub commit; each commit starts the normal Pages build and deployment.
 
 ```
-Admin edit  →  POST /api/save-data (writes KV)  →  CDN cache purge
-Page load   →  GET /api/get-data (reads KV)      →  edge-cached 24h
+Bun build   →  compile and bundle page scripts + JSON  →  dist/
+Customize   →  authenticated Pages API  →  relay GitHub commit  →  Pages deployment
 ```
 
-Writes trigger a `purge_everything` against the Cloudflare zone API. Next read hits KV fresh, CDN caches it again. Static assets (JS, CSS, images) are cached aggressively at the edge and invalidated on deploy.
+The Cloudflare Pages build command is configured as `bun run build`, with `dist` as the output directory. Static assets (JS, CSS, images) are served from `dist`.
 
 ## Security
 
 The browser is untrusted. All sensitive operations stay server-side:
 
-- **Pricing** — Checkout sessions are created server-side from KV prices, not client-submitted totals
+- **Pricing** — Checkout sessions are created server-side from the repository product catalog, not client-submitted totals
 - **Payments** — Stripe verification and order emails run server-side only
 - **Auth** — Admin JWT via PBKDF2 password verification, stored in `sessionStorage`, verified on every write endpoint
-- **Data reads are public** — intentionally, since the data is already visible on the site. Enables CDN caching without auth overhead
+- **Content is public** — it is already visible on the site and is bundled into public page assets
 - **Secrets** — Stripe/AWS keys and JWT secret are Cloudflare environment secrets, never exposed to the client
-- **Validation** — KV table names allowlisted, S3 keys validated against path traversal, HTML escaped in mail rendering
+- **Validation** — Customize commits can only target the four content JSON files, S3 keys are validated against path traversal, and mail content is HTML escaped
 
 ## Local Dev
 
 ```bash
-npm run dev                    # static files at localhost:8080
-npx wrangler pages dev src     # with Pages Functions + KV
+bun run build                  # emit static site assets to dist/
+npm run dev                    # build and serve dist at localhost:8080
+npx wrangler pages dev dist    # with Pages Functions and retained order KV
 ```
 
 ## Admin Authentication
@@ -68,7 +69,7 @@ npx wrangler r2 bucket lifecycle add sweet-hope-luna-attachments luna-attachment
 
 Each run's credential-redacted Codex JSONL event stream (including model text and tool inputs/results) is uploaded directly to `s3://cf-templates-1id935irfrtba-us-east-1/luna-traces/<task-id>/<workflow-id>-<attempt>.jsonl`. The stream stays in a mode-0600 temporary file until the AWS CLI upload finishes; it is never printed, sent to the relay, or included in a GitHub artifact. GitHub Actions uses OIDC for short-lived AWS credentials. No long-lived AWS key is stored in GitHub. Configure the private trace bucket with all four S3 Block Public Access settings and S3-managed AES256 encryption by default. The role policy is in [`docs/luna-cli-s3-policy.json`](docs/luna-cli-s3-policy.json).
 
-Codex runs with full shell access on the temporary GitHub-hosted runner. Luna may edit repository files and commit/push directly to `main`; the runner does not create or validate a source patch artifact. For live content, Luna uses Cloudflare's `cf` CLI to read and write KV and purge the site cache. For public media, it uses the standard AWS CLI to list, upload, and delete objects in the `sweethopebakeryy` bucket. The workflow supplies a scoped Cloudflare API token and short-lived AWS credentials from GitHub OIDC. Luna reads each KV value immediately before changing it and verifies its writes afterward. KV does not provide compare-and-swap, so concurrent admin edits can still race. A pushed commit is not treated as a verified Pages deployment; the task page shows the commit and GitHub Actions run so deployment can be checked separately. The relay allows up to 10 minutes for environment startup, then up to 12 minutes for the runner, bounded by the workflow’s remaining 15-minute job budget. Setup failures are reported by a workflow finalizer; interrupted editing is marked uncertain because live writes or a push may already have happened. The workflow pins its GitHub Actions, Codex CLI, and Cloudflare CLI revisions; AWS CLI comes from the GitHub runner image. It uses the standard ChatGPT-plan speed with `gpt-6-luna`; Fast is a pay-as-you-go API tier and ChatGPT-plan requests may reject service-tier overrides, so the cloud runner does not enable it.
+Codex runs with full shell access on the temporary GitHub-hosted runner. Luna edits and commits the repository content files (`src/data/products.json`, `src/data/home_page.json`, `src/data/about_page.json`, and `src/data/contact_page.json`) along with any requested code, then pushes to `main`; the commit starts the normal Pages build. Customize uses a fixed relay operation to commit saves and deletions to the same JSON files. Website content is never written to KV. Luna uses the standard AWS CLI to list, upload, and delete public media in the `sweethopebakeryy` bucket and to upload private run traces. The workflow supplies short-lived AWS credentials from GitHub OIDC. A pushed commit is not treated as a verified Pages deployment; the task page shows the commit and GitHub Actions run so deployment can be checked separately. The relay allows up to 10 minutes for environment startup, then up to 12 minutes for the runner, bounded by the workflow’s remaining 15-minute job budget. Setup failures are reported by a workflow finalizer; interrupted editing is marked uncertain because a push may already have happened. The workflow pins its GitHub Actions and Codex CLI revisions; AWS CLI comes from the GitHub runner image. It uses the standard ChatGPT-plan speed with `gpt-6-luna`; Fast is a pay-as-you-go API tier and ChatGPT-plan requests may reject service-tier overrides, so the cloud runner does not enable it.
 
 To set up the cloud runner:
 
@@ -82,9 +83,8 @@ To set up the cloud runner:
    ```
 
    Set the GitHub repository variable `LUNA_CLI_AWS_ROLE_ARN` to the role ARN. The policy allows trace writes and read/write/delete only within the site's public media prefixes in the `sweethopebakeryy` bucket.
-4. Configure a Cloudflare API token scoped to Workers KV Storage Read, Workers KV Storage Write, and Cache Purge, limited to the site's account and zone. Store it as the GitHub Actions secret `LUNA_CLOUDFLARE_API_TOKEN`; set repository variables `LUNA_CLOUDFLARE_ACCOUNT_ID`, `LUNA_CLOUDFLARE_KV_NAMESPACE_ID`, `LUNA_CLOUDFLARE_ZONE_ID`, and `LUNA_TRACE_AWS_REGION` (`us-east-1`). The runner passes the Cloudflare token to Luna so it can use `cf` directly.
-5. Create the private R2 bucket and its `tasks/` lifecycle rule above, then deploy the relay Worker from `codex-relay/` with `npx wrangler deploy --config codex-relay/wrangler.toml`. Keep the existing Pages binding to `CODEX_AGENT_RELAY` and the same `CODEX_AGENT_RELAY_TOKEN` secret on Pages and the Worker. If the Pages project has not already been deployed with the Durable Object binding and relay secret, configure those as part of the Pages deployment too.
-6. After Luna completes its first cloud run, remove the one-time `CODEX_SIWC_CREDENTIALS` Worker secret with `npx wrangler secret delete CODEX_SIWC_CREDENTIALS --config codex-relay/wrangler.toml`. The Durable Object retains the latest refreshed credential for future runs.
+4. Set the GitHub repository variable `LUNA_TRACE_AWS_REGION` to `us-east-1`. Create the private R2 bucket and its `tasks/` lifecycle rule above, then deploy the relay Worker from `codex-relay/` with `npx wrangler deploy --config codex-relay/wrangler.toml`. Keep the existing Pages binding to `CODEX_AGENT_RELAY` and the same `CODEX_AGENT_RELAY_TOKEN` secret on Pages and the Worker. If the Pages project has not already been deployed with the Durable Object binding and relay secret, configure those as part of the Pages deployment too.
+5. Confirm the Cloudflare Pages build command is `bun run build` and output directory is `dist`. After Luna completes its first cloud run, remove the one-time `CODEX_SIWC_CREDENTIALS` Worker secret with `npx wrangler secret delete CODEX_SIWC_CREDENTIALS --config codex-relay/wrangler.toml`. The Durable Object retains the latest refreshed credential for future runs.
 
 The browser never receives the relay token. Page requests still require the existing admin session, and the Pages Function forwards them to the Durable Object over Cloudflare's binding. The GitHub workflow accepts only a task ID, requires a matching active relay task, and does not accept prompts directly from GitHub's workflow-dispatch UI.
 

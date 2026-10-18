@@ -2,11 +2,9 @@
 // Creates a Stripe Checkout session for the current cart.
 // Requires env: STRIPE_SECRET_KEY, AWS_KEY, AWS_SECRET_KEY
 
-import { getKv } from '../_kv.js';
 import { stripeRequest } from '../_stripe.js';
 import { saveOrderSnapshot } from '../_orders.js';
-
-const PRODUCTS_KEY = 'data/products.json';
+import products from '../../../src/data/products.json';
 
 function getReturnUrl(request, env) {
   const requestOrigin = new URL(request.url).origin;
@@ -23,14 +21,6 @@ function getReturnUrl(request, env) {
     }
   }
   return new URL('/return?session_id={CHECKOUT_SESSION_ID}', base).toString();
-}
-
-async function loadProducts(context) {
-  const kv = getKv(context);
-  if (!kv) throw new Error('KV binding not available');
-  const data = await kv.get(PRODUCTS_KEY, 'json');
-  if (!Array.isArray(data)) throw new Error('Unable to load products data');
-  return data;
 }
 
 function buildStripeLineItems(cartLines, products) {
@@ -126,7 +116,6 @@ export async function onRequestPost(context) {
     }
 
     stage = 'load_catalog';
-    const products = await loadProducts(context);
     stage = 'validate_cart';
     const stripeLineItems = buildStripeLineItems(cartLines, products);
     const cartSummary = buildCartSummary(cartLines, products);

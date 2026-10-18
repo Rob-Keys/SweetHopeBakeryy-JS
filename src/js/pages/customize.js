@@ -8,7 +8,7 @@ import { getTable, putItem, removeItem } from '../modules/database.js';
 import { uploadImages, deleteImages } from '../aws/s3.js';
 import { renderPageSectionEditor, renderLocalCodeAgentPanel } from '../components/customize-page.js';
 import { escapeHtml } from '../modules/escape.js';
-import { initLocalCodeAgentHandlers } from '../modules/luna-agent.js?v=luna-recovery-v4';
+import { initLocalCodeAgentHandlers } from '../modules/luna-agent.js';
 import { showError } from '../modules/page-state.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -26,6 +26,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 let lunaPanel;
+
+function showCommitPending(result) {
+  const version = document.getElementById('deployment-version');
+  if (version && result?.commit) {
+    version.textContent = `Saved in ${result.commit.slice(0, 7)}. Live site updates after the deploy finishes.`;
+  }
+}
 
 async function loadCustomize() {
   const container = document.getElementById('customize-content');
@@ -466,6 +473,7 @@ function initProductEditHandlers() {
         if (!saveResult.success) {
           throw new Error(saveResult.error || 'Save failed.');
         }
+        showCommitPending(saveResult);
 
         // Delete removed images only after the catalog no longer references them.
         if (imagesToRemove.length > 0) {
@@ -589,6 +597,7 @@ function initSectionEditHandlers() {
         if (!saveResult.success) {
           throw new Error(saveResult.error || 'Save failed.');
         }
+        showCommitPending(saveResult);
 
         // Delete the old image only after the saved section no longer references it.
         if (imageToRemove) {
@@ -665,6 +674,7 @@ function initRemoveHandlers() {
       setButtonBusy(submitButton, true, 'Removing...');
       const result = await removeItem(tableName, key);
       if (result.success) {
+        showCommitPending(result);
         form.closest('.menu-row')?.remove();
       } else {
         setRowStatus(form, result.error || 'Could not remove item.', 'danger');
@@ -684,6 +694,7 @@ function initRemoveHandlers() {
       setButtonBusy(submitButton, true, 'Removing...');
       const result = await removeItem(tableName, key);
       if (result.success) {
+        showCommitPending(result);
         form.closest('.menu-row')?.remove();
       } else {
         setRowStatus(form, result.error || 'Could not remove section.', 'danger');
@@ -735,7 +746,8 @@ function initAddHandlers() {
 
       const saveResult = await putItem('products', { itemName: name, description, prices, customizations, imageURLs }, { createOnly: true });
       if (!saveResult.success) throw new Error(saveResult.error || 'Could not add product.');
-      setRowStatus(form, 'Product added. Reload the page to edit it.', 'success');
+      showCommitPending(saveResult);
+      setRowStatus(form, 'Product added. Live site updates after the deploy finishes; reload the page to edit it.', 'success');
       form.reset();
     } catch (err) {
       console.error('Add product failed:', err);
@@ -780,7 +792,8 @@ function initAddHandlers() {
 
         const saveResult = await putItem(pageName, { sectionIndex, headerText, bodyText, imageURLs }, { createOnly: true });
         if (!saveResult.success) throw new Error(saveResult.error || 'Could not add section.');
-        setRowStatus(form, 'Section added. Reload the page to edit it.', 'success');
+        showCommitPending(saveResult);
+        setRowStatus(form, 'Section added. Live site updates after the deploy finishes; reload the page to edit it.', 'success');
         form.reset();
       } catch (err) {
         console.error('Add section failed:', err);

@@ -3,3 +3,4 @@ vendor/
 .claude/
 node_modules/
 .wrangler/
+dist/

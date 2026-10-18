@@ -8,7 +8,7 @@ import { chromium } from 'playwright';
 import { preparePreviewPage } from './lib/preview-page.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '..');
-const siteRoot = resolve(repoRoot, 'src');
+const siteRoot = resolve(repoRoot, 'dist');
 const outputRoot = resolve(process.env.LUNA_PREVIEW_OUTPUT_DIR || resolve(process.env.RUNNER_TEMP || tmpdir(), 'luna-preview'));
 const routes = process.argv.slice(2).filter(argument => !argument.startsWith('--'));
 const renderAll = process.argv.includes('--all');
@@ -35,45 +35,10 @@ const mimeTypes = {
   '.xml': 'application/xml; charset=utf-8'
 };
 
-async function readPublicTable(tableName) {
-  if (!['products', 'home_page', 'about_page', 'contact_page'].includes(tableName)) return null;
-  const url = new URL('/api/get-data', 'https://www.sweethopebakeryy.com');
-  url.searchParams.set('tableName', tableName);
-  let lastError;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) });
-      if (response.ok) {
-        const value = await response.json();
-        if (Array.isArray(value)) return value;
-        throw new Error(`The public ${tableName} endpoint returned non-array JSON.`);
-      }
-      lastError = new Error(`The public ${tableName} endpoint returned HTTP ${response.status}.`);
-      if (response.status < 500 && response.status !== 429) break;
-    } catch (error) {
-      lastError = error;
-    }
-    if (attempt < 2) await new Promise(resolveDelay => setTimeout(resolveDelay, 250 * (2 ** attempt)));
-  }
-  throw lastError || new Error(`The public ${tableName} endpoint is unavailable.`);
-}
-
 const server = createServer(async (request, response) => {
   const requestUrl = new URL(request.url || '/', 'http://127.0.0.1');
   if (requestUrl.pathname.startsWith('/api/')) {
-    if (request.method === 'GET' && requestUrl.pathname === '/api/get-data') {
-      try {
-        const table = await readPublicTable(requestUrl.searchParams.get('tableName') || '');
-        response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-        response.end(JSON.stringify(table));
-      } catch (error) {
-        response.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
-        response.end(JSON.stringify({ error: error?.message || 'Preview data is unavailable.' }));
-      }
-      return;
-    }
-
-    // Do not let preview actions write to any live service.
+    // Previews never contact live APIs.
     response.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
     response.end(JSON.stringify({ error: 'API writes are disabled in the visual preview.' }));
     return;

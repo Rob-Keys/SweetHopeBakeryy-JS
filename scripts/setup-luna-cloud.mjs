@@ -59,7 +59,7 @@ try {
   const githubToken = await readHidden('Paste a fine-grained GitHub token scoped to this repository with Actions: write and Contents: write (input hidden): ');
   if (!githubToken.trim()) throw new Error('A repository-scoped GitHub Actions/contents token is required.');
 
-  console.log('Saving the relay URL and relay token to GitHub Actions, then configuring Cloudflare secrets…');
+  console.log('Saving Luna and relay credentials…');
   run('gh', ['secret', 'set', 'CODEX_AGENT_RELAY_TOKEN', '--repo', repo], relayToken);
   run('gh', ['secret', 'set', 'LUNA_GITHUB_PUSH_TOKEN', '--repo', repo], githubToken.trim());
   run('gh', ['variable', 'set', 'CODEX_AGENT_RELAY_URL', '--repo', repo, '--body', relayUrl]);

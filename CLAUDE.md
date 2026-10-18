@@ -1,18 +1,21 @@
 # CLAUDE.md
 
 ## Project Overview
-Sweet Hope Bakery — static e-commerce site. Pure HTML + ES6 modules served by Cloudflare Pages. Server-side operations (Stripe, AWS S3/SES, auth) run as Cloudflare Pages Functions.
+Sweet Hope Bakery — static e-commerce site. HTML and Bun-built browser bundles are served by Cloudflare Pages. Content JSON is bundled into page scripts. Server-side operations (Stripe, AWS S3/SES, auth) run as Cloudflare Pages Functions.
 
 ## Quick Start
 ```bash
+bun run build # build static assets to dist/
 npm run dev   # → http://localhost:8080 (static files only, no functions)
 ```
 Admin authentication requires a privately configured `ADMIN_PASSWORD_HASH` when running the Pages Functions locally.
 
 ## Architecture Rules
-- **Page init order matters**: `DOMContentLoaded` → `renderHeader()` → fetch data → render content → `renderFooter()` → `initShared()`. The `initShared()` call MUST come last — it attaches IntersectionObservers and ImageSliders to elements that must already be in the DOM.
+- **Page init order matters**: `DOMContentLoaded` → `renderHeader()` → read bundled data → render content → `renderFooter()` → `initShared()`. The `initShared()` call MUST come last — it attaches IntersectionObservers and ImageSliders to elements that must already be in the DOM.
 - **Header/footer are injected via JS** into `<div id="header-placeholder">` and `<div id="footer-placeholder">`. Every HTML page has these.
 - **Clean URLs** (`/about` not `/about.html`): handled by `serve.json` `cleanUrls: true` locally. Cloudflare Pages handles this automatically in production.
+- **Content data** lives in `src/data/{products,home_page,about_page,contact_page}.json`. Browser bundles import it; checkout imports `products.json` for server-side price validation. Do not read or write content through KV.
+- **Build**: Cloudflare Pages runs `bun run build` and serves `dist/`. The build copies static files and bundles each `src/js/pages/` JavaScript or TypeScript entry point with its imported data.
 - **Admin auth uses JWT** — password is POST'd to `/api/authenticate`, server verifies PBKDF2 hash in `ADMIN_PASSWORD_HASH`, returns a signed JWT. Token stored in `sessionStorage['shb_auth']`, sent as `Authorization: Bearer <token>` on all admin API calls. Server verifies JWT before executing any admin endpoint.
 - **Rate limiting** — `/api/authenticate` should be protected by Cloudflare WAF/Rate Limiting rules (per-IP).
 - **Order emails are server-side** — Stripe's `/api/rate/stripe-webhook` is the primary fulfillment path, and `verify-checkout` is the customer return/recovery path. Both verify payment and share per-recipient idempotent delivery state. No unprotected email endpoints.
@@ -33,7 +36,6 @@ All server-side operations run as Cloudflare Pages Functions. Each file maps to 
 | Endpoint | Method | Auth | Function |
 |---|---|---|---|
 | `/api/authenticate` | POST | — | Verify password, return JWT |
-| `/api/get-data` | GET | — | Read JSON table from KV (edge-cached, purged on writes) |
 | `/api/create-checkout` | POST | — | Create Stripe checkout session (server-side price validation) |
 | `/api/verify-checkout` | POST | — | Verify Stripe payment + send order emails |
 | `/api/send-email` | POST | JWT | Admin compose — send single email via SES |
@@ -41,8 +43,8 @@ All server-side operations run as Cloudflare Pages Functions. Each file maps to 
 | `/api/get-outbox` | GET | JWT | List emails from S3 outbox |
 | `/api/upload-images` | POST | JWT | Generate presigned S3 upload URLs |
 | `/api/delete-images` | POST | JWT | Delete images from S3 |
-| `/api/save-data` | POST | JWT | Upsert item in JSON data file on KV |
-| `/api/delete-data` | POST | JWT | Remove item from JSON data file on KV |
+| `/api/save-data` | POST | JWT | Apply a deterministic edit to a repository JSON file through the relay and commit to GitHub |
+| `/api/delete-data` | POST | JWT | Apply a deterministic deletion to a repository JSON file through the relay and commit to GitHub |
 
 ## Env Vars (Cloudflare Pages)
 
@@ -71,4 +73,4 @@ Optional: `AWS_REGION` (defaults to `us-east-1`)
 ## Key State Keys
 - **localStorage**: `shb_cart` (cart lines + summary), `shb_customer` (checkout form details), `shb_completed_order` (snapshot for return page)
 - **sessionStorage**: `shb_auth` (JWT token), `shb_desired_page` (redirect target after login)
-- **In-memory**: `database.js` caches fetched JSON data
+- **Cloudflare KV**: retained for order snapshots created by legacy checkout flows

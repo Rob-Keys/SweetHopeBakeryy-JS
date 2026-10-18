@@ -1,8 +1,17 @@
-// database.js - client-side data access (KV API reads + admin API writes).
+// Repository content bundled into each browser page at build time.
 
 import { getAuthToken, handle401 } from './auth.js';
+import products from '../../data/products.json';
+import homePage from '../../data/home_page.json';
+import aboutPage from '../../data/about_page.json';
+import contactPage from '../../data/contact_page.json';
 
-const dataCache = {};
+const TABLES = Object.freeze({
+  products,
+  home_page: homePage,
+  about_page: aboutPage,
+  contact_page: contactPage
+});
 
 /**
  * Get a table (or a single item from a table) by name.
@@ -12,14 +21,9 @@ const dataCache = {};
  * @returns {Promise<Array|Object|null>}
  */
 async function getTable(tableName, partitionKeyValue = null) {
-  if (!dataCache[tableName]) {
-    const url = `/api/get-data?tableName=${encodeURIComponent(tableName)}`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Failed to load ${tableName}: ${response.status}`);
-    dataCache[tableName] = await response.json();
-  }
-
-  const data = dataCache[tableName];
+  const source = TABLES[tableName];
+  if (!source) throw new Error(`Unknown content table: ${tableName}`);
+  const data = structuredClone(source);
 
   if (partitionKeyValue !== null) {
     const partitionKey = tableName === 'products' ? 'itemName' : 'sectionIndex';
@@ -28,18 +32,6 @@ async function getTable(tableName, partitionKeyValue = null) {
   }
 
   return data;
-}
-
-/**
- * Clear the in-memory cache for a table (or all tables).
- * @param {string|null} tableName
- */
-function clearCache(tableName = null) {
-  if (tableName) {
-    delete dataCache[tableName];
-  } else {
-    Object.keys(dataCache).forEach(k => delete dataCache[k]);
-  }
 }
 
 /**
@@ -77,7 +69,6 @@ async function putItem(tableName, item, { createOnly = false, previousKey = null
       }
       throw new Error(message);
     }
-    clearCache(tableName);
     return await response.json();
   } catch (err) {
     console.error('putItem failed:', err);
@@ -100,7 +91,6 @@ async function removeItem(tableName, key) {
     });
     if (response.status === 401) { handle401(); return { success: false, error: 'Unauthorized' }; }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    clearCache(tableName);
     return await response.json();
   } catch (err) {
     console.error('removeItem failed:', err);
@@ -108,4 +98,4 @@ async function removeItem(tableName, key) {
   }
 }
 
-export { getTable, putItem, removeItem, clearCache };
+export { getTable, putItem, removeItem };

@@ -1,6 +1,6 @@
-import { renderHeader } from '/js/components/header.js';
-import { renderFooter } from '/js/components/footer.js';
-import { authenticate, getDesiredPage } from '/js/modules/auth.js';
+import { renderHeader } from '../components/header.js';
+import { renderFooter } from '../components/footer.js';
+import { authenticate, getDesiredPage } from '../modules/auth.js';
 
 renderHeader();
 renderFooter();
