@@ -151,7 +151,7 @@
 	background: #4a321f;
 	box-shadow: var(--shadow-soft);
 }
-.front-page::before, .front-page::after, .bg-third { z-index: -2; background-size: cover; background-position: center; }
+.front-page::before, .front-page::after, .bg-third { z-index: -2; background-size: contain; }
 .front-page::after { opacity: .95; }
 .front-page::before { opacity: .88; }
 .bg-third { opacity: .88; }
@@ -172,6 +172,7 @@
 @media (max-width: 991px) {
 	.front-holder { margin: 1rem .65rem 0; }
 	.front-page { min-height: clamp(27rem, 72svh, 40rem); border-radius: 1.25rem; }
+	.front-page::before, .front-page::after, .front-page .bg-third { background-size: cover; }
 	#home-sections { padding-block: 2.5rem; }
 	#home-sections > .row { gap: 1rem; margin-bottom: 3rem !important; }
 	#home-sections > .home-first-section > .col-5 { padding-inline: .5rem !important; }
