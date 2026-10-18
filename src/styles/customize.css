@@ -228,6 +228,14 @@
 .local-agent-task > pre + strong { display: block; margin-top: .9rem; }
 .local-agent-task pre { max-height: 18rem; margin: .6rem 0 0; padding: .65rem; overflow: auto; white-space: pre-wrap; border-radius: .35rem; color: #342719; background: rgba(63, 42, 20, .07); font: .88rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 
+#customize-content > .m-5 { max-width: 1480px; margin-inline: auto !important; padding-inline: var(--page-gutter); }
+#customize-content > .m-5 > h2 { margin-bottom: 1rem; }
+#customize-content .menu-row { border: 1px solid var(--line); border-radius: .85rem; background: var(--cream-card); box-shadow: 0 6px 18px rgba(56,37,22,.05); }
+#customize-content .btn, .local-code-agent .btn { min-height: 2.7rem; border-radius: .6rem; }
+.local-code-agent { border-color: var(--line); border-radius: 1.25rem; box-shadow: var(--shadow-soft); }
+.local-code-agent-form { border: 1px solid var(--line); }
+.demo-photo { border-radius: .65rem; }
+
 @media (max-width: 700px) {
     .local-code-agent { grid-template-columns: 1fr; gap: 1rem; padding: 1rem; }
     .local-code-agent-actions { align-items: stretch; flex-direction: column; }

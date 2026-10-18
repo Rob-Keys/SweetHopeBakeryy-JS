@@ -34,3 +34,13 @@
 .contact-info-instagram {
     margin: 0.625rem 0;
 }
+
+.content#contact-content { margin-block: var(--section-space) !important; border: 1px solid var(--line); border-radius: 1.25rem; background: var(--cream-card); box-shadow: var(--shadow-soft); }
+.subtitle { margin-bottom: .8rem; font-size: clamp(2.2rem, 5vw, 3.2rem) !important; text-align: center; }
+.description { max-width: 42rem; margin: 0 auto 1.75rem; color: var(--brown-soft); font-size: 1.15rem !important; font-weight: 500; line-height: 1.7; text-align: center; }
+.contact-info { padding: 1rem 1.25rem; border: 1px solid var(--line); border-radius: .85rem; background: #fbf4e7; font-size: 1.05rem; }
+.contact-info a { color: var(--accent-dark); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.contact-info a:hover { color: var(--accent); }
+.contact-extra-section { border-color: var(--line); }
+.contact-extra-section h3 { margin-bottom: .5rem; }
+.contact-extra-section p { color: var(--brown-soft); }

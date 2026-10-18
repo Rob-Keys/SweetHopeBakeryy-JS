@@ -139,3 +139,40 @@
 	#home-sections > .row > .col-6 { width: 100%; padding-inline: 0; }
 	#home-sections > .home-first-section > .col-5 { padding-inline: clamp(2rem, 8vw, 3rem); }
 }
+
+.front-holder { margin: clamp(1rem, 3vw, 2.5rem) var(--page-gutter) 0; }
+.front-page {
+	width: 100%;
+	max-width: 1500px;
+	min-height: clamp(28rem, 66vh, 46rem);
+	isolation: isolate;
+	margin-inline: auto;
+	border-radius: clamp(1.25rem, 3vw, 2.5rem);
+	background: #4a321f;
+	box-shadow: var(--shadow-soft);
+}
+.front-page::before, .front-page::after, .bg-third { z-index: -2; background-size: cover; background-position: center; }
+.front-page::after { opacity: .95; }
+.front-page::before { opacity: .88; }
+.bg-third { opacity: .88; }
+.front-page::after { content: ''; }
+.front-page::before { filter: saturate(.88); }
+.front-page > .welcome, .front-page > .subwelcome, .front-page > .btn { position: relative; z-index: 1; }
+.front-page .welcome { max-width: 13ch; margin: 0 auto 1rem; font-size: clamp(3.2rem, 8vw, 6rem) !important; line-height: .98; letter-spacing: -.04em; text-wrap: balance; text-shadow: 0 3px 24px rgba(24,15,8,.28); }
+.front-page .subwelcome { margin-bottom: 1.5rem !important; font-size: clamp(1.05rem, 2vw, 1.35rem) !important; font-weight: 500; letter-spacing: .015em; text-shadow: 0 2px 12px rgba(24,15,8,.35); }
+.front-page .btn { padding: .9rem 1.5rem; font-size: 1.05rem !important; }
+#home-sections { max-width: 1320px; margin: 0 auto; padding-block: var(--section-space); }
+#home-sections > .row { align-items: center; margin-bottom: clamp(3rem, 7vw, 6rem) !important; }
+#home-sections > .row:last-child { margin-bottom: 0 !important; }
+.home-story-image { border-radius: 1.15rem; box-shadow: var(--shadow-soft); }
+.image-caption { max-width: 42rem; margin-inline: auto; padding: clamp(1rem, 3vw, 2rem); }
+.image-caption h3 { font-size: clamp(1.65rem, 3vw, 2.35rem) !important; line-height: 1.25; text-wrap: balance; }
+.image-caption .btn { margin-top: 1.2rem !important; }
+.front-page::before, .front-page::after, .front-page .bg-third { background-attachment: scroll; }
+@media (max-width: 991px) {
+	.front-holder { margin: 1rem .65rem 0; }
+	.front-page { min-height: clamp(27rem, 72svh, 40rem); border-radius: 1.25rem; }
+	#home-sections { padding-block: 2.5rem; }
+	#home-sections > .row { gap: 1rem; margin-bottom: 3rem !important; }
+	#home-sections > .home-first-section > .col-5 { padding-inline: .5rem !important; }
+}

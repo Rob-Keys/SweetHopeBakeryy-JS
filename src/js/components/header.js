@@ -45,6 +45,5 @@ export function renderHeader() {
           <a href="/" class="pe-2 float-end"><img class="navbar-brand" src="https://sweethopebakeryy.s3.us-east-1.amazonaws.com/header/sweethopebakeryy.avif" alt="Sweet Hope Bakery Logo"></a>
         </div>
       </nav>
-    </header>
-    <main>`;
+    </header>`;
 }

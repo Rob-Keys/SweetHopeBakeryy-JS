@@ -4,6 +4,12 @@
     gap: var(--section-space);
     margin: var(--section-space) var(--page-gutter) !important;
 }
+
+#return-content > .card, #return-content > [class*="col-"] .card { overflow: hidden; border: 1px solid var(--line); border-radius: 1rem; background: var(--cream-card); box-shadow: var(--shadow-soft); }
+#return-content .card-header { border-bottom: 1px solid var(--line); background: #f5ead8; }
+#return-content .list-group-item { border-color: var(--line); background: transparent; }
+#return-content .alert { border: 1px solid rgba(168,67,45,.2); border-radius: .75rem; }
+@media (max-width: 767px) { #return-content { grid-template-columns: 1fr; } }
 .return-content > .col-md-1 { display: none; }
 .return-content > .col-12 { grid-column: 1 / -1; }
 .return-content > [class*="col-"] { width: 100%; padding: 0; }
