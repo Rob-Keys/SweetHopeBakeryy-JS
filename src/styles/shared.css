@@ -254,9 +254,17 @@ p {
 	font-size: 1.05rem !important;
 }
 
-/* Content stays visible until a one-shot entrance animation starts. */
+/* Hide only elements that will receive an entrance animation. The early
+   motion-ready class prevents a visible-first frame before the observer runs. */
 .fade-in-up, .fade-in-right, .fade-in-left {
   opacity: 1;
+}
+
+html.motion-ready :is(.fade-in-up, .fade-in-right, .fade-in-left):not(.fade-visible):not(h1, h2, h3, nav, form, button, .btn, a[href]):not(:has(h1, h2, h3, nav, form, button, .btn, a[href])) {
+  opacity: 0;
+}
+html.motion-ready .product-card.fade-in-up:not(.fade-visible) {
+  opacity: 0;
 }
 
 .fade-visible.fade-in-up { animation: fade-in-up 0.6s ease; }
@@ -307,6 +315,11 @@ p {
 }
 
 @media (prefers-reduced-motion: reduce) {
+	html.motion-ready .fade-in-up,
+	html.motion-ready .fade-in-right,
+	html.motion-ready .fade-in-left {
+		opacity: 1;
+	}
 	*, *::before, *::after {
 		animation-duration: .01ms !important;
 		animation-iteration-count: 1 !important;

@@ -2,6 +2,11 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8">
+        <script>
+            if ('IntersectionObserver' in window && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.documentElement.classList.add('motion-ready');
+            }
+        </script>
         <title>Order Summary</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="description" content="Order delicious baked goods from Sweet Hope Bakery. Enter your pickup details and pay securely online at checkout.">

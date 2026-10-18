@@ -2,6 +2,11 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8">
+        <script>
+            if ('IntersectionObserver' in window && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.documentElement.classList.add('motion-ready');
+            }
+        </script>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Contact the Sweet Hope Bakery</title>
         <meta name="description" content="Sweet Hope Bakery offers custom cakes, cookies, donuts, and more baked goods in Arlington, Virginia. Gluten-free, dairy-free, and other allergy restrictions can all be incorporated. Order your treats today!">
