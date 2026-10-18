@@ -191,36 +191,40 @@ export function renderPageSectionEditor(sections, pageName) {
     // Edit mode markup.
     html += `
         <div class="col-2 edit-mode" style="display: none;">
-          <textarea class="form-control edit-sectionIndex" rows="2" disabled>${safeSectionIndex}</textarea>
+          <label class="editor-field-label">Section index</label>
+          <textarea class="form-control edit-sectionIndex" aria-label="Section index" rows="2" disabled>${safeSectionIndex}</textarea>
           <input type="hidden" class="original-sectionIndex" value="${safeSectionIndex}">
         </div>`;
 
     if (showHeader) {
       html += `
         <div class="col-2 edit-mode" style="display: none;">
-          <textarea class="form-control edit-headerText" rows="2">${safeHeaderText}</textarea>
+          <label class="editor-field-label">Header text</label>
+          <textarea class="form-control edit-headerText" aria-label="Header text" rows="2">${safeHeaderText}</textarea>
         </div>`;
     }
     html += `
         <div class="${editBodyColClass} edit-mode" style="display: none;">
-          <textarea class="form-control edit-bodyText" rows="4">${safeBodyText}</textarea>
+          <label class="editor-field-label">Body text</label>
+          <textarea class="form-control edit-bodyText" aria-label="Body text" rows="4">${safeBodyText}</textarea>
         </div>`;
 
     if (showImage) {
       html += `
         <div class="col-2">
-          <div class="view-mode">
-            <img class="demo-photo" src="${safeImageUrl}" alt="Section's associated image" loading="lazy" decoding="async">
+          <div class="view-mode section-image-preview">
+            ${safeImageUrl ? `<img class="demo-photo" src="${safeImageUrl}" alt="Section's associated image" loading="lazy" decoding="async">` : '<div class="site-preview-image-empty"><i class="fa-regular fa-image" aria-hidden="true"></i><span>No image set</span></div>'}
           </div>
           <div class="edit-mode" style="display: none;">
             <div class="edit-images-container">
-              <div class="edit-image-item" data-image-url="${safeImageUrl}">
+              ${safeImageUrl ? `<div class="edit-image-item" data-image-url="${safeImageUrl}">
                 <img src="${safeImageUrl}" alt="Section image" class="edit-product-image" style="width: 80px; height: 80px; object-fit: cover;" loading="lazy" decoding="async">
-                <button type="button" class="btn btn-sm btn-danger remove-image-btn">&times;</button>
-              </div>
+                <button type="button" class="btn btn-sm btn-danger remove-image-btn" aria-label="Remove section image">&times;</button>
+              </div>` : '<small class="text-muted">No image currently set</small>'}
             </div>
-            <input type="file" class="form-control mt-2 add-images-input" accept="image/*">
-            <small class="text-muted">Replace image</small>
+            <label class="editor-field-label" for="section-image-${pageName}-${i}">Replace image</label>
+            <input id="section-image-${pageName}-${i}" type="file" class="form-control mt-2 add-images-input" accept="image/*">
+            <small class="text-muted">Choose a new image, or remove the current one.</small>
           </div>
         </div>`;
     }
@@ -245,24 +249,28 @@ export function renderPageSectionEditor(sections, pageName) {
   html += `
     <form class="row menu-row add-section-form" data-page-name="${pageName}">
       <div class="col-2">
-        <input type="number" name="partitionKeyValue" placeholder="Section Index" min="${minimumSectionIndex}" step="1" value="${nextSectionIndex}" required>
+        <label class="editor-field-label">Section index</label>
+        <input type="number" name="partitionKeyValue" aria-label="Section index" placeholder="Section Index" min="${minimumSectionIndex}" step="1" value="${nextSectionIndex}" required>
       </div>`;
 
   if (showHeader) {
     html += `
       <div class="col-2">
-        <textarea rows="2" name="headerText" placeholder="Header text"></textarea>
+        <label class="editor-field-label">Header text</label>
+        <textarea rows="2" name="headerText" aria-label="Header text" placeholder="Header text"></textarea>
       </div>`;
   }
   html += `
       <div class="${bodyColClass}">
-        <textarea rows="4" name="bodyText" placeholder="Body text"></textarea>
+        <label class="editor-field-label">Body text</label>
+        <textarea rows="4" name="bodyText" aria-label="Body text" placeholder="Body text"></textarea>
       </div>`;
 
   if (showImage) {
     html += `
       <div class="col-2">
-        <input type="file" name="images[]">
+        <label class="editor-field-label">Section image</label>
+        <input type="file" name="images[]" aria-label="Section image" accept="image/*">
       </div>`;
   }
 

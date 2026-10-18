@@ -87,13 +87,13 @@ async function loadCustomize() {
     <div id="luna-panel-mount"></div>
     ${tableErrors.products ? '<div class="alert alert-danger">Could not load menu data. The menu editor is unavailable until the data service responds. <button type="button" class="btn btn-sm btn-cookie" data-retry-editor>Retry</button></div>' : ''}
     <h2 class="subtitle">Edit Menu</h2>
-    <p>"Prices" will create a dropdown menu of those quantities at those prices. So "6:10, 12:15", would mean 6 for $10, or 12 for $15.</p>
+    <p>Set each menu option as a quantity and a price. For example, add one option for 6 cookies at $10 and another for 12 at $15.</p>
     <p>"Customizations" currently dont do anything and you can just leave that field blank for now.</p>
     <p>I recommend uploading images that are of filetype .avif, as theyre most efficient size-wise and will make your site load faster. To convert a .png or .jpg to .avif you can use a site like: <a href="https://cloudinary.com/tools/jpg-to-avif" target="_blank" rel="noopener noreferrer">JPEG-To-Avif Converter</a></p>
     <div class="row menu-row">
       <div class="col-2"><h5>Product Name</h5></div>
       <div class="col-2"><h5>Description</h5></div>
-      <div class="col-2"><h5>Prices</h5></div>
+      <div class="col-2"><h5>Price options</h5></div>
       <div class="col-2"><h5>Customizations</h5></div>
       <div class="col-2"><h5>Image</h5></div>
       <div class="col-2 right-align"><h5>Actions</h5></div>
@@ -121,7 +121,7 @@ async function loadCustomize() {
     const editImagesHTML = imageURLs.map(url => `
       <div class="edit-image-item" data-image-url="${escapeHtml(url)}">
         <img src="${escapeHtml(url)}" alt="Product image" class="edit-product-image" style="width: 80px; height: 80px; object-fit: cover;" loading="lazy" decoding="async">
-        <button type="button" class="btn btn-sm btn-danger remove-image-btn">&times;</button>
+        <button type="button" class="btn btn-sm btn-danger remove-image-btn" aria-label="Remove product image">&times;</button>
       </div>`).join('');
 
     html += `
@@ -133,14 +133,14 @@ async function loadCustomize() {
       <div class="col-2 view-mode"><p>${safeCustomStr}</p></div>
       <!-- Edit Mode -->
       <div class="col-2 edit-mode" style="display: none;">
-        <textarea class="form-control edit-itemName" rows="4">${safeItemName}</textarea>
+          <textarea class="form-control edit-itemName" aria-label="Product name" rows="4">${safeItemName}</textarea>
         <input type="hidden" class="original-itemName" value="${safeItemName}">
       </div>
       <div class="col-2 edit-mode" style="display: none;">
-        <textarea class="form-control edit-description" rows="4">${safeDescription}</textarea>
+        <textarea class="form-control edit-description" aria-label="Product description" rows="4">${safeDescription}</textarea>
       </div>
-      <div class="col-2 edit-mode" style="display: none;">
-        <textarea class="form-control edit-prices" rows="4">${safePricesStr}</textarea>
+      <div class="col-2 edit-mode price-options-field" style="display: none;">
+        ${renderPriceOptionsEditor(product.prices || {})}
       </div>
       <div class="col-2 edit-mode" style="display: none;">
         <textarea class="form-control edit-customizations" rows="4">${safeCustomStr}</textarea>
@@ -152,7 +152,8 @@ async function loadCustomize() {
         </div>
         <div class="edit-mode" style="display: none;">
           <div class="edit-images-container">${editImagesHTML}</div>
-          <input type="file" class="form-control mt-2 add-images-input" multiple accept="image/*">
+          <label class="editor-field-label">Add product images</label>
+          <input type="file" class="form-control mt-2 add-images-input" aria-label="Add product images" multiple accept="image/*">
           <small class="text-muted">Add new images or remove existing ones</small>
         </div>
       </div>
@@ -172,11 +173,13 @@ async function loadCustomize() {
   // Add new product form.
   if (!tableErrors.products) html += `
     <form class="row menu-row add-product-form">
-      <div class="col-2"><textarea rows="4" name="partitionKeyValue" placeholder="Product Name" required></textarea></div>
-      <div class="col-2"><textarea rows="4" name="description" placeholder="Product description"></textarea></div>
-      <div class="col-2"><textarea rows="4" name="csvPrices" placeholder="qnty: price, qnty: price, ..." required></textarea></div>
+      <div class="col-2"><label class="editor-field-label">Product name</label><textarea rows="4" name="partitionKeyValue" placeholder="Product Name" required></textarea></div>
+      <div class="col-2"><label class="editor-field-label">Description</label><textarea rows="4" name="description" placeholder="Product description"></textarea></div>
+      <div class="col-2 price-options-field">
+        ${renderPriceOptionsEditor({})}
+      </div>
       <div class="col-2"><textarea rows="4" name="csvCustomizations" placeholder="cstm: price, cstm: price, ..."></textarea></div>
-      <div class="col-2"><input type="file" name="images[]" multiple accept="image/*" required></div>
+      <div class="col-2"><label class="editor-field-label">Product images</label><input type="file" name="images[]" aria-label="Product images" multiple accept="image/*" required></div>
       <div class="col-2 right-align">
         <input type="hidden" name="tableName" value="products">
         <input type="hidden" name="partitionKey" value="itemName">
@@ -220,6 +223,7 @@ async function loadCustomize() {
 
   // ── Event handlers ──
   initProductEditHandlers();
+  initPriceOptionsEditors();
   initSectionEditHandlers();
   initRemoveHandlers();
   initAddHandlers();
@@ -312,6 +316,58 @@ function parsePrices(value) {
   return prices;
 }
 
+function renderPriceOptionsEditor(prices) {
+  const entries = Object.entries(prices || {});
+  const rows = (entries.length ? entries : [['', '']]).map(([quantity, price]) => `
+    <div class="price-option-row">
+      <label>Quantity <input class="price-quantity" type="number" min="1" step="1" inputmode="numeric" value="${escapeHtml(quantity)}" placeholder="6"></label>
+      <label>Price ($) <input class="price-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="${escapeHtml(price)}" placeholder="10.00"></label>
+      <button type="button" class="btn btn-sm btn-outline-danger remove-price-option" aria-label="Remove price option">Remove</button>
+    </div>`).join('');
+  return `<div class="price-options-editor">
+    <div class="price-option-list">${rows}</div>
+    <button type="button" class="btn btn-sm btn-outline-secondary add-price-option">+ Add price option</button>
+    <small class="text-muted">Choose the quantity and its total price.</small>
+  </div>`;
+}
+
+function readPriceOptions(editor) {
+  const values = Array.from(editor.querySelectorAll('.price-option-row')).map((row) => {
+    const quantity = row.querySelector('.price-quantity')?.value.trim() || '';
+    const price = row.querySelector('.price-amount')?.value.trim() || '';
+    if (!quantity && !price) return null;
+    if (!quantity || !price) throw new Error('Enter both a quantity and a price for each option.');
+    return `${quantity}:${price}`;
+  }).filter(Boolean);
+  return parsePrices(values.join(', '));
+}
+
+function initPriceOptionsEditors() {
+  document.querySelectorAll('.price-options-editor').forEach((editor) => {
+    const list = editor.querySelector('.price-option-list');
+    editor.addEventListener('click', (event) => {
+      const addButton = event.target.closest('.add-price-option');
+      const removeButton = event.target.closest('.remove-price-option');
+      if (addButton) {
+        const row = document.createElement('div');
+        row.className = 'price-option-row';
+        row.innerHTML = '<label>Quantity <input class="price-quantity" type="number" min="1" step="1" inputmode="numeric" placeholder="12"></label><label>Price ($) <input class="price-amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="15.00"></label><button type="button" class="btn btn-sm btn-outline-danger remove-price-option" aria-label="Remove price option">Remove</button>';
+        list.append(row);
+        row.querySelector('.price-quantity')?.focus();
+      }
+      if (removeButton) {
+        const rows = list.querySelectorAll('.price-option-row');
+        if (rows.length === 1) {
+          rows[0].querySelectorAll('input').forEach((input) => { input.value = ''; });
+          rows[0].querySelector('.price-quantity')?.focus();
+        } else {
+          removeButton.closest('.price-option-row')?.remove();
+        }
+      }
+    });
+  });
+}
+
 function buildSlidesHTML(imageURLs, itemName) {
   const safeName = escapeHtml(itemName || '');
   return imageURLs.map(url =>
@@ -343,6 +399,13 @@ function rebuildEditImages(row, imageURLs, onRemove) {
   const container = row.querySelector('.edit-images-container');
   if (!container) return;
   container.innerHTML = '';
+  if (!imageURLs.length) {
+    const empty = document.createElement('small');
+    empty.className = 'text-muted';
+    empty.textContent = 'No image currently set';
+    container.appendChild(empty);
+    return;
+  }
   imageURLs.forEach(url => {
     const item = document.createElement('div');
     item.className = 'edit-image-item';
@@ -362,6 +425,7 @@ function rebuildEditImages(row, imageURLs, onRemove) {
     btn.type = 'button';
     btn.className = 'btn btn-sm btn-danger remove-image-btn';
     btn.textContent = '×';
+    btn.setAttribute('aria-label', 'Remove image');
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       onRemove(url, item);
@@ -425,7 +489,7 @@ function initProductEditHandlers() {
       const itemName = row.querySelector('.edit-itemName')?.value.trim();
       const originalItemName = row.querySelector('.original-itemName')?.value;
       const description = row.querySelector('.edit-description')?.value;
-      const prices = row.querySelector('.edit-prices')?.value;
+      const priceEditor = row.querySelector('.price-options-editor');
       const customizations = row.querySelector('.edit-customizations')?.value;
 
       let parsedPrices;
@@ -445,7 +509,7 @@ function initProductEditHandlers() {
 
       try {
         if (!itemName) throw new Error('Product name is required.');
-        parsedPrices = parsePrices(prices);
+        parsedPrices = readPriceOptions(priceEditor);
 
         // Upload new images and collect their public URLs.
         let newImageURLs = [];
@@ -626,9 +690,25 @@ function initSectionEditHandlers() {
         const viewBody = viewCols[viewOffset]?.querySelector('p');
         if (viewBody) viewBody.textContent = bodyText || '';
 
-        // Update view mode image.
-        const viewImg = row.querySelector('.view-mode img.demo-photo');
-        if (viewImg && imageURLs[0]) viewImg.src = imageURLs[0];
+        // Update view mode image, including the empty state when the image was removed.
+        const imagePreview = row.querySelector('.section-image-preview');
+        if (imagePreview) {
+          imagePreview.replaceChildren();
+          if (imageURLs[0]) {
+            const img = document.createElement('img');
+            img.className = 'demo-photo';
+            img.src = imageURLs[0];
+            img.alt = "Section's associated image";
+            img.loading = 'lazy';
+            img.decoding = 'async';
+            imagePreview.append(img);
+          } else {
+            const empty = document.createElement('div');
+            empty.className = 'site-preview-image-empty';
+            empty.textContent = 'No image set';
+            imagePreview.append(empty);
+          }
+        }
 
         // Update stored image URLs for next edit.
         row.dataset.imageUrls = JSON.stringify(imageURLs);
@@ -712,7 +792,6 @@ function initAddHandlers() {
     const form = e.target;
     const name = form.querySelector('[name="partitionKeyValue"]').value.trim();
     const description = form.querySelector('[name="description"]')?.value || '';
-    const csvPrices = form.querySelector('[name="csvPrices"]')?.value || '';
     const csvCustomizations = form.querySelector('[name="csvCustomizations"]')?.value || '';
     if (!name) return;
 
@@ -728,7 +807,7 @@ function initAddHandlers() {
     });
 
     try {
-      const prices = parsePrices(csvPrices);
+      const prices = readPriceOptions(form.querySelector('.price-options-editor'));
 
       // Upload images before saving, so an upload failure cannot create a product
       // record with missing image URLs.

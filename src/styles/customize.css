@@ -2,7 +2,7 @@
     background-color: white;
     border: black 1px solid;
     padding: 1.25rem .5rem;
-    min-width: 900px;
+    min-width: 0;
     margin: 0 0 1rem;
     row-gap: 1rem;
 }
@@ -16,6 +16,14 @@
 .menu-row p { margin-bottom: 0; }
 .menu-row .right-align { gap: .75rem; }
 .menu-row .right-align .btn { margin-top: 0 !important; }
+.editor-field-label { display: block; margin: 0 0 .3rem; color: #755b3f; font-size: .8rem; font-weight: 800; }
+.price-options-editor { display: grid; gap: .55rem; }
+.price-option-list { display: grid; gap: .5rem; }
+.price-option-row { display: grid; grid-template-columns: minmax(3rem, .8fr) minmax(4rem, 1fr) auto; align-items: end; gap: .35rem; padding: .5rem; border: 1px solid var(--line); border-radius: .55rem; background: #fffdf8; }
+.price-option-row label { min-width: 0; color: #755b3f; font-size: .72rem; font-weight: 800; }
+.price-option-row input { display: block; min-height: 2.5rem; padding: .4rem !important; color: var(--brown); font-size: .9rem; }
+.price-option-row .remove-price-option { min-height: 2.5rem !important; padding: .3rem .45rem; white-space: nowrap; }
+.price-options-editor > small { display: block; }
 .edit-images-container { padding: .5rem; }
 .menu-row .arrow { padding: .5rem .25rem; }
 .menu-row .arrow.left { left: .25rem; }
@@ -252,9 +260,12 @@
     .site-preview-footer { flex-direction: column; }
 }
 
-@media (max-width: 575px) {
-    .menu-row > .col-2 { width: 16.6667% !important; }
-    .menu-row > .col-4 { width: 33.3333% !important; }
-    .menu-row > .col-6 { width: 50% !important; }
+@media (max-width: 767px) {
+    #customize-content > .m-5 { padding-inline: .25rem; }
+    #customize-content .menu-row { display: flex; flex-direction: column; padding: 1rem; }
+    .menu-row > [class*="col-"] { width: 100% !important; max-width: 100%; }
+    .menu-row > .right-align { align-items: stretch; }
+    .price-option-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+    .price-option-row .remove-price-option { padding-inline: .35rem; }
 }
 
