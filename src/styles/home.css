@@ -89,8 +89,8 @@
 	margin-inline: 0;
 	--bs-gutter-x: clamp(1.5rem, 4vw, 3rem);
 }
-#home-sections > .row > .col-5 { width: 45%; }
-#home-sections > .row > .col-6 { width: 55%; }
+#home-sections > .row > .col-5 { width: 50%; }
+#home-sections > .row > .col-6 { width: 50%; }
 .rhombus {
 	max-width: calc(100% - 2 * var(--page-gutter));
 }
@@ -161,7 +161,7 @@
 .front-page .welcome { max-width: 13ch; margin: 0 auto 1rem; font-size: clamp(3.2rem, 8vw, 6rem) !important; line-height: .98; letter-spacing: -.04em; text-wrap: balance; text-shadow: 0 3px 24px rgba(24,15,8,.28); }
 .front-page .subwelcome { margin-bottom: 1.5rem !important; font-size: clamp(1.05rem, 2vw, 1.35rem) !important; font-weight: 500; letter-spacing: .015em; text-shadow: 0 2px 12px rgba(24,15,8,.35); }
 .front-page .btn { padding: .9rem 1.5rem; font-size: 1.05rem !important; }
-#home-sections { max-width: 1320px; margin: 0 auto; padding-block: var(--section-space); }
+#home-sections { max-width: 1500px; margin: 0 auto; padding-block: var(--section-space); }
 #home-sections > .row { align-items: center; margin-bottom: clamp(3rem, 7vw, 6rem) !important; }
 #home-sections > .row:last-child { margin-bottom: 0 !important; }
 .home-story-image { border-radius: 1.15rem; box-shadow: var(--shadow-soft); }
