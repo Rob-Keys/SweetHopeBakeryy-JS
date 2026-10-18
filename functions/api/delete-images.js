@@ -5,6 +5,7 @@
 import { S3Client, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { checkS3Auth } from './_auth.js';
 import { isSafeKey } from './_s3.js';
+import { describeError } from './_errors.js';
 
 export async function onRequestPost(context) {
   const denied = await checkS3Auth(context);
@@ -37,13 +38,16 @@ export async function onRequestPost(context) {
       }
     }));
     if (result.Errors?.length) {
-      console.error('delete-images partial failure:', result.Errors.length);
-      return Response.json({ error: 'Some images could not be deleted' }, { status: 502 });
+      const details = result.Errors.map(error => `${error.Key || 'unknown key'}: ${error.Code || 'UnknownError'}${error.Message ? ` (${error.Message})` : ''}`);
+      const message = `Image deletion failed for ${result.Errors.length} object(s): ${details.join('; ')}`;
+      console.error('delete-images partial failure:', message);
+      return Response.json({ error: message }, { status: 502 });
     }
 
     return Response.json({ success: true });
   } catch (err) {
-    console.error('delete-images error:', err);
-    return Response.json({ error: 'Internal error' }, { status: 500 });
+    const message = describeError(err, 'Image deletion');
+    console.error('delete-images error:', message);
+    return Response.json({ error: message }, { status: 502 });
   }
 }

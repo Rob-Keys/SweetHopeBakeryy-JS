@@ -6,6 +6,7 @@
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { checkAuth } from './_auth.js';
+import { describeError } from './_errors.js';
 
 export async function onRequestPost(context) {
   const denied = await checkAuth(context);
@@ -16,6 +17,7 @@ export async function onRequestPost(context) {
     return Response.json({ error: 'AWS credentials not configured' }, { status: 500 });
   }
 
+  let operation = 'Email send';
   try {
     const { from, to, subject, body, date } = await context.request.json();
 
@@ -34,6 +36,7 @@ export async function onRequestPost(context) {
     }));
 
     // Archive payload for audit/replay.
+    operation = 'Email archive to S3 (the email was already sent)';
     const timestamp = date || Date.now();
     await s3.send(new PutObjectCommand({
       Bucket: 'sweethopebakeryy-emails',
@@ -44,7 +47,8 @@ export async function onRequestPost(context) {
 
     return Response.json({ success: true });
   } catch (err) {
-    console.error('send-email error:', err);
-    return Response.json({ error: 'Internal error' }, { status: 500 });
+    const message = describeError(err, operation);
+    console.error('send-email error:', message);
+    return Response.json({ error: message }, { status: 502 });
   }
 }

@@ -102,7 +102,7 @@ export class CodeAgentRelay {
       return await task;
     } catch (error) {
       this.log('content_commit_failed', { status: error?.status || 502 });
-      return Response.json({ success: false, error: 'GitHub could not commit the content change. Please retry.' }, { status: 502 });
+      return Response.json({ success: false, error: error?.message || 'GitHub content commit failed with an unknown error.' }, { status: 502 });
     }
   }
 

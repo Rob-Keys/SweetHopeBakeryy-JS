@@ -1,6 +1,7 @@
 // s3.js - client helpers for S3-related admin endpoints.
 
 import { getAuthToken, handle401 } from '../modules/auth.js';
+import { readApiError } from '../modules/api-error.js';
 
 /**
  * Build headers with auth token for admin API calls.
@@ -33,16 +34,7 @@ async function uploadImages(filenames, files) {
       body: formData
     });
     if (response.status === 401) { handle401(); return { success: false, error: 'Unauthorized' }; }
-    if (!response.ok) {
-      let message = `HTTP ${response.status}`;
-      try {
-        const body = await response.json();
-        if (body?.error) message = body.error;
-      } catch {
-        // Keep the HTTP status when the response has no JSON error message.
-      }
-      throw new Error(message);
-    }
+    if (!response.ok) throw new Error(await readApiError(response));
     const { uploads } = await response.json();
 
     return { success: true, urls: uploads.map(upload => upload.publicUrl) };
@@ -65,7 +57,7 @@ async function deleteImages(s3Keys) {
       body: JSON.stringify({ s3Keys })
     });
     if (response.status === 401) { handle401(); return { success: false, error: 'Unauthorized' }; }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) throw new Error(await readApiError(response));
     return await response.json();
   } catch (err) {
     console.error('deleteImages failed:', err);
@@ -85,7 +77,7 @@ async function getInbox() {
 
     const response = await fetch('/api/get-inbox', { headers });
     if (response.status === 401) { handle401(); return []; }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) throw new Error(await readApiError(response));
     const { emails } = await response.json();
     return emails;
   } catch (err) {
@@ -106,7 +98,7 @@ async function getOutbox() {
 
     const response = await fetch('/api/get-outbox', { headers });
     if (response.status === 401) { handle401(); return []; }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) throw new Error(await readApiError(response));
     const { emails } = await response.json();
     return emails;
   } catch (err) {

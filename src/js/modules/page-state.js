@@ -7,7 +7,18 @@ export function showLoading(container, message = 'Loading…') {
 export function showError(container, message, retry) {
   if (!container) return;
   container.removeAttribute('aria-busy');
-  container.innerHTML = `<div class="alert alert-warning" role="alert"><p>${message}</p><button type="button" class="btn btn-cookie" data-retry>Retry</button></div>`;
+  const alert = document.createElement('div');
+  alert.className = 'alert alert-warning';
+  alert.setAttribute('role', 'alert');
+  const text = document.createElement('p');
+  text.textContent = message;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'btn btn-cookie';
+  button.dataset.retry = '';
+  button.textContent = 'Retry';
+  alert.append(text, button);
+  container.replaceChildren(alert);
   container.querySelector('[data-retry]')?.addEventListener('click', retry, { once: true });
 }
 

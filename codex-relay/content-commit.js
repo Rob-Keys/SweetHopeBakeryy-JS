@@ -33,7 +33,16 @@ async function github(token, path, init = {}) {
     signal: AbortSignal.timeout(20000)
   });
   if (!response.ok) {
-    const error = new Error(`GitHub API request failed (${response.status}).`);
+    let detail = '';
+    try {
+      const body = await response.json();
+      const messages = [body?.message, ...(Array.isArray(body?.errors) ? body.errors.map(item => item?.message || item?.code) : [])]
+        .filter(value => typeof value === 'string' && value.trim());
+      detail = messages.join('; ');
+    } catch {
+      // Keep the status when GitHub returns a non-JSON error body.
+    }
+    const error = new Error(`GitHub API request failed (${response.status})${detail ? `: ${detail}` : '.'}`);
     error.status = response.status;
     throw error;
   }

@@ -64,6 +64,7 @@ async function loadCustomize() {
     tableResults[index].status === 'fulfilled' && Array.isArray(tableResults[index].value) ? tableResults[index].value : []
   ]));
   const tableErrors = Object.fromEntries(tableNames.map((name, index) => [name, tableResults[index].status === 'rejected' ? tableResults[index].reason : null]));
+  const errorMessage = (error) => error instanceof Error ? error.message : String(error || 'Unknown error');
   const { products, home_page: homeSections, about_page: aboutSections, contact_page: contactSections } = tableData;
 
   // Sort sections by index.
@@ -85,7 +86,7 @@ async function loadCustomize() {
     <h1 class="subtitle">Customize Site</h1>
     <p class="text-muted small" id="deployment-version">Commit: loading…</p>
     <div id="luna-panel-mount"></div>
-    ${tableErrors.products ? '<div class="alert alert-danger">Could not load menu data. The menu editor is unavailable until the data service responds. <button type="button" class="btn btn-sm btn-cookie" data-retry-editor>Retry</button></div>' : ''}
+    ${tableErrors.products ? `<div class="alert alert-danger">Could not load menu data: ${escapeHtml(errorMessage(tableErrors.products))} <button type="button" class="btn btn-sm btn-cookie" data-retry-editor>Retry</button></div>` : ''}
     <h2 class="subtitle">Edit Menu</h2>
     <p>Set each menu option as a quantity and a price. For example, add one option for 6 cookies at $10 and another for 12 at $15.</p>
     <p>"Customizations" currently dont do anything and you can just leave that field blank for now.</p>
@@ -195,7 +196,7 @@ async function loadCustomize() {
   // Page section editors.
   for (const [tableName, sections] of [['home_page', homeSections], ['about_page', aboutSections], ['contact_page', contactSections]]) {
     html += tableErrors[tableName]
-      ? `<div class="alert alert-danger">Could not load ${escapeHtml(tableName)} content. Its editor is unavailable until the data service responds. <button type="button" class="btn btn-sm btn-cookie" data-retry-editor>Retry</button></div>`
+      ? `<div class="alert alert-danger">Could not load ${escapeHtml(tableName)} content: ${escapeHtml(errorMessage(tableErrors[tableName]))} <button type="button" class="btn btn-sm btn-cookie" data-retry-editor>Retry</button></div>`
       : renderPageSectionEditor(formatSections(sections), tableName);
   }
 
@@ -216,8 +217,8 @@ async function loadCustomize() {
       .then(({ commit }) => {
         deploymentVersion.textContent = `Commit: ${commit || 'unknown'}`;
       })
-      .catch(() => {
-        deploymentVersion.textContent = 'Commit: unavailable';
+      .catch((error) => {
+        deploymentVersion.textContent = `Commit: unavailable (${error.message})`;
       });
   }
 
@@ -228,8 +229,8 @@ async function loadCustomize() {
   initRemoveHandlers();
   initAddHandlers();
   initShared();
-  } catch {
-    showError(container, 'We could not load the editor data. Please try again.', loadCustomize);
+  } catch (error) {
+    showError(container, `Could not load editor data: ${error instanceof Error ? error.message : String(error || 'Unknown error')}`, loadCustomize);
     container.append(lunaPanel);
   }
 }

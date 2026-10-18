@@ -1,4 +1,5 @@
 import { getAuthToken, handle401 } from './auth.js';
+import { readApiError } from './api-error.js';
 
 const TASK_KEY = 'luna-active-task';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -109,14 +110,14 @@ export function initLocalCodeAgentHandlers() {
     void check();
   };
 
-  const followTask = task => {
+  const followTask = (task, initialMessage = 'Checking the saved request…') => {
     window.clearTimeout(taskTimer);
     window.clearTimeout(deploymentTimer);
     const token = ++generation;
     activeTask = task;
     busy = true;
     save(task);
-    render(task, { status: 'running', message: 'Checking the saved request…' });
+    render(task, { status: 'running', message: initialMessage });
     controls();
     let failures = 0;
     let missing = 0;
@@ -134,7 +135,7 @@ export function initLocalCodeAgentHandlers() {
           controls();
           return;
         }
-        if (!response.ok) throw new Error(`Could not get the latest task status (HTTP ${response.status}).`);
+        if (!response.ok) throw new Error(await readApiError(response, 'Could not get the latest task status.'));
         const result = await response.json();
         if (result.taskId !== task.taskId || !['running', ...TERMINAL].includes(result.status)) throw new Error('Luna returned an invalid task status.');
         task.confirmed = true;
@@ -171,7 +172,7 @@ export function initLocalCodeAgentHandlers() {
     checkingConnection = true;
     try {
       const response = await adminFetch('/api/codex/agent/status');
-      if (!response.ok) throw new Error('Luna status unavailable');
+      if (!response.ok) throw new Error(await readApiError(response, 'Luna status unavailable'));
       const result = await response.json();
       online = Boolean(result.configured);
       attachmentsAvailable = Boolean(result.attachmentsConfigured);
@@ -180,9 +181,9 @@ export function initLocalCodeAgentHandlers() {
       if (busy && !activeTask && !submitting && UUID.test(result.taskId || '')) {
         followTask({ taskId: result.taskId, prompt: 'Request started in another tab or browser.', confirmed: true });
       }
-    } catch {
+    } catch (error) {
       online = false;
-      connection.textContent = 'Unavailable — retrying automatically';
+      connection.textContent = `Unavailable — ${error.message || String(error)}; retrying automatically`;
     } finally {
       checkingConnection = false;
       indicator.classList.toggle('is-online', online);
@@ -224,7 +225,7 @@ export function initLocalCodeAgentHandlers() {
       const response = await adminFetch('/api/codex/tasks', { method: 'POST', body });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        if (response.status >= 500) throw new Error('The submission response was not confirmed.');
+        if (response.status >= 500) throw new Error(`${result.error || `HTTP ${response.status}`}. Checking whether the request was received.`);
         save(null);
         render(task, { status: 'failed', message: result.error || 'Could not send the request.' });
         return;
@@ -235,9 +236,9 @@ export function initLocalCodeAgentHandlers() {
       files.setCustomValidity('');
       help.textContent = privateHelp;
       followTask(task);
-    } catch {
+    } catch (error) {
       // A failed response does not mean the server failed to accept the request.
-      if (!disposed) followTask(task);
+      if (!disposed) followTask(task, `${error.message || String(error)} Checking whether the request was received…`);
     } finally {
       submitting = false;
       controls();

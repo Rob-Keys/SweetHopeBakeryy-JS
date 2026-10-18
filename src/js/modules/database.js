@@ -1,6 +1,7 @@
 // Repository content bundled into each browser page at build time.
 
 import { getAuthToken, handle401 } from './auth.js';
+import { readApiError } from './api-error.js';
 import products from '../../data/products.json';
 import homePage from '../../data/home_page.json';
 import aboutPage from '../../data/about_page.json';
@@ -60,14 +61,7 @@ async function putItem(tableName, item, { createOnly = false, previousKey = null
     });
     if (response.status === 401) { handle401(); return { success: false, error: 'Unauthorized' }; }
     if (!response.ok) {
-      let message = `HTTP ${response.status}`;
-      try {
-        const body = await response.json();
-        if (body?.error) message = body.error;
-      } catch {
-        // Keep the HTTP status when the response has no JSON error message.
-      }
-      throw new Error(message);
+      throw new Error(await readApiError(response));
     }
     return await response.json();
   } catch (err) {
@@ -90,7 +84,7 @@ async function removeItem(tableName, key) {
       body: JSON.stringify({ tableName, key })
     });
     if (response.status === 401) { handle401(); return { success: false, error: 'Unauthorized' }; }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) throw new Error(await readApiError(response));
     return await response.json();
   } catch (err) {
     console.error('removeItem failed:', err);

@@ -1,6 +1,7 @@
 // ses.js - client wrapper for /api/send-email.
 
 import { getAuthToken, handle401 } from '../modules/auth.js';
+import { readApiError } from '../modules/api-error.js';
 
 /**
  * Send an email via SES (server-side). Requires admin auth; server archives to S3 outbox.
@@ -19,7 +20,7 @@ async function sendEmail(mail) {
       body: JSON.stringify(mail)
     });
     if (response.status === 401) { handle401(); return { success: false, error: 'Unauthorized' }; }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) throw new Error(await readApiError(response));
     return await response.json();
   } catch (err) {
     console.error('sendEmail failed:', err);

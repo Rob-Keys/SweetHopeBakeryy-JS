@@ -5,6 +5,7 @@
 import { S3Client } from '@aws-sdk/client-s3';
 import { checkAuth } from './_auth.js';
 import { listEmails } from './_s3.js';
+import { describeError } from './_errors.js';
 
 export async function onRequestGet(context) {
   const denied = await checkAuth(context);
@@ -22,7 +23,8 @@ export async function onRequestGet(context) {
 
     return Response.json({ emails });
   } catch (err) {
-    console.error('get-outbox error:', err);
-    return Response.json({ error: 'Internal error' }, { status: 500 });
+    const message = describeError(err, 'Outbox load');
+    console.error('get-outbox error:', message);
+    return Response.json({ error: message }, { status: 502 });
   }
 }

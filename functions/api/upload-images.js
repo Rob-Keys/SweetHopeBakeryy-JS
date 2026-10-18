@@ -5,6 +5,7 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { checkS3Auth } from './_auth.js';
 import { isSafeKey } from './_s3.js';
+import { describeError } from './_errors.js';
 
 const CONTENT_TYPE_BY_EXTENSION = {
   avif: 'image/avif',
@@ -68,7 +69,8 @@ export async function onRequestPost(context) {
 
     return Response.json({ uploads });
   } catch (err) {
-    console.error('upload-images error:', err);
-    return Response.json({ error: 'Internal error' }, { status: 500 });
+    const message = describeError(err, 'Image upload');
+    console.error('upload-images error:', message);
+    return Response.json({ error: message }, { status: 502 });
   }
 }

@@ -113,7 +113,7 @@ async function loadMail() {
       const result = await sendEmail(email);
       if (!result?.success) throw new Error(result?.error || 'Send failed');
       button.textContent = 'Email sent';
-    } catch {
+    } catch (error) {
       button.disabled = false;
       button.textContent = 'Send Email';
       let status = form.querySelector('[role="alert"]');
@@ -123,10 +123,10 @@ async function loadMail() {
         status.className = 'text-danger mt-2';
         form.appendChild(status);
       }
-      status.textContent = 'The email could not be sent. Please try again.';
+      status.textContent = `The email could not be sent: ${error.message || String(error)}`;
     }
   });
-  } catch {
-    showError(container, 'We could not load messages. Please try again.', loadMail);
+  } catch (error) {
+    showError(container, `Could not load messages: ${error.message || String(error)}`, loadMail);
   }
 }

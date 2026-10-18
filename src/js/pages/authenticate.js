@@ -20,15 +20,13 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
         if (result.success) {
             window.location.href = getDesiredPage();
         } else {
-            errorEl.textContent = result.status === 500
-                ? 'Server configuration error. Please contact the administrator.'
-                : result.status === 0
-                    ? 'Could not reach the sign-in service. Please try again.'
-                    : 'Incorrect password.';
+            errorEl.textContent = result.status === 401
+                ? 'Incorrect password.'
+                : result.error || `Sign-in failed (HTTP ${result.status || 'unknown'}).`;
             errorEl.style.display = 'block';
         }
-    } catch {
-        errorEl.textContent = 'Sign in could not be completed. Please try again.';
+    } catch (error) {
+        errorEl.textContent = `Sign-in failed: ${error.message || String(error)}`;
         errorEl.style.display = 'block';
     } finally {
         button.disabled = false;

@@ -71,6 +71,7 @@ export async function onRequestPost(context) {
     return Response.json({ token });
   } catch (err) {
     console.error('authenticate error:', err);
-    return Response.json({ error: 'Internal error' }, { status: 500 });
+    const detail = [err?.name, err?.message].filter(value => typeof value === 'string' && value.trim()).join(': ');
+    return Response.json({ error: `Authentication failed${detail ? `: ${detail}` : ' with an unknown error.'}` }, { status: 500 });
   }
 }
