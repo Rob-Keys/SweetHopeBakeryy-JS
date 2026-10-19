@@ -5,7 +5,7 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { checkS3Auth } from './_auth.js';
 import { isSafeKey } from './_s3.js';
-import { describeError } from './_errors.js';
+import { adminErrorResponse } from './_errors.js';
 
 const CONTENT_TYPE_BY_EXTENSION = {
   avif: 'image/avif',
@@ -24,7 +24,7 @@ export async function onRequestPost(context) {
 
   const { AWS_KEY, AWS_SECRET_KEY, AWS_REGION = 'us-east-1' } = context.env;
   if (!AWS_KEY || !AWS_SECRET_KEY) {
-    return Response.json({ error: 'AWS credentials not configured' }, { status: 500 });
+    return Response.json({ error: 'Image upload failed: AWS credentials not configured' }, { status: 400 });
   }
 
   try {
@@ -69,8 +69,6 @@ export async function onRequestPost(context) {
 
     return Response.json({ uploads });
   } catch (err) {
-    const message = describeError(err, 'Image upload');
-    console.error('upload-images error:', message);
-    return Response.json({ error: message }, { status: 502 });
+    return adminErrorResponse(err, 'Image upload');
   }
 }

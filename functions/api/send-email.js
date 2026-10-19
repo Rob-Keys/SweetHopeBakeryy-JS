@@ -6,7 +6,7 @@
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { checkAuth } from './_auth.js';
-import { describeError } from './_errors.js';
+import { adminErrorResponse } from './_errors.js';
 
 export async function onRequestPost(context) {
   const denied = await checkAuth(context);
@@ -14,7 +14,7 @@ export async function onRequestPost(context) {
 
   const { AWS_KEY, AWS_SECRET_KEY, AWS_REGION = 'us-east-1' } = context.env;
   if (!AWS_KEY || !AWS_SECRET_KEY) {
-    return Response.json({ error: 'AWS credentials not configured' }, { status: 500 });
+    return Response.json({ error: 'Email send failed: AWS credentials not configured' }, { status: 400 });
   }
 
   let operation = 'Email send';
@@ -47,8 +47,6 @@ export async function onRequestPost(context) {
 
     return Response.json({ success: true });
   } catch (err) {
-    const message = describeError(err, operation);
-    console.error('send-email error:', message);
-    return Response.json({ error: message }, { status: 502 });
+    return adminErrorResponse(err, operation);
   }
 }

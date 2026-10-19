@@ -5,7 +5,7 @@
 import { S3Client, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { checkS3Auth } from './_auth.js';
 import { isSafeKey } from './_s3.js';
-import { describeError } from './_errors.js';
+import { adminErrorResponse } from './_errors.js';
 
 export async function onRequestPost(context) {
   const denied = await checkS3Auth(context);
@@ -13,7 +13,7 @@ export async function onRequestPost(context) {
 
   const { AWS_KEY, AWS_SECRET_KEY, AWS_REGION = 'us-east-1' } = context.env;
   if (!AWS_KEY || !AWS_SECRET_KEY) {
-    return Response.json({ error: 'AWS credentials not configured' }, { status: 500 });
+    return Response.json({ error: 'Image deletion failed: AWS credentials not configured' }, { status: 400 });
   }
 
   try {
@@ -41,13 +41,11 @@ export async function onRequestPost(context) {
       const details = result.Errors.map(error => `${error.Key || 'unknown key'}: ${error.Code || 'UnknownError'}${error.Message ? ` (${error.Message})` : ''}`);
       const message = `Image deletion failed for ${result.Errors.length} object(s): ${details.join('; ')}`;
       console.error('delete-images partial failure:', message);
-      return Response.json({ error: message }, { status: 502 });
+      return Response.json({ error: message }, { status: 400 });
     }
 
     return Response.json({ success: true });
   } catch (err) {
-    const message = describeError(err, 'Image deletion');
-    console.error('delete-images error:', message);
-    return Response.json({ error: message }, { status: 502 });
+    return adminErrorResponse(err, 'Image deletion');
   }
 }

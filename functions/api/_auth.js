@@ -6,7 +6,7 @@ import { verifyJWT } from './_jwt.js';
 export async function checkAuth(context) {
   const { JWT_SECRET } = context.env;
   if (!JWT_SECRET) {
-    return Response.json({ error: 'JWT_SECRET not configured' }, { status: 500 });
+    return Response.json({ error: 'JWT_SECRET not configured' }, { status: 400 });
   }
 
   const authHeader = context.request.headers.get('Authorization');
@@ -25,7 +25,7 @@ export async function checkAuth(context) {
 
 export async function checkS3Auth(context) {
   const { JWT_SECRET } = context.env;
-  if (!JWT_SECRET) return Response.json({ error: 'JWT_SECRET not configured' }, { status: 500 });
+  if (!JWT_SECRET) return Response.json({ error: 'JWT_SECRET not configured' }, { status: 400 });
 
   const token = context.request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
   if (!token) return Response.json({ error: 'Unauthorized' }, { status: 401 });

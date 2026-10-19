@@ -5,7 +5,7 @@
 import { S3Client } from '@aws-sdk/client-s3';
 import { checkAuth } from './_auth.js';
 import { listEmails } from './_s3.js';
-import { describeError } from './_errors.js';
+import { adminErrorResponse } from './_errors.js';
 
 export async function onRequestGet(context) {
   const denied = await checkAuth(context);
@@ -13,7 +13,7 @@ export async function onRequestGet(context) {
 
   const { AWS_KEY, AWS_SECRET_KEY, AWS_REGION = 'us-east-1' } = context.env;
   if (!AWS_KEY || !AWS_SECRET_KEY) {
-    return Response.json({ error: 'AWS credentials not configured' }, { status: 500 });
+    return Response.json({ error: 'Inbox load failed: AWS credentials not configured' }, { status: 400 });
   }
 
   try {
@@ -23,8 +23,6 @@ export async function onRequestGet(context) {
 
     return Response.json({ emails });
   } catch (err) {
-    const message = describeError(err, 'Inbox load');
-    console.error('get-inbox error:', message);
-    return Response.json({ error: message }, { status: 502 });
+    return adminErrorResponse(err, 'Inbox load');
   }
 }
