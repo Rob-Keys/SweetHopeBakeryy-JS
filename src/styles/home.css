@@ -164,6 +164,13 @@
 #home-sections { max-width: 1500px; margin: 0 auto; padding-block: var(--section-space); }
 #home-sections > .row { align-items: center; margin-bottom: clamp(3rem, 7vw, 6rem) !important; }
 #home-sections > .row:last-child { margin-bottom: 0 !important; }
+#home-sections > .row {
+	padding: clamp(1rem, 3vw, 2rem);
+	border: 1px solid var(--line);
+	border-radius: 1.25rem;
+	background: var(--cream-card);
+	box-shadow: var(--shadow-soft);
+}
 .home-story-image { border-radius: 1.15rem; box-shadow: var(--shadow-soft); }
 .image-caption { max-width: 42rem; margin-inline: auto; padding: clamp(1rem, 3vw, 2rem); }
 .image-caption h3 { font-size: clamp(1.65rem, 3vw, 2.35rem) !important; line-height: 1.25; text-wrap: balance; }
@@ -175,5 +182,6 @@
 	.front-page::before, .front-page::after, .front-page .bg-third { background-size: cover; }
 	#home-sections { padding-block: 2.5rem; }
 	#home-sections > .row { gap: 1rem; margin-bottom: 3rem !important; }
+	#home-sections > .row { padding: 1rem; border-radius: 1rem; }
 	#home-sections > .home-first-section > .col-5 { padding-inline: .5rem !important; }
 }

@@ -103,7 +103,14 @@ div > h5{
 }
 
 .content { max-width: 1320px; margin-inline: auto !important; }
-#about-sections > .row { align-items: center; padding-bottom: clamp(1.5rem, 4vw, 3rem); }
+#about-sections > .row {
+	align-items: center;
+	padding: clamp(1.25rem, 3vw, 2rem);
+	border: 1px solid var(--line);
+	border-radius: 1.25rem;
+	background: var(--cream-card);
+	box-shadow: var(--shadow-soft);
+}
 #about-sections h2, .rob-card h2 { margin-bottom: .85rem !important; text-align: left; }
 #about-sections h5 { max-width: 38rem; margin-inline: auto; color: var(--brown-soft); font-size: clamp(1.05rem, 1.4vw, 1.2rem) !important; font-weight: 500; line-height: 1.75; }
 .caroline-image { border-radius: 1rem; box-shadow: var(--shadow-soft); }
@@ -113,6 +120,7 @@ div > h5{
 .rob-card h4 { color: var(--brown-soft); font-family: var(--font-body) !important; font-size: 1.05rem !important; font-weight: 500; line-height: 1.7; }
 @media (max-width: 991px) {
 	.content { margin: 2rem .65rem !important; }
+	#about-sections > .row { gap: 1rem; padding: 1rem; border-radius: 1rem; }
 	#about-sections h2, .rob-card h2 { text-align: center; }
 	.rob-card { padding: 1.25rem; }
 }
