@@ -161,7 +161,8 @@
 .front-page .welcome { max-width: 13ch; margin: 0 auto 1rem; font-size: clamp(3.2rem, 8vw, 6rem) !important; line-height: .98; letter-spacing: -.04em; text-wrap: balance; text-shadow: 0 3px 24px rgba(24,15,8,.28); }
 .front-page .subwelcome { margin-bottom: 1.5rem !important; font-size: clamp(1.05rem, 2vw, 1.35rem) !important; font-weight: 500; letter-spacing: .015em; text-shadow: 0 2px 12px rgba(24,15,8,.35); }
 .front-page .btn { padding: .9rem 1.5rem; font-size: 1.05rem !important; }
-#home-sections { max-width: 1500px; margin: 0 auto; padding-block: var(--section-space); }
+.home-order-cta { margin-block: 1rem !important; }
+#home-sections { max-width: 1500px; margin: 0 auto; padding-block: 1rem var(--section-space); }
 #home-sections > .row { align-items: center; margin-bottom: clamp(3rem, 7vw, 6rem) !important; }
 #home-sections > .row:last-child { margin-bottom: 0 !important; }
 #home-sections > .row {
@@ -176,11 +177,14 @@
 .image-caption h3 { font-size: clamp(1.65rem, 3vw, 2.35rem) !important; line-height: 1.25; text-wrap: balance; }
 .image-caption .btn { margin-top: 1.2rem !important; }
 .front-page::before, .front-page::after, .front-page .bg-third { background-attachment: scroll; }
+@media (min-width: 992px) {
+	.home-order-cta { display: none; }
+}
 @media (max-width: 991px) {
 	.front-holder { margin: 1rem .65rem 0; }
 	.front-page { min-height: clamp(27rem, 72svh, 40rem); border-radius: 1.25rem; }
 	.front-page::before, .front-page::after, .front-page .bg-third { background-size: cover; }
-	#home-sections { padding-block: 2.5rem; }
+	#home-sections { padding-block: 1rem 2.5rem; }
 	#home-sections > .row { gap: 1rem; margin-bottom: 3rem !important; }
 	#home-sections > .row { padding: 1rem; border-radius: 1rem; }
 	#home-sections > .home-first-section > .col-5 { padding-inline: .5rem !important; }
