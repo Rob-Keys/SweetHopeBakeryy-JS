@@ -197,6 +197,13 @@ div.mobile-container{
 .slider-wrapper { transition: transform 320ms var(--ease-out); }
 .product-quantity { color: var(--brown-soft); font-size: .95rem; }
 .product-select { min-height: 2.75rem; border-color: #d8c9b5; border-radius: .55rem; }
+.product-customizations { border: 0; padding: 0; margin: 1rem 0; }
+.product-customizations legend { float: none; width: auto; margin: 0 0 .5rem; color: var(--brown-soft); font-family: var(--font-heading); font-size: .95rem; font-weight: 600; }
+.product-customizations legend span { font-family: var(--font-body); font-size: .85rem; font-weight: 400; }
+.product-customization-options { display: flex; flex-wrap: wrap; gap: .5rem; }
+.product-customization-option { display: inline-flex; align-items: center; gap: .45rem; padding: .5rem .65rem; border: 1px solid var(--line); border-radius: .65rem; background: #fffaf1; cursor: pointer; }
+.product-customization-option input { accent-color: var(--accent); width: 1rem; height: 1rem; }
+.product-customization-option small { color: var(--brown-soft); white-space: nowrap; }
 .cart-container, #normal-cart.cart-container { border: 1px solid var(--line) !important; border-radius: 1rem !important; background: var(--cream-card); box-shadow: var(--shadow-soft); }
 #normal-cart #your-cart { font-size: 1.5rem !important; }
 #normal-cart #total-price, #normal-cart #mobile-total-price { color: var(--brown); font-family: var(--font-heading); }

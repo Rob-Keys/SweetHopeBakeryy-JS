@@ -40,6 +40,7 @@ export function renderSitePreview(products, homeSections, aboutSections, contact
         const image = product.imageURLs?.[0] || '';
         const extraImages = (product.imageURLs || []).slice(1);
         const priceOptions = Object.entries(product.prices || {}).sort(([a], [b]) => Number(a) - Number(b));
+        const customizationOptions = Object.entries(product.customizations || {}).sort(([a], [b]) => a.localeCompare(b));
         return `
           <article class="site-preview-product">
             ${previewImage(image, `${product.itemName || 'Bakery'} picture`, 'site-preview-product-image')}
@@ -47,6 +48,7 @@ export function renderSitePreview(products, homeSections, aboutSections, contact
             <div class="site-preview-product-copy"><h3>${safe(product.itemName)}</h3>
               ${product.description ? `<p>${safe(product.description)}</p>` : ''}
               ${priceOptions.length ? `<p class="site-preview-prices">${priceOptions.map(([qty, price]) => `<span>${safe(qty)} for $${Number(price).toFixed(2)}</span>`).join('')}</p>` : '<p class="site-preview-empty">No price options set.</p>'}
+              ${customizationOptions.length ? `<div class="site-preview-addons"><strong>Optional add-ons</strong><ul>${customizationOptions.map(([label, price]) => `<li>${safe(label)} <span>${Number(price) === 0 ? 'Free' : `+$${Number(price).toFixed(2)}`}</span></li>`).join('')}</ul></div>` : ''}
               <label>Quantity: <select disabled aria-label="Preview quantity">${priceOptions.length ? priceOptions.map(([qty, price]) => `<option value="${safe(qty)}_${Number(price)}">${safe(qty)} for $${Number(price).toFixed(2)}</option>`).join('') : '<option>No price options</option>'}</select></label>
               <button type="button" class="btn btn-cookie" disabled>Add to Cart</button>
             </div>
@@ -157,6 +159,9 @@ export function renderPageSectionEditor(sections, pageName) {
   let html = `
     <div class="m-5">
       <h2 class="subtitle">Edit ${displayName} Content</h2>
+      <p class="text-muted">Sections appear in ascending index order. ${pageName === 'contact_page'
+        ? 'The first three sections provide the contact introduction, email, and Instagram details and are required. Add any extra sections with an index of 3 or higher.'
+        : 'Use the section index to set the order. You can add, edit, or remove sections below.'}</p>
       <div class="row menu-row">
         <div class="col-2"><h5>Section Index</h5></div>`;
 
@@ -165,7 +170,7 @@ export function renderPageSectionEditor(sections, pageName) {
   }
   html += `<div class="${bodyColClass}"><h5>Body Text</h5></div>`;
   if (showImage) {
-    html += `<div class="col-2"><h5>Image URL</h5></div>`;
+    html += `<div class="col-2"><h5>Image</h5></div>`;
   }
   html += `<div class="col-2 right-align"><h5>Actions</h5></div>
       </div>`;

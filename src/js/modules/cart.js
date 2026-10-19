@@ -40,34 +40,48 @@ function getCart() {
  * @param {string} quantityKey - The quantity key (e.g. "6") to look up in product prices
  * @returns {Promise<{name, quantity, price}>} - The item added (for UI feedback)
  */
-async function addToCart(name, quantityKey) {
+async function addToCart(name, quantityKey, selectedCustomizations = []) {
   const menuItem = await getTable('products', name);
   if (!menuItem) throw new Error(`Product not found: ${name}`);
 
-  const price = menuItem.prices[quantityKey];
-  if (price === undefined) throw new Error(`Price not found for ${name} qty ${quantityKey}`);
+  const basePrice = menuItem.prices[quantityKey];
+  if (basePrice === undefined) throw new Error(`Price not found for ${name} qty ${quantityKey}`);
+  const customizations = [...new Set(selectedCustomizations.map(String))].sort();
+  const customTotal = customizations.reduce((total, option) => {
+    const price = menuItem.customizations?.[option];
+    if (price === undefined || !Number.isFinite(Number(price)) || Number(price) < 0) {
+      throw new Error(`Invalid customization for ${name}`);
+    }
+    return total + Number(price);
+  }, 0);
+  const price = Number(basePrice) + customTotal;
+  const displayName = customizations.length ? `${name} — ${customizations.join(', ')}` : name;
 
   const store = getCartStore();
   const cart = store.summary;
   const qty = parseInt(quantityKey);
 
-  if (cart[name]) {
-    cart[name].quantity += qty;
-    cart[name].price += price;
+  if (cart[displayName]) {
+    cart[displayName].quantity += qty;
+    cart[displayName].price += price;
   } else {
-    cart[name] = { quantity: qty, price };
+    cart[displayName] = { quantity: qty, price, customizations };
   }
 
-  store.lines.push({ name, quantityKey: String(quantityKey) });
+  store.lines.push({ name, quantityKey: String(quantityKey), customizations });
   saveCartStore(store);
-  return { name, quantity: quantityKey, price };
+  return { name: displayName, quantity: quantityKey, price };
 }
 
 function removeFromCart(name) {
   const store = getCartStore();
   const cart = store.summary;
   delete cart[name];
-  store.lines = store.lines.filter(line => line.name !== name);
+  store.lines = store.lines.filter(line => {
+    const options = [...new Set(Array.isArray(line.customizations) ? line.customizations.map(String) : [])].sort();
+    const displayName = options.length ? `${line.name} — ${options.join(', ')}` : line.name;
+    return displayName !== name;
+  });
   saveCartStore(store);
 }
 

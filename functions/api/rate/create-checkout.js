@@ -29,21 +29,32 @@ function buildStripeLineItems(cartLines, products) {
   return cartLines.map((line) => {
     const name = String(line.name || '');
     const quantityKey = String(line.quantityKey || '');
+    const customizations = [...new Set(Array.isArray(line.customizations) ? line.customizations.map(String) : [])].sort();
 
     const product = productMap.get(name);
     if (!product) throw new Error(`Unknown product: ${name}`);
 
     const price = product.prices?.[quantityKey];
     if (price === undefined) throw new Error(`Invalid quantity for ${name}`);
+    const customTotal = customizations.reduce((total, option) => {
+      const optionPrice = product.customizations?.[option];
+      if (optionPrice === undefined || !Number.isFinite(Number(optionPrice)) || Number(optionPrice) < 0) {
+        throw new Error(`Invalid customization for ${name}`);
+      }
+      return total + Number(optionPrice);
+    }, 0);
+    const priceCents = Math.round((Number(price) + customTotal) * 100);
+    if (!Number.isFinite(priceCents) || priceCents <= 0) throw new Error(`Invalid price for ${name}`);
+    const displayName = customizations.length ? `${name} — ${customizations.join(', ')}` : name;
 
     return {
       price_data: {
         currency: 'usd',
         product_data: {
-          name,
-          metadata: { actual_quantity: quantityKey }
+          name: displayName,
+          metadata: { actual_quantity: quantityKey, customizations: customizations.join(', ') }
         },
-        unit_amount: Math.round(Number(price) * 100)
+        unit_amount: priceCents
       },
       quantity: 1
     };
@@ -58,21 +69,30 @@ function buildCartSummary(cartLines, products) {
   for (const line of cartLines) {
     const name = String(line?.name || '');
     const quantityKey = String(line?.quantityKey || '');
+    const customizations = [...new Set(Array.isArray(line?.customizations) ? line.customizations.map(String) : [])].sort();
     const product = productMap.get(name);
     if (!product) throw new Error(`Unknown product: ${name}`);
 
     const priceValue = product.prices?.[quantityKey];
-    const priceCents = Math.round(Number(priceValue) * 100);
+    const customTotal = customizations.reduce((total, option) => {
+      const optionPrice = product.customizations?.[option];
+      if (optionPrice === undefined || !Number.isFinite(Number(optionPrice)) || Number(optionPrice) < 0) {
+        throw new Error(`Invalid customization for ${name}`);
+      }
+      return total + Number(optionPrice);
+    }, 0);
+    const priceCents = Math.round((Number(priceValue) + customTotal) * 100);
     const quantity = Number(quantityKey);
-    if (!Number.isFinite(priceCents) || !Number.isFinite(quantity)) {
+    if (!Number.isFinite(priceCents) || priceCents <= 0 || !Number.isInteger(quantity) || quantity <= 0) {
       throw new Error(`Invalid quantity for ${name}`);
     }
 
-    if (!cart[name]) {
-      cart[name] = { quantity: 0, priceCents: 0 };
+    const displayName = customizations.length ? `${name} — ${customizations.join(', ')}` : name;
+    if (!cart[displayName]) {
+      cart[displayName] = { quantity: 0, priceCents: 0, customizations };
     }
-    cart[name].quantity += quantity;
-    cart[name].priceCents += priceCents;
+    cart[displayName].quantity += quantity;
+    cart[displayName].priceCents += priceCents;
     totalCents += priceCents;
   }
 
@@ -149,7 +169,7 @@ export async function onRequestPost(context) {
       error: String(err?.message || 'Unknown error').slice(0, 300)
     }));
     const message = String(err?.message || '');
-    if (message.includes('Unknown product') || message.includes('Invalid quantity') || message.includes('Cart is empty')) {
+    if (message.includes('Unknown product') || message.includes('Invalid quantity') || message.includes('Invalid customization') || message.includes('Invalid price') || message.includes('Cart is empty')) {
       return Response.json({ error: 'Invalid cart' }, { status: 400 });
     }
     return Response.json({ error: 'Internal error' }, { status: 500 });

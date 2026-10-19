@@ -9,7 +9,7 @@ import { escapeHtml } from '../modules/escape.js';
 import { responsiveImageAttributes } from '../modules/responsive-image.js';
 
 export function renderProduct(product) {
-  const { itemName, description, imageURLs, prices, customizations } = product;
+  const { itemName, description, imageURLs, prices, customizations = {} } = product;
   const safeName = escapeHtml(itemName);
   const safeDescription = escapeHtml(description || '');
 
@@ -34,6 +34,10 @@ export function renderProduct(product) {
   const optionsHTML = sortedPrices.map(([qty, price]) =>
     `<option value="${escapeHtml(qty)}_${escapeHtml(price)}" style="font-family: sans-serif">${escapeHtml(qty)} for $${Number(price).toFixed(2)}</option>`
   ).join('');
+  const customizationOptions = Object.entries(customizations)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([label, price]) => `<label class="product-customization-option"><input type="checkbox" name="customizations" value="${escapeHtml(label)}"><span>${escapeHtml(label)}</span><small>${Number(price) === 0 ? 'Free' : `+$${Number(price).toFixed(2)}`}</small></label>`)
+    .join('');
 
   return `
     <div class="product-card cv-auto mb-4 p-3 rounded fade-in-up">
@@ -49,6 +53,7 @@ export function renderProduct(product) {
         <div class="mb-2 product-quantity"><label>Quantity:</label>
           <select name="quantity" class="form-select d-inline-block w-auto product-select">${optionsHTML}</select>
         </div>
+        ${customizationOptions ? `<fieldset class="product-customizations"><legend>Make it yours <span>(optional)</span></legend><div class="product-customization-options">${customizationOptions}</div></fieldset>` : ''}
         <input type="hidden" name="action" value="add">
         <button type="submit" class="btn btn-lg btn-cookie">Add to Cart</button>
       </form>

@@ -75,9 +75,10 @@ async function loadProducts() {
       const name = form.querySelector('input[name="name"]').value;
       const quantityValue = form.querySelector('select[name="quantity"]').value;
       const [qty, price] = quantityValue.split('_');
+      const customizations = Array.from(form.querySelectorAll('input[name="customizations"]:checked'), input => input.value);
 
       try {
-        const data = await addToCart(name, qty);
+        const data = await addToCart(name, qty, customizations);
 
         // Update cart UI.
         updateCartAfterAdd(data);
