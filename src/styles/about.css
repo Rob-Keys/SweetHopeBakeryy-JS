@@ -114,7 +114,8 @@ div > h5{
 #about-sections h2, .rob-card h2 { margin-bottom: .85rem !important; text-align: left; }
 #about-sections h5 { max-width: 38rem; margin-inline: auto; color: var(--brown-soft); font-size: clamp(1.05rem, 1.4vw, 1.2rem) !important; font-weight: 500; line-height: 1.75; }
 .caroline-image { border-radius: 1rem; box-shadow: var(--shadow-soft); }
-.rob-card { gap: 1.5rem; border: 1px solid var(--line); border-radius: 1.25rem; background: var(--cream-card); box-shadow: var(--shadow-soft); transition: transform 180ms var(--ease-out), box-shadow 180ms ease; }
+.rob-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 3fr); gap: 1.5rem; border: 1px solid var(--line); border-radius: 1.25rem; background: var(--cream-card); box-shadow: var(--shadow-soft); transition: transform 180ms var(--ease-out), box-shadow 180ms ease; }
+.rob-card > .col-3, .rob-card > .col-9 { width: auto; min-width: 0; }
 .rob-card:hover { transform: translateY(-3px); box-shadow: 0 18px 42px rgba(56,37,22,.12); }
 .rob-card:focus-visible { outline: 3px solid #d79d64; outline-offset: 4px; }
 .rob-card h4 { color: var(--brown-soft); font-family: var(--font-body) !important; font-size: 1.05rem !important; font-weight: 500; line-height: 1.7; }
@@ -122,5 +123,6 @@ div > h5{
 	.content { margin: 2rem .65rem !important; }
 	#about-sections > .row { gap: 1rem; padding: 1rem; border-radius: 1rem; }
 	#about-sections h2, .rob-card h2 { text-align: center; }
-	.rob-card { padding: 1.25rem; }
+	.rob-card { grid-template-columns: minmax(0, 1fr); padding: 1.25rem; }
+	.rob-card > .col-3, .rob-card > .col-9 { width: 100%; }
 }
