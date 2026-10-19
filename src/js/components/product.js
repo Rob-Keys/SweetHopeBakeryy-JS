@@ -22,6 +22,9 @@ export function renderProduct(product) {
   const arrowsHTML = imageURLs.length > 1
     ? `<button class="arrow left">&#8249;</button><button class="arrow right">&#8250;</button>`
     : '';
+  const imageCountHTML = imageURLs.length
+    ? `<span class="slider-image-count" aria-live="polite" aria-label="Image 1 of ${imageURLs.length}">1 / ${imageURLs.length}</span>`
+    : '';
 
   // Include description only when provided.
   const descHTML = safeDescription ? `<h5 class="mt-2 mb-2">${safeDescription}</h5>` : '';
@@ -38,6 +41,7 @@ export function renderProduct(product) {
       <div class="slider-container">
         <div class="slider-wrapper">${slidesHTML}</div>
         ${arrowsHTML}
+        ${imageCountHTML}
       </div>
       ${descHTML}
       <form class="add-to-cart-form">

@@ -95,6 +95,8 @@ export class ImageSlider {
       this.touchEndX = e.changedTouches[0].screenX;
       this.handleSwipe();
     });
+
+    this.updateSlider();
   }
 
   handleSwipe() {
@@ -111,16 +113,24 @@ export class ImageSlider {
   }
 
   updateSlider() {
+    if (!this.totalSlides) return;
     const offset = -this.currentIndex * 100;
     this.wrapper.style.transform = `translateX(${offset}%)`;
+    const imageCount = this.container.querySelector('.slider-image-count');
+    if (imageCount) {
+      imageCount.textContent = `${this.currentIndex + 1} / ${this.totalSlides}`;
+      imageCount.setAttribute('aria-label', `Image ${this.currentIndex + 1} of ${this.totalSlides}`);
+    }
   }
 
   nextSlide() {
+    if (!this.totalSlides) return;
     this.currentIndex = (this.currentIndex + 1) % this.totalSlides;
     this.updateSlider();
   }
 
   prevSlide() {
+    if (!this.totalSlides) return;
     this.currentIndex = (this.currentIndex - 1 + this.totalSlides) % this.totalSlides;
     this.updateSlider();
   }

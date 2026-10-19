@@ -25,9 +25,6 @@
 .price-option-row .remove-price-option { min-height: 2.5rem !important; padding: .3rem .45rem; white-space: nowrap; }
 .price-options-editor > small { display: block; }
 .edit-images-container { padding: .5rem; }
-.menu-row .arrow { padding: .5rem .25rem; }
-.menu-row .arrow.left { left: .25rem; }
-.menu-row .arrow.right { right: .25rem; }
 #mail-content { margin: var(--section-space) var(--page-gutter); min-width: 0; overflow-wrap: anywhere; }
 #mail-content > h2 { margin-bottom: 1.25rem; }
 #mail-content > h2:not(:first-child) { margin-top: 2rem; }

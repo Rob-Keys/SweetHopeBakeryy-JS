@@ -193,27 +193,52 @@ header .navbar-nav > li + li::before {
 .arrow {
   position: absolute;
   top: 50%;
+  width: 2.6rem;
+  height: 2.6rem;
+  display: grid;
+  place-items: center;
   transform: translateY(-50%);
-  background-color: rgba(0, 0, 0, 0.5);
+  padding: 0;
+  border: 1px solid rgba(255,255,255,.5);
+  border-radius: 50%;
+  background: rgba(56,37,22,.65);
   color: white;
-  border: none;
   font-size: 1.5rem;
-  padding: 1rem 0.625rem;
   cursor: pointer;
   z-index: 1000;
-  transition: background-color 0.3s;
+  backdrop-filter: blur(8px);
+  transition: background-color 150ms ease, transform 150ms var(--ease-out);
 }
 
 .arrow:hover {
-  background-color: rgba(0, 0, 0, 0.8);
+  background: rgba(56,37,22,.9);
+}
+
+.arrow:active {
+  transform: translateY(-50%) scale(.96);
 }
 
 .arrow.left {
-  left: 0.625rem;
+  left: .625rem;
 }
 
 .arrow.right {
-  right: 0.625rem;
+  right: .625rem;
+}
+
+.slider-image-count {
+  position: absolute;
+  right: .6rem;
+  bottom: .6rem;
+  z-index: 1;
+  padding: .2rem .55rem;
+  border: 1px solid rgba(255,255,255,.45);
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(56,37,22,.68);
+  font: 600 .75rem/1.35 var(--font-body, sans-serif);
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(8px);
 }
 
 /* End product image slider. */

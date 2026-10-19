@@ -118,6 +118,9 @@ async function loadCustomize() {
     const arrowsHTML = imageURLs.length > 1
       ? `<button class="arrow left">&#8249;</button><button class="arrow right">&#8250;</button>`
       : '';
+    const imageCountHTML = imageURLs.length
+      ? `<span class="slider-image-count" aria-live="polite" aria-label="Image 1 of ${imageURLs.length}">1 / ${imageURLs.length}</span>`
+      : '';
 
     // Edit mode images.
     const editImagesHTML = imageURLs.map(url => `
@@ -151,6 +154,7 @@ async function loadCustomize() {
         <div class="slider-container view-mode">
           <div class="slider-wrapper">${slidesHTML}</div>
           ${arrowsHTML}
+          ${imageCountHTML}
         </div>
         <div class="edit-mode" style="display: none;">
           <div class="edit-images-container">${editImagesHTML}</div>
