@@ -6,6 +6,7 @@
  * @returns {string} HTML string
  */
 import { escapeHtml } from '../modules/escape.js';
+import { responsiveImageAttributes } from '../modules/responsive-image.js';
 
 export function renderProduct(product) {
   const { itemName, description, imageURLs, prices, customizations } = product;
@@ -14,7 +15,7 @@ export function renderProduct(product) {
 
   // Build the image slider markup.
   const slidesHTML = imageURLs.map(url =>
-    `<div class="slide"><img src="${escapeHtml(url)}" alt="${safeName} picture" class="product-image" loading="lazy" decoding="async"></div>`
+    `<div class="slide"><img ${responsiveImageAttributes(url, '(max-width: 767px) 90vw, (max-width: 1200px) 45vw, 540px')} alt="${safeName} picture" class="product-image" loading="lazy" decoding="async"></div>`
   ).join('');
 
   // Only show arrows when multiple images are available.

@@ -28,13 +28,26 @@ export async function onRequestPost(context) {
       }
     }
 
+    // New still-image uploads are stored as UUID-w{width}.avif siblings. The
+    // content model keeps only the largest URL, so remove its responsive
+    // siblings when that image is removed. Missing siblings are harmless S3
+    // delete targets; legacy single-file uploads still delete as before.
+    const deleteKeys = new Set(s3Keys);
+    for (const key of s3Keys) {
+      const match = key.match(/^(.*)-w(\d+)\.avif$/i);
+      if (!match) continue;
+      for (const width of new Set([480, 960, 1600, 2400, Number(match[2])])) {
+        deleteKeys.add(`${match[1]}-w${width}.avif`);
+      }
+    }
+
     const credentials = { accessKeyId: AWS_KEY, secretAccessKey: AWS_SECRET_KEY };
     const s3 = new S3Client({ region: AWS_REGION, credentials });
 
     const result = await s3.send(new DeleteObjectsCommand({
       Bucket: 'sweethopebakeryy',
       Delete: {
-        Objects: s3Keys.map(Key => ({ Key }))
+        Objects: [...deleteKeys].map(Key => ({ Key }))
       }
     }));
     if (result.Errors?.length) {

@@ -5,6 +5,7 @@ import { renderFooter } from '../components/footer.js';
 import { initShared } from '../shared.js';
 import { getTable } from '../modules/database.js';
 import { escapeHtml } from '../modules/escape.js';
+import { responsiveImageAttributes } from '../modules/responsive-image.js';
 import { showLoading, showError, showReady } from '../modules/page-state.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -29,7 +30,6 @@ async function loadAboutSections() {
     let html = '';
     sections.forEach((section, index) => {
       const imageURL = section.imageURLs ? section.imageURLs[0] : '';
-      const safeImageUrl = escapeHtml(imageURL);
       const safeHeaderText = escapeHtml(section.headerText || '');
       const safeBodyText = escapeHtml(section.bodyText || '');
       const rowClass = index % 2 === 0 ? 'row row-reverse mb-4' : 'row mb-4';
@@ -39,7 +39,7 @@ async function loadAboutSections() {
       html += `
         <div class="${rowClass} cv-auto">
           <div class="col-6 ${imgFade}">
-            <img src="${safeImageUrl}" class="caroline-image" alt="${safeHeaderText}" loading="lazy" decoding="async">
+            <img ${responsiveImageAttributes(imageURL, '(max-width: 767px) 90vw, 50vw')} class="caroline-image" alt="${safeHeaderText}" loading="lazy" decoding="async">
           </div>
           <div class="col-6 d-flex flex-column justify-content-center ${txtFade}">
             <h2 class="mb-3">${safeHeaderText}</h2>

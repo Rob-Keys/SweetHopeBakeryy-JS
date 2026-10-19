@@ -1,10 +1,65 @@
 /*
-  Cache-Control: public, max-age=0, must-revalidate
   X-Placeholder: csp-disabled
   Referrer-Policy: strict-origin-when-cross-origin
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Permissions-Policy: geolocation=(), microphone=(), camera=()
 
-/api/*
-  Cache-Control: no-store
+# Pages and stable entry bundles are revalidated so content edits take effect
+# on the next visit. Bun's content-hashed shared chunks can be cached forever.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/about
+  Cache-Control: public, max-age=0, must-revalidate
+/menu
+  Cache-Control: public, max-age=0, must-revalidate
+/contact
+  Cache-Control: public, max-age=0, must-revalidate
+/checkout
+  Cache-Control: public, max-age=0, must-revalidate
+/customize
+  Cache-Control: public, max-age=0, must-revalidate
+/return
+  Cache-Control: public, max-age=0, must-revalidate
+/authenticate
+  Cache-Control: public, max-age=0, must-revalidate
+/error
+  Cache-Control: public, max-age=0, must-revalidate
+/mail
+  Cache-Control: public, max-age=0, must-revalidate
+
+/js/chunks/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/js/about.js
+  Cache-Control: public, max-age=0, must-revalidate
+/js/authenticate.js
+  Cache-Control: public, max-age=0, must-revalidate
+/js/checkout.js
+  Cache-Control: public, max-age=0, must-revalidate
+/js/contact.js
+  Cache-Control: public, max-age=0, must-revalidate
+/js/customize.js
+  Cache-Control: public, max-age=0, must-revalidate
+/js/error.js
+  Cache-Control: public, max-age=0, must-revalidate
+/js/home.js
+  Cache-Control: public, max-age=0, must-revalidate
+/js/mail.js
+  Cache-Control: public, max-age=0, must-revalidate
+/js/menu.js
+  Cache-Control: public, max-age=0, must-revalidate
+/js/return.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Stable CSS, local imagery, and codec WASM files are revalidated daily.
+/styles/*
+  Cache-Control: public, max-age=86400, must-revalidate
+/images/*
+  Cache-Control: public, max-age=86400, must-revalidate
+/assets/*
+  Cache-Control: public, max-age=86400, must-revalidate

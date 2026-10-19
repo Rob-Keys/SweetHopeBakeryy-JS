@@ -16,7 +16,11 @@
     "@aws-sdk/client-s3": "^3.0.0",
     "@aws-sdk/client-ses": "^3.0.0",
     "@aws-sdk/s3-request-presigner": "^3.0.0",
-    "@xmldom/xmldom": "0.9.12"
+    "@jsquash/avif": "2.1.1",
+    "@libwebp-wasm/gif2webp": "1.0.8",
+    "@su-engineering/heic": "0.2.0",
+    "@xmldom/xmldom": "0.9.12",
+    "libheif-js": "1.23.5"
   },
   "devDependencies": {
     "miniflare": "4.20260730.0",

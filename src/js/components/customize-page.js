@@ -7,6 +7,7 @@
  * @returns {string} HTML string
  */
 import { escapeHtml } from '../modules/escape.js';
+import { responsiveImageAttributes } from '../modules/responsive-image.js';
 
 const safe = (value) => escapeHtml(value == null ? '' : String(value));
 
@@ -14,7 +15,7 @@ function previewImage(url, alt, className = '') {
   if (!url) {
     return `<div class="site-preview-image-empty" aria-label="No image currently set"><i class="fa-regular fa-image" aria-hidden="true"></i><span>No image set</span></div>`;
   }
-  return `<img class="${className}" src="${safe(url)}" alt="${safe(alt)}" loading="lazy" decoding="async">`;
+  return `<img class="${className}" ${responsiveImageAttributes(url, '(max-width: 767px) 90vw, 50vw')} alt="${safe(alt)}" loading="lazy" decoding="async">`;
 }
 
 /**
@@ -223,8 +224,8 @@ export function renderPageSectionEditor(sections, pageName) {
               </div>` : '<small class="text-muted">No image currently set</small>'}
             </div>
             <label class="editor-field-label" for="section-image-${pageName}-${i}">Replace image</label>
-            <input id="section-image-${pageName}-${i}" type="file" class="form-control mt-2 add-images-input" accept="image/*">
-            <small class="text-muted">Choose a new image, or remove the current one.</small>
+            <input id="section-image-${pageName}-${i}" type="file" class="form-control mt-2 add-images-input" accept="image/*,.heic,.heif">
+            <small class="text-muted">Choose a new image, or remove the current one. Still images are saved as AVIF; GIF animations are saved as WebP.</small>
           </div>
         </div>`;
     }
@@ -270,7 +271,8 @@ export function renderPageSectionEditor(sections, pageName) {
     html += `
       <div class="col-2">
         <label class="editor-field-label">Section image</label>
-        <input type="file" name="images[]" aria-label="Section image" accept="image/*">
+        <input type="file" name="images[]" aria-label="Section image" accept="image/*,.heic,.heif">
+        <small class="text-muted">Still images are saved as AVIF; GIF animations are saved as WebP.</small>
       </div>`;
   }
 

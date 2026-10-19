@@ -8,6 +8,7 @@ import { getTable, putItem, removeItem } from '../modules/database.js';
 import { uploadImages, deleteImages } from '../aws/s3.js';
 import { renderPageSectionEditor, renderLocalCodeAgentPanel } from '../components/customize-page.js';
 import { escapeHtml } from '../modules/escape.js';
+import { responsiveImageAttributes } from '../modules/responsive-image.js';
 import { initLocalCodeAgentHandlers } from '../modules/luna-agent.js';
 import { showError } from '../modules/page-state.js';
 
@@ -90,7 +91,7 @@ async function loadCustomize() {
     <h2 class="subtitle">Edit Menu</h2>
     <p>Set each menu option as a quantity and a price. For example, add one option for 6 cookies at $10 and another for 12 at $15.</p>
     <p>"Customizations" currently dont do anything and you can just leave that field blank for now.</p>
-    <p>I recommend uploading images that are of filetype .avif, as theyre most efficient size-wise and will make your site load faster. To convert a .png or .jpg to .avif you can use a site like: <a href="https://cloudinary.com/tools/jpg-to-avif" target="_blank" rel="noopener noreferrer">JPEG-To-Avif Converter</a></p>
+    <p>Images are optimized automatically when you upload them: still images become responsive AVIF sizes, animated GIFs become animated WebP, and Apple HEIC/HEIF photos are supported.</p>
     <div class="row menu-row">
       <div class="col-2"><h5>Product Name</h5></div>
       <div class="col-2"><h5>Description</h5></div>
@@ -112,7 +113,7 @@ async function loadCustomize() {
 
     // Slides for view mode.
     const slidesHTML = imageURLs.map(url =>
-      `<div class="slide"><img src="${escapeHtml(url)}" alt="${safeItemName} picture" class="product-image" loading="lazy" decoding="async"></div>`
+      `<div class="slide"><img ${responsiveImageAttributes(url, '(max-width: 767px) 90vw, (max-width: 1200px) 45vw, 540px')} alt="${safeItemName} picture" class="product-image" loading="lazy" decoding="async"></div>`
     ).join('');
     const arrowsHTML = imageURLs.length > 1
       ? `<button class="arrow left">&#8249;</button><button class="arrow right">&#8250;</button>`
@@ -154,7 +155,7 @@ async function loadCustomize() {
         <div class="edit-mode" style="display: none;">
           <div class="edit-images-container">${editImagesHTML}</div>
           <label class="editor-field-label">Add product images</label>
-          <input type="file" class="form-control mt-2 add-images-input" aria-label="Add product images" multiple accept="image/*">
+          <input type="file" class="form-control mt-2 add-images-input" aria-label="Add product images" multiple accept="image/*,.heic,.heif">
           <small class="text-muted">Add new images or remove existing ones</small>
         </div>
       </div>
@@ -180,7 +181,7 @@ async function loadCustomize() {
         ${renderPriceOptionsEditor({})}
       </div>
       <div class="col-2"><textarea rows="4" name="csvCustomizations" placeholder="cstm: price, cstm: price, ..."></textarea></div>
-      <div class="col-2"><label class="editor-field-label">Product images</label><input type="file" name="images[]" aria-label="Product images" multiple accept="image/*" required></div>
+      <div class="col-2"><label class="editor-field-label">Product images</label><input type="file" name="images[]" aria-label="Product images" multiple accept="image/*,.heic,.heif" required></div>
       <div class="col-2 right-align">
         <input type="hidden" name="tableName" value="products">
         <input type="hidden" name="partitionKey" value="itemName">
@@ -372,7 +373,7 @@ function initPriceOptionsEditors() {
 function buildSlidesHTML(imageURLs, itemName) {
   const safeName = escapeHtml(itemName || '');
   return imageURLs.map(url =>
-    `<div class="slide"><img src="${escapeHtml(url)}" alt="${safeName} picture" class="product-image" loading="lazy" decoding="async"></div>`
+    `<div class="slide"><img ${responsiveImageAttributes(url, '(max-width: 767px) 90vw, (max-width: 1200px) 45vw, 540px')} alt="${safeName} picture" class="product-image" loading="lazy" decoding="async"></div>`
   ).join('');
 }
 
@@ -435,17 +436,6 @@ function rebuildEditImages(row, imageURLs, onRemove) {
     item.appendChild(img);
     item.appendChild(btn);
     container.appendChild(item);
-  });
-}
-
-function getImageUploadKeys(directory, files) {
-  const supportedExtensions = new Set(['avif', 'jpg', 'jpeg', 'png', 'webp', 'gif', 'ico']);
-  return files.map(file => {
-    const extension = file.name.split('.').pop()?.toLowerCase();
-    if (!extension || !supportedExtensions.has(extension)) {
-      throw new Error(`Unsupported image format for “${file.name}”. Use AVIF, JPG, PNG, WebP, or GIF.`);
-    }
-    return `${directory}/${crypto.randomUUID()}.${extension}`;
   });
 }
 
@@ -517,8 +507,7 @@ function initProductEditHandlers() {
         const newImagesInput = row.querySelector('.add-images-input');
         if (newImagesInput?.files?.length > 0) {
           const files = Array.from(newImagesInput.files);
-          const filenames = getImageUploadKeys('products', files);
-          const result = await uploadImages(filenames, files);
+          const result = await uploadImages('products', files);
           if (!result.success) {
             throw new Error(result.error || 'Failed to upload images.');
           }
@@ -642,8 +631,7 @@ function initSectionEditHandlers() {
         const newImageInput = row.querySelector('.add-images-input');
         if (newImageInput?.files?.length > 0) {
           const files = Array.from(newImageInput.files);
-          const filenames = getImageUploadKeys(pageName, files);
-          const result = await uploadImages(filenames, files);
+          const result = await uploadImages(pageName, files);
           if (!result.success) {
             throw new Error(result.error || 'Failed to upload image.');
           }
@@ -816,8 +804,7 @@ function initAddHandlers() {
       const imageInput = form.querySelector('[name="images[]"]');
       if (imageInput?.files?.length > 0) {
         const files = Array.from(imageInput.files);
-        const filenames = getImageUploadKeys('products', files);
-        const result = await uploadImages(filenames, files);
+        const result = await uploadImages('products', files);
         if (!result.success || !result.urls) {
           throw new Error(result.error || 'Image upload failed.');
         }
@@ -862,8 +849,7 @@ function initAddHandlers() {
         const imageInput = form.querySelector('[name="images[]"]');
         if (imageInput?.files?.length > 0) {
           const files = Array.from(imageInput.files);
-          const filenames = getImageUploadKeys(pageName, files);
-          const result = await uploadImages(filenames, files);
+          const result = await uploadImages(pageName, files);
           if (!result.success || !result.urls) {
             throw new Error(result.error || 'Image upload failed.');
           }

@@ -5,6 +5,7 @@ import { renderFooter } from '../components/footer.js';
 import { initShared } from '../shared.js';
 import { getTable } from '../modules/database.js';
 import { escapeHtml } from '../modules/escape.js';
+import { responsiveImageAttributes } from '../modules/responsive-image.js';
 import { showLoading, showError, showReady } from '../modules/page-state.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -29,7 +30,6 @@ async function loadHomeSections() {
     let html = '';
     sections.forEach((section, index) => {
       const imageURL = section.imageURLs ? section.imageURLs[0] : '';
-      const safeImageUrl = escapeHtml(imageURL);
       const safeBodyText = escapeHtml(section.bodyText || '');
       const rowClass = index % 2 === 0 ? 'row mb-5' : 'row row-reverse mb-5';
       const imgFade = index % 2 === 0 ? 'fade-in-right' : 'fade-in-left';
@@ -40,7 +40,7 @@ async function loadHomeSections() {
       html += `
         <div class="${rowClass} cv-auto ${sectionClass}">
           <div class="col-5 ${imgFade}">
-            <img class="home-story-image" src="${safeImageUrl}" alt="" loading="lazy" decoding="async">
+            <img class="home-story-image" ${responsiveImageAttributes(imageURL, '(max-width: 767px) 90vw, 50vw')} alt="" loading="lazy" decoding="async">
           </div>
           <div class="col-6 d-flex align-items-center ${txtFade}">
             <div class="image-caption d-flex flex-column align-items-center">

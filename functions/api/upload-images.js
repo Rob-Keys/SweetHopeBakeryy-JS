@@ -9,13 +9,7 @@ import { adminErrorResponse } from './_errors.js';
 
 const CONTENT_TYPE_BY_EXTENSION = {
   avif: 'image/avif',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  png: 'image/png',
-  webp: 'image/webp',
-  gif: 'image/gif',
-  ico: 'image/x-icon',
-  webm: 'video/webm'
+  webp: 'image/webp'
 };
 
 export async function onRequestPost(context) {
@@ -43,9 +37,9 @@ export async function onRequestPost(context) {
       return Response.json({ error: 'Missing upload file' }, { status: 400 });
     }
 
-    for (const filename of filenames) {
+    for (const [index, filename] of filenames.entries()) {
       const ext = String(filename).split('.').pop().toLowerCase();
-      if (!isSafeKey(filename) || !CONTENT_TYPE_BY_EXTENSION[ext]) {
+      if (!isSafeKey(filename) || !CONTENT_TYPE_BY_EXTENSION[ext] || files[index].type !== CONTENT_TYPE_BY_EXTENSION[ext]) {
         return Response.json({ error: 'Invalid filename' }, { status: 400 });
       }
     }
@@ -61,7 +55,8 @@ export async function onRequestPost(context) {
         Bucket: 'sweethopebakeryy',
         Key: filename,
         Body: new Uint8Array(await file.arrayBuffer()),
-        ContentType: contentType
+        ContentType: contentType,
+        CacheControl: 'public, max-age=31536000, immutable'
       }));
       const publicUrl = `https://sweethopebakeryy.s3.us-east-1.amazonaws.com/${filename}`;
       return { filename, publicUrl };
