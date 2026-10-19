@@ -16,6 +16,24 @@ document.addEventListener('DOMContentLoaded', () => {
   loadContactSections();
 });
 
+function renderInstagramEmbed() {
+  const scriptId = 'instagram-embed-script';
+  const processEmbeds = () => window.instgrm?.Embeds?.process();
+  const script = document.getElementById(scriptId);
+  if (script) {
+    if (window.instgrm?.Embeds) processEmbeds();
+    else script.addEventListener('load', processEmbeds, { once: true });
+    return;
+  }
+
+  const embedScript = document.createElement('script');
+  embedScript.id = scriptId;
+  embedScript.src = 'https://www.instagram.com/embed.js';
+  embedScript.async = true;
+  embedScript.onload = processEmbeds;
+  document.body.appendChild(embedScript);
+}
+
 async function loadContactSections() {
   const container = document.getElementById('contact-content');
   showLoading(container, 'Loading contact information…');
@@ -46,13 +64,11 @@ async function loadContactSections() {
       </div>
       <section class="instagram-preview" aria-labelledby="instagram-preview-title">
         <h3 id="instagram-preview-title">A little look at our Instagram</h3>
-        <a class="instagram-preview-card" href="https://www.instagram.com/sweethopebakeryy/" target="_blank" rel="noopener noreferrer" aria-label="Visit Sweet Hope Bakery on Instagram">
-          <span class="instagram-preview-icon" aria-hidden="true"><i class="fa-brands fa-instagram"></i></span>
-          <span class="instagram-preview-name">@sweethopebakeryy</span>
-          <span class="instagram-preview-description">Custom cakes, cookies, donuts, and more baked treats.</span>
-          <span class="instagram-preview-button">Visit Instagram <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></span>
-        </a>
+        <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/sweethopebakeryy/" data-instgrm-version="14">
+          <a href="https://www.instagram.com/sweethopebakeryy/" target="_blank" rel="noopener noreferrer">View @sweethopebakeryy on Instagram</a>
+        </blockquote>
       </section>${extraSections}`;
+    renderInstagramEmbed();
   }
   showReady(container);
   } catch {
