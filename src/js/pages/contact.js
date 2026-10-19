@@ -42,8 +42,17 @@ async function loadContactSections() {
       <h5 class="description">${safeBody0}</h5>
       <div class="contact-info">
         <p class="contact-info-email"><strong>${safeHeader1}:</strong> <a href="mailto:${safeBody1}" class="contact-page-link">${safeBody1}</a></p>
-        <p class="contact-info-instagram"><strong>${safeHeader2}:</strong> <a href="https://www.instagram.com/sweethopebakeryy/" target="_blank" class="contact-page-link">${safeBody2} <i class="fa-brands fa-instagram"></i></a></p>
-      </div>${extraSections}`;
+        <p class="contact-info-instagram"><strong>${safeHeader2}:</strong> <a href="https://www.instagram.com/sweethopebakeryy/" target="_blank" rel="noopener noreferrer" class="contact-page-link">${safeBody2} <i class="fa-brands fa-instagram"></i></a></p>
+      </div>
+      <section class="instagram-preview" aria-labelledby="instagram-preview-title">
+        <h3 id="instagram-preview-title">A little look at our Instagram</h3>
+        <a class="instagram-preview-card" href="https://www.instagram.com/sweethopebakeryy/" target="_blank" rel="noopener noreferrer" aria-label="Visit Sweet Hope Bakery on Instagram">
+          <span class="instagram-preview-icon" aria-hidden="true"><i class="fa-brands fa-instagram"></i></span>
+          <span class="instagram-preview-name">@sweethopebakeryy</span>
+          <span class="instagram-preview-description">Custom cakes, cookies, donuts, and more baked treats.</span>
+          <span class="instagram-preview-button">Visit Instagram <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></span>
+        </a>
+      </section>${extraSections}`;
   }
   showReady(container);
   } catch {

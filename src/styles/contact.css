@@ -15,6 +15,14 @@
 .contact-info p + p { margin-top: 1rem; }
 .contact-extra-section { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #eadfce; }
 .contact-extra-section p:last-child { margin-bottom: 0; }
+.instagram-preview { margin-top: 2rem; text-align: center; }
+.instagram-preview h3 { margin-bottom: 1rem; font-size: 1.35rem; }
+.instagram-preview-card { display: flex; min-height: 210px; max-width: 540px; margin-inline: auto; padding: 1.5rem; flex-direction: column; align-items: center; justify-content: center; gap: .65rem; border: 1px solid var(--line); border-radius: .85rem; background: radial-gradient(circle at 15% 10%, #f7dfd2, transparent 48%), linear-gradient(135deg, #fffaf2, #f8eddd); color: var(--accent-dark); text-decoration: none; transition: box-shadow .2s ease, transform .2s ease; }
+.instagram-preview-card:hover { color: var(--accent-dark); box-shadow: var(--shadow-soft); transform: translateY(-2px); }
+.instagram-preview-icon { display: grid; width: 3.25rem; height: 3.25rem; place-items: center; border: 1px solid #d9a890; border-radius: 1rem; background: #fff9f2; color: var(--accent); font-size: 1.6rem; }
+.instagram-preview-name { font-size: 1.15rem; font-weight: 700; }
+.instagram-preview-description { color: var(--brown-soft); }
+.instagram-preview-button { margin-top: .25rem; padding: .55rem 1rem; border-radius: 999px; background: var(--accent-dark); color: #fff; font-size: .95rem; font-weight: 700; }
 
 .subtitle {
     font-size: 2.5rem;
