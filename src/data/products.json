@@ -65,18 +65,5 @@
       "/images/products/cinn1.avif",
       "/images/products/cinn2.avif"
     ]
-  },
-  {
-    "itemName": "Test Cookies",
-    "description": "The kind of cookies you want while testing a website",
-    "prices": {
-      "6": 50,
-      "12": 100,
-      "18": 1000.5
-    },
-    "customizations": {},
-    "imageURLs": [
-      "https://sweethopebakeryy.s3.us-east-1.amazonaws.com/products/602db02b-334c-41f3-98c0-70918e92fbb5.jpg"
-    ]
   }
 ]
