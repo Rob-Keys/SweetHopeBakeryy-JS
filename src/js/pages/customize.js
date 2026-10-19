@@ -90,7 +90,7 @@ async function loadCustomize() {
     <div id="luna-panel-mount"></div>
     ${tableErrors.products ? `<div class="alert alert-danger">Could not load menu data: ${escapeHtml(errorMessage(tableErrors.products))} <button type="button" class="btn btn-sm btn-cookie" data-retry-editor>Retry</button></div>` : ''}
     <h2 class="subtitle">Edit Menu</h2>
-    <p>Add quantity and package-price options, then list optional add-ons customers can choose on the Menu. Add-on prices are charged once per package; use 0 for a free option. For example: <code>Gluten-free: 1.50, Rainbow sprinkles: 0</code>.</p>
+    <p>Add quantity and package-price options, then list optional add-ons customers can choose on the Menu. Add-on prices are charged once per package; use 0 for a free option. For example: <code>Gluten-free: 1.50, Extra chocolate chips: 0.75</code>.</p>
     <p>Customers see each add-on and its price before adding the item to their cart. Their choices and updated prices carry through checkout, Stripe, and order confirmation emails.</p>
     <p>Uploaded still images are converted to responsive AVIF sizes, animated GIFs to animated WebP, and Apple HEIC/HEIF photos are supported. You can add or remove product photos while editing.</p>
     <div class="row menu-row">
@@ -150,7 +150,7 @@ async function loadCustomize() {
       </div>
       <div class="col-2 edit-mode" style="display: none;">
         <label class="editor-field-label">Add-ons (name: price)</label>
-        <textarea class="form-control edit-customizations" rows="4" placeholder="Gluten-free: 1.50, Rainbow sprinkles: 0">${safeCustomStr}</textarea>
+        <textarea class="form-control edit-customizations" rows="4" placeholder="Gluten-free: 1.50, Extra chocolate chips: 0.75">${safeCustomStr}</textarea>
       </div>
       <div class="col-2">
         <div class="slider-container view-mode">
@@ -186,7 +186,7 @@ async function loadCustomize() {
       <div class="col-2 price-options-field">
         ${renderPriceOptionsEditor({})}
       </div>
-      <div class="col-2"><label class="editor-field-label">Add-ons (name: price)</label><textarea rows="4" name="csvCustomizations" placeholder="Gluten-free: 1.50, Rainbow sprinkles: 0"></textarea></div>
+      <div class="col-2"><label class="editor-field-label">Add-ons (name: price)</label><textarea rows="4" name="csvCustomizations" placeholder="Gluten-free: 1.50, Extra chocolate chips: 0.75"></textarea></div>
       <div class="col-2"><label class="editor-field-label">Product images</label><input type="file" name="images[]" aria-label="Product images" multiple accept="image/*,.heic,.heif" required></div>
       <div class="col-2 right-align">
         <input type="hidden" name="tableName" value="products">

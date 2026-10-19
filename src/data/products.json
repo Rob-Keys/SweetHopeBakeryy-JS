@@ -7,7 +7,7 @@
       "6": 30,
       "12": 40
     },
-    "customizations": { "Gluten-free": 1.5, "Rainbow sprinkles": 0 },
+    "customizations": { "Gluten-free": 1.5, "Extra maple drizzle": 0.75 },
     "imageURLs": [
       "/images/products/map1.avif",
       "/images/products/map2.avif"
@@ -20,7 +20,7 @@
       "6": 25,
       "12": 40
     },
-    "customizations": { "Gluten-free": 1.5, "Rainbow sprinkles": 0 },
+    "customizations": { "Gluten-free": 1.5, "Extra cinnamon sugar": 0 },
     "imageURLs": [
       "/images/products/snick1.avif",
       "/images/products/snick2.avif"
@@ -33,7 +33,7 @@
       "6": 20,
       "12": 38
     },
-    "customizations": { "Gluten-free": 1.5, "Rainbow sprinkles": 0 },
+    "customizations": { "Extra protein": 1.5 },
     "imageURLs": [
       "/images/products/prot1.avif",
       "/images/products/prot2.avif"
@@ -47,7 +47,7 @@
       "6": 18,
       "12": 30
     },
-    "customizations": { "Gluten-free": 1.5, "Rainbow sprinkles": 0 },
+    "customizations": { "Gluten-free": 1.5, "Extra chocolate chips": 0.75 },
     "imageURLs": [
       "/images/products/muff1.avif",
       "/images/products/muff2.avif"
@@ -60,7 +60,7 @@
       "6": 20,
       "12": 38
     },
-    "customizations": { "Gluten-free": 1.5, "Rainbow sprinkles": 0 },
+    "customizations": { "Gluten-free": 1.5, "Extra cream cheese frosting": 0.75 },
     "imageURLs": [
       "/images/products/cinn1.avif",
       "/images/products/cinn2.avif"

@@ -89,7 +89,7 @@ function buildCartSummary(cartLines, products) {
 
     const displayName = customizations.length ? `${name} — ${customizations.join(', ')}` : name;
     if (!cart[displayName]) {
-      cart[displayName] = { quantity: 0, priceCents: 0, customizations };
+      cart[displayName] = { name, quantity: 0, priceCents: 0, customizations };
     }
     cart[displayName].quantity += quantity;
     cart[displayName].priceCents += priceCents;

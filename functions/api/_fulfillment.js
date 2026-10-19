@@ -56,7 +56,10 @@ function buildCustomerReceipt(cart, cartTotal, details) {
 
   body += `<h4>Summary:</h4>`;
   for (const [name, item] of Object.entries(cart)) {
-    body += `<p>${Number(item.quantity)} x ${escapeHtml(name)}: $${formatPrice(item.price)}</p>`;
+    body += `<p>${Number(item.quantity)} x ${escapeHtml(item.name || name)}: $${formatPrice(item.price)}</p>`;
+    if (Array.isArray(item.customizations) && item.customizations.length) {
+      body += `<p style='margin-top:-10px;color:#6b5a49;'><small>Add-ons: ${item.customizations.map(escapeHtml).join(', ')}</small></p>`;
+    }
   }
   body += `<p><strong>Total: $${formatPrice(cartTotal)}</strong></p>`;
   body += `<hr><p>Thank you for your business!</p>`;
