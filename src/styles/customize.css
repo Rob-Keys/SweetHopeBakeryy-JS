@@ -24,6 +24,13 @@
 .price-option-row input { display: block; min-height: 2.5rem; padding: .4rem !important; color: var(--brown); font-size: .9rem; }
 .price-option-row .remove-price-option { min-height: 2.5rem !important; padding: .3rem .45rem; white-space: nowrap; }
 .price-options-editor > small { display: block; }
+.add-on-options-editor { display: grid; gap: .55rem; }
+.add-on-option-list { display: grid; gap: .5rem; }
+.add-on-option-row { display: grid; grid-template-columns: minmax(3rem, .8fr) minmax(4rem, 1fr) auto; align-items: end; gap: .35rem; padding: .5rem; border: 1px solid var(--line); border-radius: .55rem; background: #fffdf8; }
+.add-on-option-row label { min-width: 0; color: #755b3f; font-size: .72rem; font-weight: 800; }
+.add-on-option-row input { display: block; min-height: 2.5rem; padding: .4rem !important; color: var(--brown); font-size: .9rem; }
+.add-on-option-row .remove-add-on-option { min-height: 2.5rem !important; padding: .3rem .45rem; white-space: nowrap; }
+.add-on-options-editor > small { display: block; }
 .edit-images-container { padding: .5rem; }
 #mail-content { margin: var(--section-space) var(--page-gutter); min-width: 0; overflow-wrap: anywhere; }
 #mail-content > h2 { margin-bottom: 1.25rem; }
@@ -268,5 +275,7 @@
     .menu-row > .right-align { align-items: stretch; }
     .price-option-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
     .price-option-row .remove-price-option { padding-inline: .35rem; }
+    .add-on-option-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+    .add-on-option-row .remove-add-on-option { padding-inline: .35rem; }
 }
 

@@ -61,13 +61,13 @@ async function loadContactSections() {
       <div class="contact-info">
         <p class="contact-info-email"><strong>${safeHeader1}:</strong> <a href="mailto:${safeBody1}" class="contact-page-link">${safeBody1}</a></p>
         <p class="contact-info-instagram"><strong>${safeHeader2}:</strong> <a href="https://www.instagram.com/sweethopebakeryy/" target="_blank" rel="noopener noreferrer" class="contact-page-link">${safeBody2} <i class="fa-brands fa-instagram"></i></a></p>
+        <section class="instagram-preview" aria-label="Sweet Hope Bakery on Instagram">
+          <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/sweethopebakeryy/" data-instgrm-version="14">
+            <a href="https://www.instagram.com/sweethopebakeryy/" target="_blank" rel="noopener noreferrer">View @sweethopebakeryy on Instagram</a>
+          </blockquote>
+        </section>
       </div>
-      <section class="instagram-preview" aria-labelledby="instagram-preview-title">
-        <h3 id="instagram-preview-title">A little look at our Instagram</h3>
-        <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/sweethopebakeryy/" data-instgrm-version="14">
-          <a href="https://www.instagram.com/sweethopebakeryy/" target="_blank" rel="noopener noreferrer">View @sweethopebakeryy on Instagram</a>
-        </blockquote>
-      </section>${extraSections}`;
+      ${extraSections}`;
     renderInstagramEmbed();
   }
   showReady(container);

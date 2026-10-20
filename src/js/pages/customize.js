@@ -149,8 +149,7 @@ async function loadCustomize() {
         ${renderPriceOptionsEditor(product.prices || {})}
       </div>
       <div class="col-2 edit-mode" style="display: none;">
-        <label class="editor-field-label">Add-ons (name: price)</label>
-        <textarea class="form-control edit-customizations" rows="4" placeholder="Gluten-free: 1.50, Extra chocolate chips: 0.75">${safeCustomStr}</textarea>
+        ${renderAddOnOptionsEditor(product.customizations || {})}
       </div>
       <div class="col-2">
         <div class="slider-container view-mode">
@@ -186,7 +185,9 @@ async function loadCustomize() {
       <div class="col-2 price-options-field">
         ${renderPriceOptionsEditor({})}
       </div>
-      <div class="col-2"><label class="editor-field-label">Add-ons (name: price)</label><textarea rows="4" name="csvCustomizations" placeholder="Gluten-free: 1.50, Extra chocolate chips: 0.75"></textarea></div>
+      <div class="col-2 add-on-options-field">
+        ${renderAddOnOptionsEditor({})}
+      </div>
       <div class="col-2"><label class="editor-field-label">Product images</label><input type="file" name="images[]" aria-label="Product images" multiple accept="image/*,.heic,.heif" required></div>
       <div class="col-2 right-align">
         <input type="hidden" name="tableName" value="products">
@@ -232,6 +233,7 @@ async function loadCustomize() {
   // ── Event handlers ──
   initProductEditHandlers();
   initPriceOptionsEditors();
+  initAddOnOptionsEditors();
   initSectionEditHandlers();
   initRemoveHandlers();
   initAddHandlers();
@@ -337,6 +339,63 @@ function renderPriceOptionsEditor(prices) {
     <button type="button" class="btn btn-sm btn-outline-secondary add-price-option">+ Add price option</button>
     <small class="text-muted">Choose the quantity and its total price.</small>
   </div>`;
+}
+
+function renderAddOnOptionsEditor(customizations) {
+  const entries = Object.entries(customizations || {});
+  const rows = (entries.length ? entries : [['', '']]).map(([name, price]) => `
+    <div class="add-on-option-row">
+      <label>Add-on name <input class="add-on-name" type="text" value="${escapeHtml(name)}" placeholder="Extra chocolate chips"></label>
+      <label>Price ($) <input class="add-on-amount" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(price)}" placeholder="0.75"></label>
+      <button type="button" class="btn btn-sm btn-outline-danger remove-add-on-option" aria-label="Remove add-on">Remove</button>
+    </div>`).join('');
+  return `<div class="add-on-options-editor">
+    <div class="add-on-option-list">${rows}</div>
+    <button type="button" class="btn btn-sm btn-outline-secondary add-add-on-option">+ Add add-on</button>
+    <small class="text-muted">Choose an add-on and its price. Use 0 for a free option.</small>
+  </div>`;
+}
+
+function readAddOnOptions(editor) {
+  const customizations = {};
+  for (const row of editor?.querySelectorAll('.add-on-option-row') || []) {
+    const name = row.querySelector('.add-on-name')?.value.trim() || '';
+    const priceText = row.querySelector('.add-on-amount')?.value.trim() || '';
+    if (!name && !priceText) continue;
+    if (!name || !priceText) throw new Error('Enter both an add-on name and a price for each option.');
+    if (!/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(priceText)) {
+      throw new Error(`Invalid add-on price "${priceText}". Prices must be dollar amounts with up to two decimal places.`);
+    }
+    const price = Number(priceText);
+    if (!Number.isFinite(price) || price < 0) throw new Error('Add-on prices cannot be negative.');
+    if (Object.hasOwn(customizations, name)) throw new Error(`Add-on "${name}" appears more than once.`);
+    customizations[name] = price;
+  }
+  return customizations;
+}
+
+function initAddOnOptionsEditors() {
+  document.querySelectorAll('.add-on-options-editor').forEach((editor) => {
+    const list = editor.querySelector('.add-on-option-list');
+    editor.addEventListener('click', (event) => {
+      if (event.target.closest('.add-add-on-option')) {
+        const row = document.createElement('div');
+        row.className = 'add-on-option-row';
+        row.innerHTML = '<label>Add-on name <input class="add-on-name" type="text" placeholder="Extra chocolate chips"></label><label>Price ($) <input class="add-on-amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.75"></label><button type="button" class="btn btn-sm btn-outline-danger remove-add-on-option" aria-label="Remove add-on">Remove</button>';
+        list.append(row);
+        row.querySelector('.add-on-name')?.focus();
+      }
+      if (event.target.closest('.remove-add-on-option')) {
+        const rows = list.querySelectorAll('.add-on-option-row');
+        if (rows.length === 1) {
+          rows[0].querySelectorAll('input').forEach((input) => { input.value = ''; });
+          rows[0].querySelector('.add-on-name')?.focus();
+        } else {
+          event.target.closest('.add-on-option-row')?.remove();
+        }
+      }
+    });
+  });
 }
 
 function readPriceOptions(editor) {
@@ -490,19 +549,11 @@ function initProductEditHandlers() {
       const originalItemName = row.querySelector('.original-itemName')?.value;
       const description = row.querySelector('.edit-description')?.value;
       const priceEditor = row.querySelector('.price-options-editor');
-      const customizations = row.querySelector('.edit-customizations')?.value;
+      const customizationsEditor = row.querySelector('.add-on-options-editor');
 
       let parsedPrices;
 
-      // Parse customizations.
-      const parsedCustom = {};
-      if (customizations) {
-        customizations.split(',').forEach(pair => {
-          const [c, p] = pair.split(':').map(s => s.trim());
-          const price = Number(p);
-          if (c && p !== '' && Number.isFinite(price) && price >= 0) parsedCustom[c] = price;
-        });
-      }
+      let parsedCustom;
 
       // Build current image URLs from remaining DOM elements (minus removed).
       const currentImageURLs = Array.from(row.querySelectorAll('.edit-image-item'))
@@ -511,6 +562,7 @@ function initProductEditHandlers() {
       try {
         if (!itemName) throw new Error('Product name is required.');
         parsedPrices = readPriceOptions(priceEditor);
+        parsedCustom = readAddOnOptions(customizationsEditor);
 
         // Upload new images and collect their public URLs.
         let newImageURLs = [];
@@ -791,23 +843,15 @@ function initAddHandlers() {
     const form = e.target;
     const name = form.querySelector('[name="partitionKeyValue"]').value.trim();
     const description = form.querySelector('[name="description"]')?.value || '';
-    const csvCustomizations = form.querySelector('[name="csvCustomizations"]')?.value || '';
     if (!name) return;
 
     const submitButton = form.querySelector('[type="submit"]');
     setRowStatus(form, 'Adding product...', 'info');
     setButtonBusy(submitButton, true, 'Adding...');
 
-    // Parse customizations.
-    const customizations = {};
-    csvCustomizations.split(',').forEach(pair => {
-      const [c, p] = pair.split(':').map(s => s.trim());
-      const price = Number(p);
-      if (c && p !== '' && Number.isFinite(price) && price >= 0) customizations[c] = price;
-    });
-
     try {
       const prices = readPriceOptions(form.querySelector('.price-options-editor'));
+      const customizations = readAddOnOptions(form.querySelector('.add-on-options-editor'));
 
       // Upload images before saving, so an upload failure cannot create a product
       // record with missing image URLs.
