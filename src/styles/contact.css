@@ -15,7 +15,7 @@
 .contact-info p + p { margin-top: 1rem; }
 .contact-extra-section { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #eadfce; }
 .contact-extra-section p:last-child { margin-bottom: 0; }
-.instagram-preview { margin-top: .75rem; text-align: center; }
+.instagram-preview { max-width: 540px; margin: .75rem auto 0; overflow: hidden; border-radius: 1rem; text-align: center; }
 .instagram-preview blockquote { width: calc(100% - 2px) !important; min-width: min(100%, 326px) !important; max-width: 540px !important; margin: 0 auto !important; }
 
 .subtitle {

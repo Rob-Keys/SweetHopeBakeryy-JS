@@ -8,7 +8,7 @@
   --bs-gutter-x: clamp(1.5rem, 4vw, 3rem);
 }
 #about-sections h5 { line-height: 1.5; }
-.about-us-body .rob-card { margin: 0; row-gap: 1.5rem; }
+.about-us-body .rob-card { margin: 0; }
 .rob-card h4 { line-height: 1.5; margin-bottom: 0; }
 .caroline-image {
   display: block;
@@ -18,8 +18,10 @@
   background: #f2e5d0;
 }
 .rob-card {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(5rem, 1fr) minmax(0, 3fr);
   align-items: center;
+  gap: clamp(.875rem, 3vw, 2rem);
   background-color: #fdf5e6;
   border-radius: 12px;
   padding: 2rem;
@@ -62,12 +64,14 @@
   object-position: center;
 }
 
-/* Center the image inside the left column of the card. */
-.rob-card > .col-3 {
+/* Keep the portrait and biography in separate columns at every screen size. */
+.rob-card-image {
   display: flex;
   align-items: center;
   justify-content: center;
 }
+.rob-card-image, .rob-card-content { min-width: 0; }
+.rob-card-content h2 { text-align: left; }
 .mobile-divider {
   display: none; /* Hidden by default; shown on mobile. */
 }
@@ -85,20 +89,12 @@ div > h5{
   div > h2{
     margin-top: 1.5rem;
   }
-  .rob-card {
-    text-align: center;
-  }
-  .rob-card > .col-3 {
-    display: flex;
-    justify-content: center;
-  }
   .mobile-divider {
     width: 100%;
     display: block;
     margin-bottom: 0;
   }
   #about-sections > .row > .col-6 { width: 100%; padding-inline: 0; }
-  .rob-card > .col-3, .rob-card > .col-9 { width: 100%; }
   .rob-image { max-width: 16rem; }
 }
 
@@ -114,15 +110,13 @@ div > h5{
 #about-sections h2, .rob-card h2 { margin-bottom: .85rem !important; text-align: left; }
 #about-sections h5 { max-width: 38rem; margin-inline: auto; color: var(--brown-soft); font-size: clamp(1.05rem, 1.4vw, 1.2rem) !important; font-weight: 500; line-height: 1.75; }
 .caroline-image { border-radius: 1rem; box-shadow: var(--shadow-soft); }
-.rob-card { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr); align-items: center; gap: clamp(1.25rem, 3vw, 2rem); border: 1px solid var(--line); border-radius: 1.25rem; background: var(--cream-card); box-shadow: var(--shadow-soft); transition: transform 180ms var(--ease-out), box-shadow 180ms ease; }
-.rob-card > .col-3, .rob-card > .col-9 { width: auto; min-width: 0; }
+.rob-card { border: 1px solid var(--line); border-radius: 1.25rem; background: var(--cream-card); box-shadow: var(--shadow-soft); transition: transform 180ms var(--ease-out), box-shadow 180ms ease; }
 .rob-card:hover { transform: translateY(-3px); box-shadow: 0 18px 42px rgba(56,37,22,.12); }
 .rob-card:focus-visible { outline: 3px solid #d79d64; outline-offset: 4px; }
 .rob-card h4 { color: var(--brown-soft); font-family: var(--font-body) !important; font-size: 1.05rem !important; font-weight: 500; line-height: 1.7; }
 @media (max-width: 991px) {
 	.content { margin: 2rem .65rem !important; }
 	#about-sections > .row { gap: 1rem; padding: 1rem; border-radius: 1rem; }
-	#about-sections h2, .rob-card h2 { text-align: center; }
-	.rob-card { grid-template-columns: minmax(0, 1fr); padding: 1.25rem; }
-	.rob-card > .col-3, .rob-card > .col-9 { width: 100%; }
+	#about-sections h2 { text-align: center; }
+	.rob-card { padding: 1.25rem; }
 }
