@@ -64,7 +64,7 @@
   object-position: center;
 }
 
-/* Keep the portrait and biography in separate columns at every screen size. */
+/* Center the portrait in its grid cell. */
 .rob-card-image {
   display: flex;
   align-items: center;
@@ -117,6 +117,6 @@ div > h5{
 @media (max-width: 991px) {
 	.content { margin: 2rem .65rem !important; }
 	#about-sections > .row { gap: 1rem; padding: 1rem; border-radius: 1rem; }
-	#about-sections h2 { text-align: center; }
-	.rob-card { padding: 1.25rem; }
+	#about-sections h2, .rob-card h2 { text-align: center; }
+	.rob-card { grid-template-columns: minmax(0, 1fr); padding: 1.25rem; text-align: center; }
 }
