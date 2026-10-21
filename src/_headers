@@ -56,9 +56,11 @@
 /js/return.js
   Cache-Control: public, max-age=0, must-revalidate
 
-# Stable CSS, local imagery, and codec WASM files are revalidated daily.
+# Stylesheets are revalidated on every request so deployed visual fixes take effect immediately.
 /styles/*
-  Cache-Control: public, max-age=86400, must-revalidate
+	Cache-Control: public, max-age=0, must-revalidate
+
+# Local imagery and codec WASM files are revalidated daily.
 /images/*
   Cache-Control: public, max-age=86400, must-revalidate
 /assets/*
