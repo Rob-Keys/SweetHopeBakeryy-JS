@@ -5,8 +5,7 @@
   X-Frame-Options: DENY
   Permissions-Policy: geolocation=(), microphone=(), camera=()
 
-# Pages and stable entry bundles are revalidated so content edits take effect
-# on the next visit. Bun's content-hashed shared chunks can be cached forever.
+# HTML pages and routes stay at stable URLs and revalidate after each deployment.
 /
   Cache-Control: public, max-age=0, must-revalidate
 
@@ -32,33 +31,12 @@
 /mail
   Cache-Control: public, max-age=0, must-revalidate
 
-/js/chunks/*
+/js/*
   Cache-Control: public, max-age=31536000, immutable
 
-/js/about.js
-  Cache-Control: public, max-age=0, must-revalidate
-/js/authenticate.js
-  Cache-Control: public, max-age=0, must-revalidate
-/js/checkout.js
-  Cache-Control: public, max-age=0, must-revalidate
-/js/contact.js
-  Cache-Control: public, max-age=0, must-revalidate
-/js/customize.js
-  Cache-Control: public, max-age=0, must-revalidate
-/js/error.js
-  Cache-Control: public, max-age=0, must-revalidate
-/js/home.js
-  Cache-Control: public, max-age=0, must-revalidate
-/js/mail.js
-  Cache-Control: public, max-age=0, must-revalidate
-/js/menu.js
-  Cache-Control: public, max-age=0, must-revalidate
-/js/return.js
-  Cache-Control: public, max-age=0, must-revalidate
-
-# Stylesheets are revalidated on every request so deployed visual fixes take effect immediately.
+# Fingerprinted stylesheets can be cached because each content change gets a new URL.
 /styles/*
-	Cache-Control: public, max-age=0, must-revalidate
+  Cache-Control: public, max-age=31536000, immutable
 
 # Local imagery and codec WASM files are revalidated daily.
 /images/*
