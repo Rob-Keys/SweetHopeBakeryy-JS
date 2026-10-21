@@ -15,8 +15,9 @@
 .contact-info p + p { margin-top: 1rem; }
 .contact-extra-section { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #eadfce; }
 .contact-extra-section p:last-child { margin-bottom: 0; }
-.instagram-preview { max-width: 540px; margin: .75rem auto 0; overflow: hidden; border-radius: 1rem; text-align: center; }
-.instagram-preview blockquote { width: calc(100% - 2px) !important; min-width: min(100%, 326px) !important; max-width: 540px !important; margin: 0 auto !important; }
+.instagram-preview { width: min(100%, 328px); margin: .75rem 0 0; overflow: hidden; border: 1px solid var(--brown); border-radius: 0; box-sizing: border-box; text-align: left; }
+.instagram-preview blockquote { width: calc(100% - 2px) !important; min-width: min(100%, 326px) !important; max-width: 100% !important; margin: 0 !important; }
+.instagram-preview iframe { width: 100% !important; min-width: 0 !important; max-width: 100% !important; margin-bottom: -48px !important; }
 
 .subtitle {
     font-size: 2.5rem;
