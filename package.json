@@ -9,6 +9,7 @@
     "test:luna": "node --test tests/luna-*.test.mjs",
     "test:fades": "node --test tests/fades.test.mjs",
     "luna:preview": "bun run build && node scripts/luna-visual-preview.mjs",
+    "luna:refresh-auth": "node scripts/refresh-luna-codex-auth.mjs",
     "cloud-agent": "node scripts/codex-cloud-agent.mjs",
     "setup-cloud-agent": "node scripts/setup-luna-cloud.mjs"
   },

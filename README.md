@@ -75,6 +75,7 @@ To set up the cloud runner:
 
 1. Add a fine-grained GitHub token scoped only to `Rob-Keys/SweetHopeBakeryy-JS` with `Actions: write` and `Contents: write`. The Worker uses it to dispatch `luna-agent.yml`; the runner checkout uses it for Luna's direct commit and push, which triggers Cloudflare Pages deployment.
 2. Sign in to Codex on the setup Mac with the ChatGPT account whose plan should be used (`codex login status` checks the session). Put the Worker URL in `.env` as `CODEX_AGENT_RELAY_URL` and the matching relay secret as `CODEX_AGENT_RELAY_TOKEN`. Then run `npm run setup-cloud-agent`; the script accepts the repository-scoped GitHub token with hidden terminal input, stores it as a repository secret for the Worker and runner checkout, sends it to Wrangler as a Worker secret, and configures the GitHub Actions relay secret and URL variable.
+
 3. Create a GitHub Actions environment named `luna-cli` and restrict it to the `main` branch. Create the AWS role and policy from the repository root:
 
    ```sh
@@ -85,6 +86,8 @@ To set up the cloud runner:
    Set the GitHub repository variable `LUNA_CLI_AWS_ROLE_ARN` to the role ARN. The policy allows trace writes and read/write/delete only within the site's public media prefixes in the `sweethopebakeryy` bucket.
 4. Set the GitHub repository variable `LUNA_TRACE_AWS_REGION` to `us-east-1`. Create the private R2 bucket and its `tasks/` lifecycle rule above, then deploy the relay Worker from `codex-relay/` with `npx wrangler deploy --config codex-relay/wrangler.toml`. Keep the existing Pages binding to `CODEX_AGENT_RELAY` and the same `CODEX_AGENT_RELAY_TOKEN` secret on Pages and the Worker. If the Pages project has not already been deployed with the Durable Object binding and relay secret, configure those as part of the Pages deployment too.
 5. Confirm the Cloudflare Pages build command is `bun run build` and output directory is `dist`. After Luna completes its first cloud run, remove the one-time `CODEX_SIWC_CREDENTIALS` Worker secret with `npx wrangler secret delete CODEX_SIWC_CREDENTIALS --config codex-relay/wrangler.toml`. The Durable Object retains the latest refreshed credential for future runs.
+
+If Luna reports an expired or rejected Codex session, sign in again with `codex login`, deploy the relay Worker, then run `npm run luna:refresh-auth` to replace the session stored by the relay.
 
 The browser never receives the relay token. Page requests still require the existing admin session, and the Pages Function forwards them to the Durable Object over Cloudflare's binding. The GitHub workflow accepts only a task ID, requires a matching active relay task, and does not accept prompts directly from GitHub's workflow-dispatch UI.
 

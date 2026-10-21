@@ -64,6 +64,7 @@ export class CodeAgentRelay {
     const denied = await this.authorize(request);
     if (denied) return denied;
     if (url.pathname === '/internal/status' && request.method === 'GET') return this.status();
+    if (url.pathname === '/internal/credentials' && request.method === 'PUT') return this.updateCredentials(request);
     if (url.pathname === '/internal/content' && request.method === 'POST') return this.contentChange(request);
     if (url.pathname === '/internal/tasks' && request.method === 'POST') return this.startTask(request);
     const attachmentListMatch = url.pathname.match(/^\/internal\/tasks\/([0-9a-f-]{36})\/attachments$/i);
@@ -138,6 +139,33 @@ export class CodeAgentRelay {
     if (validCodexAuth(auth)) return auth;
     try { auth = JSON.parse(this.env.CODEX_SIWC_CREDENTIALS || 'null'); } catch { return null; }
     return validCodexAuth(auth) ? auth : null;
+  }
+
+  async updateCredentials(request) {
+    const declaredLength = Number(request.headers.get('Content-Length'));
+    if (Number.isFinite(declaredLength) && declaredLength > 50000) {
+      return Response.json({ error: 'Credential payload is too large.' }, { status: 413 });
+    }
+
+    let body;
+    try {
+      const raw = await request.text();
+      if (raw.length > 50000) return Response.json({ error: 'Credential payload is too large.' }, { status: 413 });
+      body = JSON.parse(raw);
+    } catch {
+      return Response.json({ error: 'Invalid credential payload.' }, { status: 400 });
+    }
+    if (!validCodexAuth(body?.auth)) {
+      return Response.json({ error: 'A valid ChatGPT Codex session is required.' }, { status: 400 });
+    }
+
+    let hostId = await this.ctx.storage.get('extAgentHostId');
+    if (!hostId) {
+      hostId = `urn:uuid:${crypto.randomUUID()}`;
+      await this.ctx.storage.put('extAgentHostId', hostId);
+    }
+    await this.ctx.storage.put('codexAuth', { ...body.auth, ext_agent_host_id: hostId });
+    return Response.json({ updated: true });
   }
 
   async startTask(request) {
