@@ -327,6 +327,7 @@ html.motion-ready .product-card.fade-in-up:not(.fade-visible) {
 		display: none !important;
 	}
 	.navbar-nav { justify-content: space-around !important; gap: .25rem; }
+	header .navbar-nav > li { flex: 1 1 0; min-width: 0; }
 	.nav-link { padding-left: .25rem !important; padding-right: .25rem !important; }
 	.nav-link h5 { font-size: 1rem !important; letter-spacing: 0; white-space: nowrap; }
 	footer.d-flex { align-items: flex-start !important; flex-direction: column; gap: .75rem; }
